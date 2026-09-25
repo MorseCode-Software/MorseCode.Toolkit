@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Settings for the Microsoft Code Coverage collector, passed by build.cake through the platform's
+    coverage-settings option. See SodaFlow's coverage.runsettings for the history.
+
+    A pair of hyphens cannot appear inside an XML comment, and the collector rejects the whole file
+    if one does, reporting only that the settings do not exist or are invalid.
+
+    Cobertura, because that is a format Coveralls accepts. Only the shipping assemblies are listed.
+    A package missing from this list does not read as uncovered; it is absent from the report, which
+    reads as though there were nothing there to cover. Add each new package here.
+-->
+<RunSettings>
+  <DataCollectionRunSettings>
+    <DataCollectors>
+      <DataCollector friendlyName="Code Coverage">
+        <Configuration>
+          <Format>Cobertura</Format>
+          <CodeCoverage>
+            <ModulePaths>
+              <Include>
+                <ModulePath>.*\MorseCode\.Mvvm\.dll$</ModulePath>
+              </Include>
+            </ModulePaths>
+          </CodeCoverage>
+        </Configuration>
+      </DataCollector>
+    </DataCollectors>
+  </DataCollectionRunSettings>
+</RunSettings>

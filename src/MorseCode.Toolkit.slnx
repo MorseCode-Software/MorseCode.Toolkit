@@ -1,2 +1,4 @@
 <Solution>
+  <Project Path="MorseCode.Mvvm/MorseCode.Mvvm.csproj" />
+  <Project Path="MorseCode.Mvvm.Tests/MorseCode.Mvvm.Tests.csproj" />
 </Solution>

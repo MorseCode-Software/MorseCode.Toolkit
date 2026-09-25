@@ -12,6 +12,12 @@ software the same way can.
 The packages are published under the `MorseCode.*` prefix and version independently. They are
 pre-1.0, and their APIs will change as the applications built on them teach us what they need.
 
+## Packages
+
+- **MorseCode.Mvvm**: building blocks for view models. It starts with `CompositeDisposable`, which
+  a view model uses to release the subscriptions its construction made: every entry once, in
+  order, and without one failure leaking the rest.
+
 ## License
 
 BSD 3-Clause. See [LICENSE](LICENSE).
