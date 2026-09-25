@@ -1,0 +1,18 @@
+# Whitespace hygiene only. Formatting stays in src/MorseCode.Toolkit.sln.DotSettings, so that this
+# file and ReSharper cannot disagree about the same thing.
+
+root = true
+
+[*]
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# Written by `dotnet tool install`, which ends the file at the closing brace and would undo the rule
+# on the next tool added.
+[.config/dotnet-tools.json]
+insert_final_newline = false
+
+# Legal text, left byte-for-byte as adopted.
+[LICENSE]
+insert_final_newline = false
+trim_trailing_whitespace = false

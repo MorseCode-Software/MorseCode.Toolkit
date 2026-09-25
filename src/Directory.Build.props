@@ -1,0 +1,89 @@
+<Project>
+
+    <!--
+        This file follows SodaFlow's src/Directory.Build.props, which records the reasoning and the
+        measurements behind each choice. Only what differs, or what a reader here needs in order to
+        act, is repeated below.
+    -->
+
+    <!--
+        Every project restores through a committed packages.lock.json. A PackageReference change is
+        not done until the regenerated lock file is committed with it. Locked mode is on CI only, so
+        a missing lock file fails there rather than being rewritten on a developer's machine.
+    -->
+    <PropertyGroup>
+        <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+        <RestoreLockedMode Condition="'$(CI)' != ''">true</RestoreLockedMode>
+    </PropertyGroup>
+
+    <!--
+        Package metadata shared by every packable project. Anything that identifies one package -
+        PackageId, Title, Product, Description, AssemblyName, RootNamespace, MinVerTagPrefix -
+        stays in that project's own file.
+    -->
+    <PropertyGroup>
+        <Authors>MorseCode Software LLC</Authors>
+        <Company>MorseCode Software LLC</Company>
+        <PackageProjectUrl>https://github.com/MorseCode-Software/MorseCode.Toolkit</PackageProjectUrl>
+        <PackageLicenseExpression>BSD-3-Clause</PackageLicenseExpression>
+        <IncludeSource>True</IncludeSource>
+        <IncludeSymbols>True</IncludeSymbols>
+    </PropertyGroup>
+
+    <!--
+        Versions come from git tags via MinVer, one MinVerTagPrefix per packable project, so each
+        package releases on its own schedule. Prefixes are the package id in lower case with dots
+        turned into hyphens - morsecode-mvvm- for MorseCode.Mvvm - so that every tag matches the
+        one pattern build.yml triggers on.
+
+        MinVerIgnoreHeight keeps an untagged package on its last tagged version while unrelated
+        commits land elsewhere in the repository. The cost is that unreleased changes to a package
+        do not show in its version: tag on release.
+    -->
+    <ItemGroup>
+        <PackageReference Include="MinVer" Version="8.0.0" PrivateAssets="all"/>
+    </ItemGroup>
+
+    <PropertyGroup>
+        <MinVerIgnoreHeight>true</MinVerIgnoreHeight>
+    </PropertyGroup>
+
+    <!--
+        Read at build time by the compiler and by ReSharper, and of no use to a consumer at run
+        time, so PrivateAssets keeps it out of the packages.
+    -->
+    <ItemGroup>
+        <PackageReference Include="JetBrains.Annotations" Version="2026.2.0" PrivateAssets="all"/>
+    </ItemGroup>
+
+    <!--
+        A dependency between two packages here is emitted with the next major version as its
+        ceiling, so NuGet refuses a pairing across a breaking change rather than resolving it and
+        failing at run time. Pack writes a bare version, which NuGet reads as a minimum with no
+        ceiling; this target widens it into a range between the target that collects the versions
+        and GenerateNuspec, which reads them.
+    -->
+    <Target Name="AddUpperBoundToProjectReferenceVersions"
+            AfterTargets="_GetProjectReferenceVersions"
+            Condition="'$(NuspecFile)' == ''">
+        <ItemGroup>
+            <_ProjectReferencesWithVersions Update="@(_ProjectReferencesWithVersions)">
+                <ProjectVersion>[%(ProjectVersion), $([MSBuild]::Add($([System.Text.RegularExpressions.Regex]::Match(%(ProjectVersion), `^[0-9]+`).Value), 1)).0.0)</ProjectVersion>
+            </_ProjectReferencesWithVersions>
+        </ItemGroup>
+    </Target>
+
+    <!--
+        Release notes come from a PackageReleaseNotes.md beside the project, so a release edits one
+        file rather than a csproj. Where there is none, the releases page is the answer.
+    -->
+    <Target Name="SetPackageReleaseNotesFromFile" BeforeTargets="GenerateNuspec">
+        <PropertyGroup>
+            <_ProjectReleaseNotes>$(MSBuildProjectDirectory)\PackageReleaseNotes.md</_ProjectReleaseNotes>
+
+            <PackageReleaseNotes Condition="'$(PackageReleaseNotes)' == '' And Exists('$(_ProjectReleaseNotes)')">$([System.IO.File]::ReadAllText('$(_ProjectReleaseNotes)'))</PackageReleaseNotes>
+            <PackageReleaseNotes Condition="'$(PackageReleaseNotes)' == ''">https://github.com/MorseCode-Software/MorseCode.Toolkit/releases</PackageReleaseNotes>
+        </PropertyGroup>
+    </Target>
+
+</Project>
