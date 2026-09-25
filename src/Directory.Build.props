@@ -7,6 +7,17 @@
     -->
 
     <!--
+        No default items, in every project. A project builds only the Compile, None, and other
+        items it lists by name, so adding a file to a folder is not a build change until someone
+        says so. It is set here, once, rather than in each project, so a new project cannot be
+        added without it. The SDK reads this property after this file is imported, so setting it
+        here turns every default glob off.
+    -->
+    <PropertyGroup>
+        <EnableDefaultItems>false</EnableDefaultItems>
+    </PropertyGroup>
+
+    <!--
         Every project restores through a committed packages.lock.json. A PackageReference change is
         not done until the regenerated lock file is committed with it. Locked mode is on CI only, so
         a missing lock file fails there rather than being rewritten on a developer's machine.

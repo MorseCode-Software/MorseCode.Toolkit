@@ -13,7 +13,6 @@
     <PropertyGroup>
         <AssemblyName>MorseCode.Mvvm.Tests</AssemblyName>
         <RootNamespace>MorseCode.Mvvm.Tests</RootNamespace>
-        <EnableDefaultItems>false</EnableDefaultItems>
         <IsPackable>false</IsPackable>
     </PropertyGroup>
 

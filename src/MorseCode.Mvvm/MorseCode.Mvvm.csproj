@@ -14,7 +14,6 @@
         <Description>Building blocks for view models written in a functional reactive style on SodaFlow.</Description>
         <AssemblyName>MorseCode.Mvvm</AssemblyName>
         <RootNamespace>MorseCode.Mvvm</RootNamespace>
-        <EnableDefaultItems>false</EnableDefaultItems>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
     </PropertyGroup>
 
