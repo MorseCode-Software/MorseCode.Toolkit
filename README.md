@@ -22,6 +22,14 @@ pre-1.0, and their APIs will change as the applications built on them teach us w
   order, and without one failure leaking the rest.<br>
   [![Latest Stable Version](https://img.shields.io/nuget/v/MorseCode.Mvvm.svg)](https://www.nuget.org/packages/MorseCode.Mvvm/)
   [![Total Downloads](https://img.shields.io/nuget/dt/MorseCode.Mvvm.svg)](https://www.nuget.org/packages/MorseCode.Mvvm/)
+- **MorseCode.StagedConstruction**: construction of immutable objects in ordered stages. A static
+  `Create` method builds every value in local variables and hands the finished values to a
+  constructor that only assigns them. A base type's `CreateBase` method trades values with its
+  subclass one stage at a time, so nothing can read a partly built object and the order of the
+  work is set by the types. It has no dependency on SodaFlow, though it was written for objects
+  whose properties are SodaFlow graphs.<br>
+  [![Latest Stable Version](https://img.shields.io/nuget/v/MorseCode.StagedConstruction.svg)](https://www.nuget.org/packages/MorseCode.StagedConstruction/)
+  [![Total Downloads](https://img.shields.io/nuget/dt/MorseCode.StagedConstruction.svg)](https://www.nuget.org/packages/MorseCode.StagedConstruction/)
 
 ## License
 
