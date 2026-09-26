@@ -1,0 +1,250 @@
+# Builds, tests, packs, inspects and releases the solution under src/.
+#
+# This follows SodaFlow's .github/workflows/build.yml job for job, and that file records the
+# measurements and the failures behind each choice. What is repeated here is what a reader needs in
+# order to act.
+#
+# THREE JOBS. Build and Inspect run at the same time, because the inspection needs the solution
+# compiled and nothing the tests produce. Publish waits for both, so a release cannot happen when
+# either failed, and it is the only job that holds id-token: write.
+#
+# THIS WORKFLOW RELEASES, on a tag. There is no NuGet API key anywhere in this repository: the
+# publish job trades its OIDC token for a short-lived key through trusted publishing. That needs a
+# trusted publishing policy on nuget.org, under the account named in the NuGet login step, for this
+# repository and this workflow file. Until one exists the exchange is refused and the release fails
+# loudly.
+#
+# Coverage goes to Coveralls with the run's own GITHUB_TOKEN, so no Coveralls secret exists either.
+# The repository has to be enabled on coveralls.io for the submission to be accepted.
+name: Build
+
+# Tags are built, and a tag build is what releases a package. Every MinVerTagPrefix here begins
+# morsecode-; which tag names which package is worked out in build.cake, from the projects.
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'morsecode-*' ]
+  pull_request:
+  workflow_dispatch:
+
+# Naming one permission drops every other to none. The jobs that need more say so themselves.
+permissions:
+  contents: read
+
+# Superseded pull request runs are cancelled, and nothing else is: a tag run publishes, and a
+# publish must not be cancelled part-way through.
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CONFIGURATION: Release
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_NOLOGO: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+
+defaults:
+  run:
+    shell: pwsh
+
+jobs:
+  # The job name is the status check name. If it becomes a required check on main, renaming it
+  # needs a matching ruleset change.
+  build:
+    name: Build
+    # Windows, for parity with SodaFlow and because the WPF adapters this repository is planned to
+    # carry build only there.
+    runs-on: windows-latest
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # MinVer reads the full commit graph and every tag. A shallow clone versions every package
+          # wrongly.
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+          # The NuGet packages folder holds both the local tools and every restored package, so the
+          # key covers both the lock files and the tool manifest. See SodaFlow's build.yml.
+          cache: true
+          cache-dependency-path: |
+            **/packages.lock.json
+            .config/dotnet-tools.json
+
+      - name: Restore tools
+        run: dotnet tool restore
+
+      # One step per phase, so a failure is attributed to its phase. --exclusive skips the
+      # dependencies an earlier step already ran.
+      - name: Build
+        run: dotnet cake --target=Build --configuration=${{ env.CONFIGURATION }}
+
+      - name: Test
+        run: dotnet cake --target=Test --exclusive --configuration=${{ env.CONFIGURATION }}
+
+      # The half of test reporting this workflow can do. test-report.yml turns this artifact into a
+      # check run, because a pull request from a fork cannot create one from here.
+      - name: Collect test results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results
+          path: coverage/**/*.trx
+
+      # The action's files input is a space-separated list, not a glob. Not recursive, because the
+      # collector writes every report twice; see build.cake.
+      - name: List coverage reports
+        id: coverage-files
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $reports = @(Get-ChildItem -Path coverage -Filter *.cobertura.xml | Sort-Object Name)
+
+          if ($reports.Count -eq 0) {
+              throw "No Cobertura report was produced, so there is nothing to send to Coveralls."
+          }
+
+          Write-Host "Sending $($reports.Count) report(s) to Coveralls."
+          "files=$(($reports | ForEach-Object { $_.FullName }) -join ' ')" |
+              Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      # fail-on-error with continue-on-error: a refused submission turns this step red where it can
+      # be seen, while the job still passes. Reporting must not decide whether the code is good.
+      - name: Upload coverage
+        continue-on-error: true
+        uses: coverallsapp/github-action@v2
+        with:
+          files: ${{ steps.coverage-files.outputs.files }}
+          format: cobertura
+          base-path: ${{ github.workspace }}
+          fail-on-error: true
+
+      - name: Pack
+        run: dotnet cake --target=Pack --exclusive --configuration=${{ env.CONFIGURATION }}
+
+      - name: Collect packages
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: packages
+          path: artifacts/*.nupkg
+
+      - name: Collect coverage
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage
+          path: coverage
+
+  inspect:
+    name: Inspect
+    runs-on: windows-latest
+    timeout-minutes: 60
+
+    permissions:
+      contents: read
+      # Uploading the inspection results to code scanning. Granted here and nowhere else.
+      security-events: write
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+          cache: true
+          cache-dependency-path: |
+            **/packages.lock.json
+            .config/dotnet-tools.json
+
+      # inspectcode's analysis caches. A stale cache is worth restoring, because inspectcode
+      # revalidates the sources that changed; build.cake keys a subdirectory by the settings, which
+      # it does not revalidate against. The key here hashes the same settings files as that one.
+      - name: Cache inspection analysis
+        uses: actions/cache@v6
+        with:
+          path: .inspectcode-cache
+          key: inspectcode-${{ runner.os }}-${{ hashFiles('src/**/*.cs', 'src/**/*.csproj', 'src/MorseCode.Toolkit.slnx', 'src/MorseCode.Toolkit.sln.DotSettings', '.editorconfig', 'src/**/.editorconfig') }}
+          restore-keys: |
+            inspectcode-${{ runner.os }}-
+
+      - name: Restore tools
+        run: dotnet tool restore
+
+      # inspectcode runs with --no-build, so this job compiles the solution itself.
+      - name: Build
+        run: dotnet cake --target=Build --configuration=${{ env.CONFIGURATION }}
+
+      - name: Inspect
+        run: dotnet cake --target=Inspect-Code --exclusive --configuration=${{ env.CONFIGURATION }}
+
+      # The same SARIF the step above fails on, so the findings land on the lines they are about.
+      # always(), because the runs with findings are the ones worth annotating; continue-on-error,
+      # because an upload problem is not a code problem.
+      - name: Upload inspection results
+        if: always()
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: inspection/inspectcode.sarif
+          category: src
+
+      - name: Collect inspection
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: inspection
+          path: inspection
+
+  # A tag build releases exactly the one package its tag names. The if names no status function, so
+  # GitHub implies success() over the needs: a failed build or inspection skips the release.
+  publish:
+    name: Publish
+    needs: [ build, inspect ]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      # No fetch-depth: the packages were versioned when they were built.
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+          cache: true
+          cache-dependency-path: |
+            **/packages.lock.json
+            .config/dotnet-tools.json
+
+      - name: Restore tools
+        run: dotnet tool restore
+
+      - name: Download packages
+        uses: actions/download-artifact@v8
+        with:
+          name: packages
+          path: artifacts
+
+      # The packages this repository publishes belong to the MorseCodeSoftware organization on
+      # nuget.org, and the trusted publishing policy is owned by that organization. user is not the
+      # owner: nuget.org documents it as the profile name of the member who created the policy,
+      # which is jam40jeff. It is a name, not a secret.
+      - name: NuGet login
+        id: nuget-login
+        uses: NuGet/login@v1
+        with:
+          user: jam40jeff
+
+      - name: Publish
+        env:
+          NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
+        run: dotnet cake --target=Publish --configuration=${{ env.CONFIGURATION }}

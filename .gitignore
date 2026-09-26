@@ -1,0 +1,37 @@
+# Build output.
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+*.user
+*.suo
+*.userosscache
+.vs/
+.idea/
+*.ncrunch*
+
+# Output this repository's own tooling produces. build.cake packs to artifacts/, writes coverage to
+# coverage/ and the InspectCode SARIF to inspection/, and keeps inspectcode's analysis caches in
+# .inspectcode-cache/. Cake caches its addins in tools/.
+artifacts/
+coverage/
+inspection/
+.inspectcode-cache/
+tools/
+[Tt]est[Rr]esults/
+
+# Backups a merge tool leaves behind.
+*.orig
+*.rej
+
+# Operating system clutter.
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# One developer's instructions for an AI coding assistant, and the local working notes for
+# ASD-STE100, which derive from a licensed specification. Both are usually symbolic links to one
+# copy shared across the organization's repositories, which is why neither entry has a trailing
+# slash: git treats a link as a file. See the same entries in SodaFlow's .gitignore for the reasons.
+CLAUDE.md
+.ste

@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <OutputType>Exe</OutputType>
+        <LangVersion>14</LangVersion>
+        <Nullable>enable</Nullable>
+        <!-- The usings are listed per file here, as everywhere else in this repository. -->
+        <TUnitImplicitUsings>disable</TUnitImplicitUsings>
+        <TUnitAssertionsImplicitUsings>disable</TUnitAssertionsImplicitUsings>
+    </PropertyGroup>
+
+    <PropertyGroup>
+        <AssemblyName>MorseCode.Mvvm.Tests</AssemblyName>
+        <RootNamespace>MorseCode.Mvvm.Tests</RootNamespace>
+        <IsPackable>false</IsPackable>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="TUnit" Version="1.66.27"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <Compile Include="CompositeDisposableTests.cs"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\MorseCode.Mvvm\MorseCode.Mvvm.csproj"/>
+    </ItemGroup>
+
+</Project>

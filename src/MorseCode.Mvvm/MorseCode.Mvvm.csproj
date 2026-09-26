@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <LangVersion>14</LangVersion>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+
+    <PropertyGroup>
+        <PackageId>MorseCode.Mvvm</PackageId>
+        <MinVerTagPrefix>morsecode-mvvm-</MinVerTagPrefix>
+        <Product>MorseCode.Mvvm</Product>
+        <Title>MorseCode.Mvvm</Title>
+        <Description>Building blocks for view models written in a functional reactive style on SodaFlow.</Description>
+        <AssemblyName>MorseCode.Mvvm</AssemblyName>
+        <RootNamespace>MorseCode.Mvvm</RootNamespace>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <Compile Include="CompositeDisposable.cs"/>
+    </ItemGroup>
+
+</Project>
