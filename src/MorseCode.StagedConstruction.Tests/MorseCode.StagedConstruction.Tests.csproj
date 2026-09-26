@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <OutputType>Exe</OutputType>
+        <LangVersion>14</LangVersion>
+        <Nullable>enable</Nullable>
+        <!-- The usings are listed per file here, as everywhere else in this repository. -->
+        <TUnitImplicitUsings>disable</TUnitImplicitUsings>
+        <TUnitAssertionsImplicitUsings>disable</TUnitAssertionsImplicitUsings>
+    </PropertyGroup>
+
+    <PropertyGroup>
+        <AssemblyName>MorseCode.StagedConstruction.Tests</AssemblyName>
+        <RootNamespace>MorseCode.StagedConstruction.Tests</RootNamespace>
+        <IsPackable>false</IsPackable>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="TUnit" Version="1.66.27"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <Compile Include="Catching.cs"/>
+        <Compile Include="ConstructTests.cs"/>
+        <Compile Include="StagedConstructionTests.cs"/>
+        <Compile Include="StageTests.cs"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\MorseCode.StagedConstruction\MorseCode.StagedConstruction.csproj"/>
+    </ItemGroup>
+
+</Project>

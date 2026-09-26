@@ -20,6 +20,7 @@
             <ModulePaths>
               <Include>
                 <ModulePath>.*\MorseCode\.Mvvm\.dll$</ModulePath>
+                <ModulePath>.*\MorseCode\.StagedConstruction\.dll$</ModulePath>
               </Include>
             </ModulePaths>
           </CodeCoverage>
