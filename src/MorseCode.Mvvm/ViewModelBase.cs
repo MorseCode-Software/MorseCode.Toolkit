@@ -11,14 +11,14 @@ using SodaFlow.Functional;
 namespace MorseCode.Mvvm;
 
 [PublicAPI]
-public class ViewModelBase : IViewModel
+public sealed class ViewModelBase : IViewModel
 {
     private readonly Action onDispose;
 
     private bool disposed;
 
     private ViewModelBase(Action onDispose) =>
-        this.onDispose = onDispose ?? throw new ArgumentNullException(nameof(onDispose));
+        this.onDispose = onDispose;
 
     public static T CreateBase<T>(
         IBindingScheduler bindingScheduler,
@@ -48,8 +48,6 @@ public class ViewModelBase : IViewModel
         }
 
         this.onDispose();
-
-        GC.SuppressFinalize(this);
     }
 
     // The properties of a view model do not change, and each bindable value sends its own
