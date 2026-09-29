@@ -55,7 +55,7 @@ public sealed class ViewModelBase : IViewModel
         IBindableFactory BindableFactory { get; }
     }
 
-    private class Output(in IBindingScheduler bindingScheduler) : IOutput, IBindableFactory
+    private sealed class Output(IBindingScheduler bindingScheduler) : IOutput, IBindableFactory
     {
         // One list, so that Dispose releases the entries in the order of their registration.
         private readonly List<IDisposable> registrations = [];
