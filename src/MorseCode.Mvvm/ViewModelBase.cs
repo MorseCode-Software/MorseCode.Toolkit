@@ -16,9 +16,9 @@ public sealed class ViewModelBase : IViewModel
 
     private ViewModelBase(IDisposable registrations) => this.registrations = registrations;
 
-    public static T CreateBase<T>(
+    public static TResult CreateBase<TResult>(
         IBindingScheduler bindingScheduler,
-        StageContinuation<IOutput, IConstruct<ViewModelBase>, T> continuation)
+        StageContinuation<IOutput, IConstruct<ViewModelBase>, TResult> continuation)
     {
         // The null check occurs here, where the caller is on the stack.
         ArgumentNullException.ThrowIfNull(argument: bindingScheduler);
