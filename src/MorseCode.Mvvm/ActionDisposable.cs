@@ -4,9 +4,23 @@ using JetBrains.Annotations;
 
 namespace MorseCode.Mvvm;
 
+/// <summary>
+///     Makes the usual <see cref="IDisposable" /> objects: one that calls an action, one that disposes a
+///     list, and one that does nothing.
+/// </summary>
 [PublicAPI]
 public static partial class Disposable
 {
+    /// <summary>
+    ///     Makes a disposable that calls <paramref name="onDispose" /> at the first call to its
+    ///     <see cref="IDisposable.Dispose" /> method.
+    /// </summary>
+    /// <remarks>
+    ///     Each subsequent call does nothing, also when two threads call at the same time.
+    /// </remarks>
+    /// <param name="onDispose">The action that releases the resource.</param>
+    /// <returns>The disposable.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="onDispose" /> is null.</exception>
     public static IDisposable FromAction(Action onDispose)
     {
         // The null check occurs here, where the caller is on the stack, and not subsequently in Dispose.

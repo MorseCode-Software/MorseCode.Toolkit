@@ -8,9 +8,9 @@ namespace MorseCode.Mvvm;
 public static partial class Disposable
 {
     /// <summary>
-    ///     Disposes a fixed list of disposables as one. A view model keeps one of these for the
-    ///     subscriptions that its construction made, and its <see cref="IDisposable.Dispose" /> calls
-    ///     <see cref="Dispose" />.
+    ///     Makes one disposable from a fixed list of disposables. A view model keeps one for the
+    ///     subscriptions that its construction made, and disposes it in its own
+    ///     <see cref="IDisposable.Dispose" /> method.
     /// </summary>
     /// <remarks>
     ///     <para>
@@ -24,6 +24,12 @@ public static partial class Disposable
     ///         the order of the list.
     ///     </para>
     /// </remarks>
+    /// <param name="disposables">
+    ///     The entries, in the order of their disposal. The composite keeps a copy, thus a subsequent
+    ///     change to the argument has no effect.
+    /// </param>
+    /// <returns>The composite.</returns>
+    /// <exception cref="ArgumentException">An entry is null.</exception>
     public static IDisposable Composite(params IEnumerable<IDisposable> disposables) =>
         new CompositeDisposable(disposables);
 
@@ -60,7 +66,7 @@ public static partial class Disposable
         /// <inheritdoc />
         /// <remarks>
         ///     The first call disposes each entry. Each subsequent call does nothing. The remarks of
-        ///     <see cref="CompositeDisposable" /> give the order and the result of an exception.
+        ///     <see cref="Composite" /> give the order and the result of an exception.
         /// </remarks>
         /// <exception cref="AggregateException">Two or more entries threw an exception.</exception>
         public void Dispose()
