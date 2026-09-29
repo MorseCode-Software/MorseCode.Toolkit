@@ -79,6 +79,26 @@ public sealed class ViewModelBaseTests
         await Assert.That(log).IsEquivalentTo(expected: ["A", "B"], ordering: CollectionOrdering.Matching);
     }
 
+    // Before one list held the two kinds, Dispose stopped each listener before it disposed any
+    // disposable, in the sequence B, A, C.
+    [Test]
+    public async Task DisposeReleasesListenersAndDisposablesInTheOrderOfTheirRegistration()
+    {
+        List<string> log = [];
+
+        ViewModelBase viewModel = Create(
+            register: output =>
+            {
+                output.AddDisposable(disposable: new Recording(log: log, name: "A"));
+                output.AddListener(listener: new RecordingListener(log: log, name: "B"));
+                output.AddDisposable(disposable: new Recording(log: log, name: "C"));
+            });
+
+        viewModel.Dispose();
+
+        await Assert.That(log).IsEquivalentTo(expected: ["A", "B", "C"], ordering: CollectionOrdering.Matching);
+    }
+
     // Before the seal, the composite read the registrations in Dispose. Thus, an entry that a kept
     // output added after construction was disposed, and an entry added after Dispose leaked.
     [Test]

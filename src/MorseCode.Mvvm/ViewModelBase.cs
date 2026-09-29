@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.Linq;
 using System.Threading;
 using JetBrains.Annotations;
 using MorseCode.StagedConstruction;
@@ -71,8 +70,8 @@ public class ViewModelBase : IViewModel
 
     private class Output(in IBindingScheduler bindingScheduler) : IOutput, IBindableFactory
     {
-        private readonly List<IWeakListener> listeners = [];
-        private readonly List<IDisposable> disposables = [];
+        // One list, so that Dispose releases the entries in the order of their registration.
+        private readonly List<IDisposable> registrations = [];
 
         private readonly BindableFactory bindableFactory =
             new(bindingScheduler ?? throw new ArgumentNullException(nameof(bindingScheduler)));
@@ -88,7 +87,9 @@ public class ViewModelBase : IViewModel
             ArgumentNullException.ThrowIfNull(argument: listener);
             this.ThrowIfSealed();
 
-            this.listeners.Add(listener);
+            // The delegate refers to the listener. Thus, the list keeps a weak listener alive for the
+            // life of the view model.
+            this.registrations.Add(Disposable.FromAction(onDispose: listener.Unlisten));
             return listener;
         }
 
@@ -101,7 +102,7 @@ public class ViewModelBase : IViewModel
             ArgumentNullException.ThrowIfNull(argument: disposable);
             this.ThrowIfSealed();
 
-            this.disposables.Add(disposable);
+            this.registrations.Add(disposable);
             return disposable;
         }
 
@@ -115,9 +116,7 @@ public class ViewModelBase : IViewModel
             this.ThrowIfSealed();
             this.isSealed = true;
 
-            return Disposable.Composite(
-                this.listeners.Select(static listener => Disposable.FromAction(listener.Unlisten))
-                    .Concat(this.disposables));
+            return Disposable.Composite(disposables: this.registrations);
         }
 
         /// <inheritdoc />
@@ -128,7 +127,7 @@ public class ViewModelBase : IViewModel
             IOneWayBindableValue<T> oneWayBindableValue =
                 this.bindableFactory.CreateOneWay(cell: cell, comparer: comparer);
 
-            this.disposables.Add(oneWayBindableValue);
+            this.registrations.Add(oneWayBindableValue);
 
             return oneWayBindableValue;
         }
@@ -144,7 +143,7 @@ public class ViewModelBase : IViewModel
             ITwoWayBindableValue<T> twoWayBindableValue =
                 this.bindableFactory.CreateTwoWay(cell: cell, editsStreamSink: editsStreamSink, comparer: comparer);
 
-            this.disposables.Add(twoWayBindableValue);
+            this.registrations.Add(twoWayBindableValue);
 
             return twoWayBindableValue;
         }
@@ -157,7 +156,7 @@ public class ViewModelBase : IViewModel
             ITwoWayBindableValue<T> twoWayBindableValue =
                 this.bindableFactory.CreateTwoWay(sink: sink, comparer: comparer);
 
-            this.disposables.Add(twoWayBindableValue);
+            this.registrations.Add(twoWayBindableValue);
 
             return twoWayBindableValue;
         }
@@ -176,7 +175,7 @@ public class ViewModelBase : IViewModel
                     initialValue: initialValue,
                     comparer: comparer);
 
-            this.disposables.Add(oneWayToSourceBindableValue);
+            this.registrations.Add(oneWayToSourceBindableValue);
 
             return oneWayToSourceBindableValue;
         }
@@ -191,7 +190,7 @@ public class ViewModelBase : IViewModel
             IOneWayToSourceBindableValue<T> oneWayToSourceBindableValue =
                 this.bindableFactory.CreateOneWayToSource(sink: sink, comparer: comparer);
 
-            this.disposables.Add(oneWayToSourceBindableValue);
+            this.registrations.Add(oneWayToSourceBindableValue);
 
             return oneWayToSourceBindableValue;
         }
@@ -209,7 +208,7 @@ public class ViewModelBase : IViewModel
                     firingsStreamSink: firingsStreamSink,
                     isEnabledCell: isEnabledCell);
 
-            this.disposables.Add(bindableAction);
+            this.registrations.Add(bindableAction);
 
             return bindableAction;
         }
@@ -226,7 +225,7 @@ public class ViewModelBase : IViewModel
                     firingsStreamSink: firingsStreamSink,
                     isEnabledCell: isEnabledCell);
 
-            this.disposables.Add(bindableAction);
+            this.registrations.Add(bindableAction);
 
             return bindableAction;
         }
@@ -244,7 +243,7 @@ public class ViewModelBase : IViewModel
                     firingsStreamSink: firingsStreamSink,
                     isEnabledCell: isEnabledCell);
 
-            this.disposables.Add(bindableAction);
+            this.registrations.Add(bindableAction);
 
             return bindableAction;
         }
