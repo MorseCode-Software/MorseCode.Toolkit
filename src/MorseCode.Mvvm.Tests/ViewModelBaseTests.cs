@@ -115,8 +115,8 @@ public sealed class ViewModelBaseTests
         await Assert.That(log).IsEquivalentTo(expected: ["A", "B", "C"], ordering: CollectionOrdering.Matching);
     }
 
-    // Before the seal, the composite read the registrations in Dispose. Thus, an entry that a kept
-    // output added after construction was disposed, and an entry added after Dispose leaked.
+    // Before the seal, the composite read the registrations in Dispose. Thus, Dispose released an
+    // entry that a kept output added after construction, and an entry added after Dispose leaked.
     [Test]
     public async Task DisposableRegistrationAfterConstructionFailsAndIsNotKept()
     {
@@ -218,7 +218,19 @@ public sealed class ViewModelBaseTests
         GC.KeepAlive(obj: viewModel);
     }
 
-    // A separate method, so that no local of the test keeps the subscriber alive.
+    [Test]
+    public async Task PropertyChangedAcceptsTheRemovalOfAHandler()
+    {
+        ViewModelBase viewModel = Create(register: static _ => { });
+        Subscriber subscriber = new();
+
+        viewModel.PropertyChanged += subscriber.OnPropertyChanged;
+        viewModel.PropertyChanged -= subscriber.OnPropertyChanged;
+
+        await Assert.That(viewModel).IsNotNull();
+    }
+
+    // A different method, so that no local of the test keeps the subscriber alive.
     [MethodImpl(methodImplOptions: MethodImplOptions.NoInlining)]
     private static WeakReference Subscribe(INotifyPropertyChanged viewModel)
     {
