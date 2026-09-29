@@ -29,7 +29,15 @@ public class ViewModelBase : IViewModel
 
         return continuation(
             output: output,
-            next: Construct.From(new ViewModelBase(() => output.GetDisposable().Dispose())));
+            next: Construct
+                .From(values: output)
+                .Select(
+                    selector: static constructedOutput =>
+                    {
+                        IDisposable registrations = constructedOutput.Seal();
+
+                        return new ViewModelBase(onDispose: registrations.Dispose);
+                    }));
     }
 
     /// <inheritdoc />
@@ -69,6 +77,8 @@ public class ViewModelBase : IViewModel
         private readonly BindableFactory bindableFactory =
             new(bindingScheduler ?? throw new ArgumentNullException(nameof(bindingScheduler)));
 
+        private bool isSealed;
+
         /// <inheritdoc />
         public T AddListener<T>(T listener)
             where T : IWeakListener
@@ -76,6 +86,7 @@ public class ViewModelBase : IViewModel
             // The null check occurs here, where the caller is on the stack. A null entry that gets to
             // Dispose stops the disposal of all of the entries.
             ArgumentNullException.ThrowIfNull(argument: listener);
+            this.ThrowIfSealed();
 
             this.listeners.Add(listener);
             return listener;
@@ -88,6 +99,7 @@ public class ViewModelBase : IViewModel
             // The null check occurs here, where the caller is on the stack. A null entry that gets to
             // Dispose stops the disposal of all of the entries.
             ArgumentNullException.ThrowIfNull(argument: disposable);
+            this.ThrowIfSealed();
 
             this.disposables.Add(disposable);
             return disposable;
@@ -96,14 +108,23 @@ public class ViewModelBase : IViewModel
         /// <inheritdoc />
         public IBindableFactory BindableFactory => this;
 
-        public IDisposable GetDisposable() =>
-            Disposable.Composite(
+        // The base calls this when the subclass calls Construct. Thus, the composite holds each entry
+        // that the construction registered, and a registration after it fails and does not leak.
+        public IDisposable Seal()
+        {
+            this.ThrowIfSealed();
+            this.isSealed = true;
+
+            return Disposable.Composite(
                 this.listeners.Select(static listener => Disposable.FromAction(listener.Unlisten))
                     .Concat(this.disposables));
+        }
 
         /// <inheritdoc />
         public IOneWayBindableValue<T> CreateOneWay<T>(Cell<T> cell, IEqualityComparer<T>? comparer = null)
         {
+            this.ThrowIfSealed();
+
             IOneWayBindableValue<T> oneWayBindableValue =
                 this.bindableFactory.CreateOneWay(cell: cell, comparer: comparer);
 
@@ -118,6 +139,8 @@ public class ViewModelBase : IViewModel
             StreamSink<T> editsStreamSink,
             IEqualityComparer<T>? comparer = null)
         {
+            this.ThrowIfSealed();
+
             ITwoWayBindableValue<T> twoWayBindableValue =
                 this.bindableFactory.CreateTwoWay(cell: cell, editsStreamSink: editsStreamSink, comparer: comparer);
 
@@ -129,6 +152,8 @@ public class ViewModelBase : IViewModel
         /// <inheritdoc />
         public ITwoWayBindableValue<T> CreateTwoWay<T>(CellSink<T> sink, IEqualityComparer<T>? comparer = null)
         {
+            this.ThrowIfSealed();
+
             ITwoWayBindableValue<T> twoWayBindableValue =
                 this.bindableFactory.CreateTwoWay(sink: sink, comparer: comparer);
 
@@ -143,6 +168,8 @@ public class ViewModelBase : IViewModel
             T initialValue,
             IEqualityComparer<T>? comparer = null)
         {
+            this.ThrowIfSealed();
+
             IOneWayToSourceBindableValue<T> oneWayToSourceBindableValue =
                 this.bindableFactory.CreateOneWayToSource(
                     editsStreamSink: editsStreamSink,
@@ -159,6 +186,8 @@ public class ViewModelBase : IViewModel
             CellSink<T> sink,
             IEqualityComparer<T>? comparer = null)
         {
+            this.ThrowIfSealed();
+
             IOneWayToSourceBindableValue<T> oneWayToSourceBindableValue =
                 this.bindableFactory.CreateOneWayToSource(sink: sink, comparer: comparer);
 
@@ -173,6 +202,8 @@ public class ViewModelBase : IViewModel
             Cell<bool>? isEnabledCell = null)
             where T : notnull
         {
+            this.ThrowIfSealed();
+
             IBindableAction<T> bindableAction =
                 this.bindableFactory.CreateBindableAction(
                     firingsStreamSink: firingsStreamSink,
@@ -188,6 +219,8 @@ public class ViewModelBase : IViewModel
             StreamSink<Unit> firingsStreamSink,
             Cell<bool>? isEnabledCell = null)
         {
+            this.ThrowIfSealed();
+
             IBindableAction bindableAction =
                 this.bindableFactory.CreateBindableAction(
                     firingsStreamSink: firingsStreamSink,
@@ -204,6 +237,8 @@ public class ViewModelBase : IViewModel
             Cell<bool>? isEnabledCell = null)
             where T : notnull
         {
+            this.ThrowIfSealed();
+
             IBindableAction<Maybe<T>> bindableAction =
                 this.bindableFactory.CreateBindableAction(
                     firingsStreamSink: firingsStreamSink,
@@ -212,6 +247,16 @@ public class ViewModelBase : IViewModel
             this.disposables.Add(bindableAction);
 
             return bindableAction;
+        }
+
+        private void ThrowIfSealed()
+        {
+            if (this.isSealed)
+            {
+                throw new InvalidOperationException(
+                    message: "The view model is already constructed. Register each disposable, listener, "
+                        + "and bindable before the subclass calls Construct.");
+            }
         }
     }
 }

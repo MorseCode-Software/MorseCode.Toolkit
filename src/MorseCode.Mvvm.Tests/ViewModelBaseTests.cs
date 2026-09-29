@@ -61,6 +61,110 @@ public sealed class ViewModelBaseTests
         await Assert.That(log).IsEquivalentTo(expected: ["A", "B"], ordering: CollectionOrdering.Matching);
     }
 
+    [Test]
+    public async Task DisposeDisposesTheEntriesOfTheConstructionOneTime()
+    {
+        List<string> log = [];
+
+        ViewModelBase viewModel = Create(
+            register: output =>
+            {
+                output.AddDisposable(disposable: new Recording(log: log, name: "A"));
+                output.AddDisposable(disposable: new Recording(log: log, name: "B"));
+            });
+
+        viewModel.Dispose();
+        viewModel.Dispose();
+
+        await Assert.That(log).IsEquivalentTo(expected: ["A", "B"], ordering: CollectionOrdering.Matching);
+    }
+
+    // Before the seal, the composite read the registrations in Dispose. Thus, an entry that a kept
+    // output added after construction was disposed, and an entry added after Dispose leaked.
+    [Test]
+    public async Task DisposableRegistrationAfterConstructionFailsAndIsNotKept()
+    {
+        List<string> log = [];
+        List<ViewModelBase.IOutput> kept = [];
+
+        ViewModelBase viewModel = Create(register: kept.Add);
+
+        Exception caught =
+            Catch(action: () => kept[0].AddDisposable(disposable: new Recording(log: log, name: "late")));
+
+        viewModel.Dispose();
+
+        await Assert.That(caught).IsTypeOf<InvalidOperationException>();
+        await Assert.That(log).IsEmpty();
+    }
+
+    [Test]
+    public async Task ListenerRegistrationAfterConstructionFailsAndIsNotKept()
+    {
+        List<string> log = [];
+        List<ViewModelBase.IOutput> kept = [];
+
+        ViewModelBase viewModel = Create(register: kept.Add);
+
+        Exception caught =
+            Catch(action: () => kept[0].AddListener(listener: new RecordingListener(log: log, name: "late")));
+
+        viewModel.Dispose();
+
+        await Assert.That(caught).IsTypeOf<InvalidOperationException>();
+        await Assert.That(log).IsEmpty();
+    }
+
+    [Test]
+    public async Task BindableAfterConstructionFails()
+    {
+        List<ViewModelBase.IOutput> kept = [];
+
+        _ = Create(register: kept.Add);
+
+        Exception caught =
+            Catch(action: () => kept[0].BindableFactory.CreateOneWay(cell: Cell.CreateSink(initialValue: 1)));
+
+        await Assert.That(caught).IsTypeOf<InvalidOperationException>();
+    }
+
+    // The base seals the output when the subclass calls Construct, and before the constructor runs.
+    [Test]
+    public async Task RegistrationInTheConstructorFails()
+    {
+        List<string> log = [];
+
+        Exception caught = Catch(
+            action: () => ViewModelBase.CreateBase(
+                bindingScheduler: BindingScheduler.Immediate,
+                continuation: (output, construct) => construct.Construct(
+                    constructor: viewModelBase =>
+                    {
+                        output.AddDisposable(disposable: new Recording(log: log, name: "in constructor"));
+
+                        return viewModelBase;
+                    })));
+
+        await Assert.That(caught).IsTypeOf<InvalidOperationException>();
+    }
+
+    // A second Construct call cannot make a second owner of the same entries.
+    [Test]
+    public async Task SecondConstructFails()
+    {
+        Exception caught = Catch(
+            action: () => ViewModelBase.CreateBase(
+                bindingScheduler: BindingScheduler.Immediate,
+                continuation: static (_, construct) =>
+                {
+                    construct.Construct(constructor: static viewModelBase => viewModelBase).Dispose();
+
+                    return construct.Construct(constructor: static viewModelBase => viewModelBase);
+                }));
+
+        await Assert.That(caught).IsTypeOf<InvalidOperationException>();
+    }
+
     private static ViewModelBase Create(Action<ViewModelBase.IOutput> register) =>
         ViewModelBase.CreateBase(
             bindingScheduler: BindingScheduler.Immediate,
@@ -92,5 +196,17 @@ public sealed class ViewModelBaseTests
         private string Name { get; } = name;
 
         public void Dispose() => this.Log.Add(this.Name);
+    }
+
+    private sealed class RecordingListener(ICollection<string> log, string name) : IWeakListener
+    {
+        private ICollection<string> Log { get; } = log;
+
+        private string Name { get; } = name;
+
+        public void Unlisten() => this.Log.Add(this.Name);
+
+        public IListenerWithWeakReference GetListenerWithWeakReference() =>
+            throw new NotSupportedException(message: "ViewModelBase does not ask for this view.");
     }
 }
