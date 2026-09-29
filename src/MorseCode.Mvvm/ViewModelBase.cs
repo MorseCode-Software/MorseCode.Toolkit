@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.Threading;
 using JetBrains.Annotations;
 using MorseCode.StagedConstruction;
 using SodaFlow;
@@ -13,12 +12,9 @@ namespace MorseCode.Mvvm;
 [PublicAPI]
 public sealed class ViewModelBase : IViewModel
 {
-    private readonly Action onDispose;
+    private readonly IDisposable registrations;
 
-    private bool disposed;
-
-    private ViewModelBase(Action onDispose) =>
-        this.onDispose = onDispose;
+    private ViewModelBase(IDisposable registrations) => this.registrations = registrations;
 
     public static T CreateBase<T>(
         IBindingScheduler bindingScheduler,
@@ -32,23 +28,11 @@ public sealed class ViewModelBase : IViewModel
                 .From(values: output)
                 .Select(
                     selector: static constructedOutput =>
-                    {
-                        IDisposable registrations = constructedOutput.Seal();
-
-                        return new ViewModelBase(onDispose: registrations.Dispose);
-                    }));
+                        new ViewModelBase(registrations: constructedOutput.Seal())));
     }
 
     /// <inheritdoc />
-    public void Dispose()
-    {
-        if (Interlocked.Exchange(location1: ref this.disposed, value: true))
-        {
-            return;
-        }
-
-        this.onDispose();
-    }
+    public void Dispose() => this.registrations.Dispose();
 
     // The properties of a view model do not change, and each bindable value sends its own
     // notifications. Thus, this event does not occur, and it keeps no handler. WPF watches a binding
