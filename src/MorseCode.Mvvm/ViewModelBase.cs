@@ -73,6 +73,10 @@ public class ViewModelBase : IViewModel
         public T AddListener<T>(T listener)
             where T : IWeakListener
         {
+            // The null check occurs here, where the caller is on the stack. A null entry that gets to
+            // Dispose stops the disposal of all of the entries.
+            ArgumentNullException.ThrowIfNull(argument: listener);
+
             this.listeners.Add(listener);
             return listener;
         }
@@ -81,6 +85,10 @@ public class ViewModelBase : IViewModel
         public T AddDisposable<T>(T disposable)
             where T : IDisposable
         {
+            // The null check occurs here, where the caller is on the stack. A null entry that gets to
+            // Dispose stops the disposal of all of the entries.
+            ArgumentNullException.ThrowIfNull(argument: disposable);
+
             this.disposables.Add(disposable);
             return disposable;
         }
