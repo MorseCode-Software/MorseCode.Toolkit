@@ -82,10 +82,17 @@ public sealed class ViewModelBase : IViewModel
     ///     This event does not occur, and it keeps no handler.
     /// </summary>
     /// <remarks>
-    ///     The properties of a view model do not change, and each bindable value sends its own
-    ///     notifications. The view model implements <see cref="INotifyPropertyChanged" /> because WPF
-    ///     uses a <c>PropertyDescriptor</c> to monitor a binding source without it. That monitor keeps
-    ///     the source alive.
+    ///     <para>
+    ///         The properties of a view model do not change, and each bindable value sends its own
+    ///         notifications. Thus, this event has no work to do.
+    ///     </para>
+    ///     <para>
+    ///         This event exists only to prevent a memory leak in WPF. WPF uses a
+    ///         <c>PropertyDescriptor</c> to monitor a binding source without
+    ///         <see cref="INotifyPropertyChanged" />, and that monitor keeps the source alive after the
+    ///         view closes. <see cref="IViewModel" /> includes the interface only to prevent this leak.
+    ///         Do not remove the interface or this event.
+    ///     </para>
     /// </remarks>
     // ReSharper disable once InheritdocConsiderUsage - The summary of INotifyPropertyChanged.PropertyChanged does not say that this event does not occur.
     public event PropertyChangedEventHandler? PropertyChanged
