@@ -1,4 +1,6 @@
 <Solution>
   <Project Path="MorseCode.Mvvm/MorseCode.Mvvm.csproj" />
   <Project Path="MorseCode.Mvvm.Tests/MorseCode.Mvvm.Tests.csproj" />
+  <Project Path="MorseCode.StagedConstruction/MorseCode.StagedConstruction.csproj" />
+  <Project Path="MorseCode.StagedConstruction.Tests/MorseCode.StagedConstruction.Tests.csproj" />
 </Solution>

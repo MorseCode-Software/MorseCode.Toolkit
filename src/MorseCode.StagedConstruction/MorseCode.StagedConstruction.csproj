@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <LangVersion>14</LangVersion>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+
+    <PropertyGroup>
+        <PackageId>MorseCode.StagedConstruction</PackageId>
+        <MinVerTagPrefix>morsecode-stagedconstruction-</MinVerTagPrefix>
+        <Product>MorseCode.StagedConstruction</Product>
+        <Title>MorseCode.StagedConstruction</Title>
+        <Description>Construction of immutable objects in ordered stages, with no access to a partly built object.</Description>
+        <AssemblyName>MorseCode.StagedConstruction</AssemblyName>
+        <RootNamespace>MorseCode.StagedConstruction</RootNamespace>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <Compile Include="Construct.cs"/>
+        <Compile Include="IConstruct.cs"/>
+        <Compile Include="IStage.cs"/>
+        <Compile Include="SelectedConstruct.cs"/>
+        <Compile Include="Stage.cs"/>
+        <Compile Include="StageContinuation.cs"/>
+        <Compile Include="StageFromBody.cs"/>
+        <Compile Include="ValuesConstruct.cs"/>
+    </ItemGroup>
+
+</Project>
