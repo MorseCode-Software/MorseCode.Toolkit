@@ -17,9 +17,11 @@ pre-1.0, and their APIs will change as the applications built on them teach us w
 
 ## Packages
 
-- **MorseCode.Mvvm**: building blocks for view models. It starts with `CompositeDisposable`, which
-  a view model uses to release the subscriptions its construction made: every entry once, in
-  order, and without one failure leaking the rest.<br>
+- **MorseCode.Mvvm**: building blocks for view models. `ViewModelBase` is the base a view model
+  builds on with MorseCode.StagedConstruction: the view model registers every subscription and
+  bindable it makes during construction, and one `Dispose` releases them all, once, in order, and
+  without one failure leaking the rest. Registration closes when the view model is constructed, so
+  nothing can be left out or slipped in later.<br>
   [![Latest Stable Version](https://img.shields.io/nuget/v/MorseCode.Mvvm.svg)](https://www.nuget.org/packages/MorseCode.Mvvm/)
   [![Total Downloads](https://img.shields.io/nuget/dt/MorseCode.Mvvm.svg)](https://www.nuget.org/packages/MorseCode.Mvvm/)
 - **MorseCode.StagedConstruction**: construction of immutable objects in ordered stages. A static

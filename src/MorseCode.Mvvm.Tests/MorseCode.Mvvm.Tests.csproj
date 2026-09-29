@@ -21,7 +21,10 @@
     </ItemGroup>
 
     <ItemGroup>
+        <Compile Include="ActionDisposableTests.cs"/>
         <Compile Include="CompositeDisposableTests.cs"/>
+        <Compile Include="ViewModelBaseBindableFactoryTests.cs"/>
+        <Compile Include="ViewModelBaseTests.cs"/>
     </ItemGroup>
 
     <ItemGroup>

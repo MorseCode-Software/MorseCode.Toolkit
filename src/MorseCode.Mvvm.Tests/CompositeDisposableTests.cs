@@ -17,8 +17,14 @@ public sealed class CompositeDisposableTests
     {
         List<string> log = [];
 
-        CompositeDisposable composite =
-            new(disposables: [new Recording(log: log, name: "A"), new Recording(log: log, name: "B"), new Recording(log: log, name: "C")]);
+        IDisposable composite =
+            Disposable.Composite(
+                disposables:
+                [
+                    new Recording(log: log, name: "A"),
+                    new Recording(log: log, name: "B"),
+                    new Recording(log: log, name: "C")
+                ]);
 
         composite.Dispose();
 
@@ -30,8 +36,8 @@ public sealed class CompositeDisposableTests
     {
         List<string> log = [];
 
-        CompositeDisposable composite =
-            new(disposables: [new Recording(log: log, name: "A"), new Recording(log: log, name: "B")]);
+        IDisposable composite =
+            Disposable.Composite(disposables: [new Recording(log: log, name: "A"), new Recording(log: log, name: "B")]);
 
         composite.Dispose();
         composite.Dispose();
@@ -44,7 +50,7 @@ public sealed class CompositeDisposableTests
     {
         const int threads = 16;
         Counting entry = new();
-        CompositeDisposable composite = new(disposables: [entry]);
+        IDisposable composite = Disposable.Composite(disposables: [entry]);
 
         // Each thread starts, adds one to the count, and waits for the start signal. The test sends
         // the signal when the count is equal to the number of threads. Thus, the calls overlap and
@@ -56,14 +62,15 @@ public sealed class CompositeDisposableTests
         [
             .. Enumerable
                 .Range(start: 0, count: threads)
-                .Select(_ => Task.Factory.StartNew(
-                    action: () =>
-                    {
-                        Interlocked.Increment(location: ref ready);
-                        start.Task.Wait();
-                        composite.Dispose();
-                    },
-                    creationOptions: TaskCreationOptions.LongRunning))
+                .Select(_ =>
+                    Task.Factory.StartNew(
+                        action: () =>
+                        {
+                            Interlocked.Increment(location: ref ready);
+                            start.Task.Wait();
+                            composite.Dispose();
+                        },
+                        creationOptions: TaskCreationOptions.LongRunning))
         ];
 
         SpinWait.SpinUntil(condition: () => Volatile.Read(location: ref ready) == threads);
@@ -80,8 +87,14 @@ public sealed class CompositeDisposableTests
         List<string> log = [];
         InvalidOperationException failure = new(message: "B failed.");
 
-        CompositeDisposable composite =
-            new(disposables: [new Recording(log: log, name: "A"), new Throwing(exception: failure), new Recording(log: log, name: "C")]);
+        IDisposable composite =
+            Disposable.Composite(
+                disposables:
+                [
+                    new Recording(log: log, name: "A"),
+                    new Throwing(exception: failure),
+                    new Recording(log: log, name: "C")
+                ]);
 
         Exception caught = Catch(action: composite.Dispose);
 
@@ -96,8 +109,12 @@ public sealed class CompositeDisposableTests
         Exception first = new InvalidOperationException(message: "A failed.");
         Exception second = new InvalidOperationException(message: "C failed.");
 
-        CompositeDisposable composite =
-            new(disposables: [new Throwing(exception: first), new Recording(log: log, name: "B"), new Throwing(exception: second)]);
+        IDisposable composite =
+            Disposable.Composite(
+                disposables:
+                [
+                    new Throwing(exception: first), new Recording(log: log, name: "B"), new Throwing(exception: second)
+                ]);
 
         Exception caught = Catch(action: composite.Dispose);
 
@@ -118,7 +135,7 @@ public sealed class CompositeDisposableTests
         // ReSharper disable once NullableWarningSuppressionIsUsed - The null entry is the input under test: the constructor must refuse it at run time.
         IDisposable[] entries = [new Recording(log: log, name: "A"), null!];
 
-        Exception caught = Catch(action: () => _ = new CompositeDisposable(disposables: entries));
+        Exception caught = Catch(action: () => _ = Disposable.Composite(disposables: entries));
 
         await Assert.That(caught).IsTypeOf<ArgumentException>();
         await Assert.That(caught.Message).Contains(expected: "index 1");
@@ -129,7 +146,7 @@ public sealed class CompositeDisposableTests
     {
         List<string> log = [];
         IDisposable[] entries = [new Recording(log: log, name: "A"), new Recording(log: log, name: "B")];
-        CompositeDisposable composite = new(disposables: entries);
+        IDisposable composite = Disposable.Composite(disposables: entries);
 
         entries[1] = new Recording(log: log, name: "replacement");
         composite.Dispose();
@@ -140,7 +157,7 @@ public sealed class CompositeDisposableTests
     [Test]
     public async Task EmptyCompositeDisposesWithoutError()
     {
-        CompositeDisposable composite = new();
+        IDisposable composite = Disposable.Composite();
 
         composite.Dispose();
 
@@ -170,7 +187,7 @@ public sealed class CompositeDisposableTests
             disposable.Dispose();
         }
 
-        new CompositeDisposable(disposables: [.. names.Select(n => new Recording(log: byComposite, name: n))]).Dispose();
+        Disposable.Composite(disposables: [.. names.Select(n => new Recording(log: byComposite, name: n))]).Dispose();
 
         await Assert.That(byComposite).IsEquivalentTo(expected: byLoop, ordering: CollectionOrdering.Matching);
     }
@@ -185,19 +202,30 @@ public sealed class CompositeDisposableTests
         InvalidOperationException failure = new(message: "B failed.");
 
         IReadOnlyList<IDisposable> loopEntries =
-            [new Recording(log: byLoop, name: "A"), new Throwing(exception: failure), new Recording(log: byLoop, name: "C")];
+        [
+            new Recording(log: byLoop, name: "A"),
+            new Throwing(exception: failure),
+            new Recording(log: byLoop, name: "C")
+        ];
 
-        _ = Catch(
-            action: () =>
-            {
-                foreach (IDisposable disposable in loopEntries)
+        _ =
+            Catch(
+                action: () =>
                 {
-                    disposable.Dispose();
-                }
-            });
+                    foreach (IDisposable disposable in loopEntries)
+                    {
+                        disposable.Dispose();
+                    }
+                });
 
-        CompositeDisposable composite =
-            new(disposables: [new Recording(log: byComposite, name: "A"), new Throwing(exception: failure), new Recording(log: byComposite, name: "C")]);
+        IDisposable composite =
+            Disposable.Composite(
+                disposables:
+                [
+                    new Recording(log: byComposite, name: "A"),
+                    new Throwing(exception: failure),
+                    new Recording(log: byComposite, name: "C")
+                ]);
 
         _ = Catch(action: composite.Dispose);
 
