@@ -9,7 +9,6 @@ namespace MorseCode.Mvvm;
 [PublicAPI]
 public static partial class Disposable
 {
-    [PublicAPI]
     public static IDisposable FromAction(Action onDispose)
     {
         // The null check occurs here, where the caller is on the stack, and not subsequently in Dispose.

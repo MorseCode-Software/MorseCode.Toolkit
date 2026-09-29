@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.ExceptionServices;
 using System.Threading;
-using JetBrains.Annotations;
 
 namespace MorseCode.Mvvm;
 
@@ -25,7 +24,6 @@ public static partial class Disposable
     ///         the order of the list.
     ///     </para>
     /// </remarks>
-    [PublicAPI]
     public static IDisposable Composite(params IEnumerable<IDisposable> disposables) =>
         new CompositeDisposable(disposables);
 
