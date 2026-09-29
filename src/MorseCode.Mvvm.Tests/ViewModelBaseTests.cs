@@ -18,7 +18,7 @@ public sealed class ViewModelBaseTests
     public async Task NullSchedulerFailsAtTheCall()
     {
         Exception caught = Catch(
-            action: () => ViewModelBase.CreateBase(
+            action: static () => ViewModelBase.CreateBase(
                 // ReSharper disable once NullableWarningSuppressionIsUsed - The null scheduler is the input under test: CreateBase must refuse it at run time.
                 bindingScheduler: null!,
                 continuation: static (_, construct) =>
@@ -189,7 +189,7 @@ public sealed class ViewModelBaseTests
     public async Task SecondConstructFails()
     {
         Exception caught = Catch(
-            action: () => ViewModelBase.CreateBase(
+            action: static () => ViewModelBase.CreateBase(
                 bindingScheduler: BindingScheduler.Immediate,
                 continuation: static (_, construct) =>
                 {
@@ -220,7 +220,7 @@ public sealed class ViewModelBaseTests
 
     // A separate method, so that no local of the test keeps the subscriber alive.
     [MethodImpl(methodImplOptions: MethodImplOptions.NoInlining)]
-    private static WeakReference Subscribe(ViewModelBase viewModel)
+    private static WeakReference Subscribe(INotifyPropertyChanged viewModel)
     {
         Subscriber subscriber = new();
         viewModel.PropertyChanged += subscriber.OnPropertyChanged;
@@ -263,6 +263,7 @@ public sealed class ViewModelBaseTests
 
     private sealed class Subscriber
     {
+        // ReSharper disable once MemberCanBeMadeStatic.Local - The handler must be an instance method, so that the delegate refers to the subscriber that the test watches.
         public void OnPropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
         }
