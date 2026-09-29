@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using SodaFlow;
 using SodaFlow.Bindable.ObjectModel;
@@ -185,6 +187,33 @@ public sealed class ViewModelBaseTests
         await Assert.That(caught).IsTypeOf<InvalidOperationException>();
     }
 
+    // A field-like event keeps each handler, and the target of the handler, alive with the view model.
+    [Test]
+    public async Task PropertyChangedKeepsNoHandler()
+    {
+        ViewModelBase viewModel = Create(register: static _ => { });
+
+        WeakReference subscriber = Subscribe(viewModel: viewModel);
+
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+
+        await Assert.That(subscriber.IsAlive).IsFalse();
+
+        GC.KeepAlive(obj: viewModel);
+    }
+
+    // A separate method, so that no local of the test keeps the subscriber alive.
+    [MethodImpl(methodImplOptions: MethodImplOptions.NoInlining)]
+    private static WeakReference Subscribe(ViewModelBase viewModel)
+    {
+        Subscriber subscriber = new();
+        viewModel.PropertyChanged += subscriber.OnPropertyChanged;
+
+        return new WeakReference(target: subscriber);
+    }
+
     private static ViewModelBase Create(Action<ViewModelBase.IOutput> register) =>
         ViewModelBase.CreateBase(
             bindingScheduler: BindingScheduler.Immediate,
@@ -216,6 +245,13 @@ public sealed class ViewModelBaseTests
         private string Name { get; } = name;
 
         public void Dispose() => this.Log.Add(this.Name);
+    }
+
+    private sealed class Subscriber
+    {
+        public void OnPropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+        }
     }
 
     private sealed class RecordingListener(ICollection<string> log, string name) : IWeakListener

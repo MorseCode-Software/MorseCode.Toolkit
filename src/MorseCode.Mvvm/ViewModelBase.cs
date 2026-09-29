@@ -52,9 +52,14 @@ public class ViewModelBase : IViewModel
         GC.SuppressFinalize(this);
     }
 
-#pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
-    public event PropertyChangedEventHandler? PropertyChanged;
-#pragma warning restore CS1591 // Missing XML comment for publicly visible type or member
+    // The properties of a view model do not change, and each bindable value sends its own
+    // notifications. Thus, this event does not occur, and it keeps no handler. WPF watches a binding
+    // source without this interface through a PropertyDescriptor, which keeps the source alive.
+    public event PropertyChangedEventHandler? PropertyChanged
+    {
+        add { }
+        remove { }
+    }
 
     [PublicAPI]
     public interface IOutput
