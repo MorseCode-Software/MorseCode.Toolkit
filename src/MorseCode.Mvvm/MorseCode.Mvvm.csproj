@@ -19,6 +19,18 @@
 
     <ItemGroup>
         <Compile Include="CompositeDisposable.cs"/>
+        <Compile Include="ActionDisposable.cs" />
+        <Compile Include="EmptyDisposable.cs" />
+        <Compile Include="IViewModel.cs" />
+        <Compile Include="ViewModelBase.cs" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\MorseCode.StagedConstruction\MorseCode.StagedConstruction.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <PackageReference Include="SodaFlow.Bindable.ObjectModel" Version="4.0.0" />
     </ItemGroup>
 
 </Project>

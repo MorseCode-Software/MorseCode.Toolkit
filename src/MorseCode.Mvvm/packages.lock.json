@@ -13,6 +13,58 @@
         "requested": "[8.0.0, )",
         "resolved": "8.0.0",
         "contentHash": "AJy/KVjXgUbgjf6HiI8wAk4DSSq0SCmvXQF8aU6IB+pnIQq+YJvofvMczug2hqO8yEvnQY557ryew66KPpyCsA=="
+      },
+      "SodaFlow.Bindable.ObjectModel": {
+        "type": "Direct",
+        "requested": "[4.0.0, )",
+        "resolved": "4.0.0",
+        "contentHash": "rtFTmjT49XJfPLPr1S9eUFkXnfgxobeQxKImtRdzw+k1I9rmZ28xPrHOxODCeAIjoQHFnyHOJPRcCuDQgDQjrQ==",
+        "dependencies": {
+          "SodaFlow": "[5.0.0, 6.0.0)",
+          "SodaFlow.Bindable.ObjectModel.Core": "[4.0.0, 5.0.0)",
+          "SodaFlow.Functional": "[3.0.1, 4.0.0)",
+          "System.ValueTuple": "4.6.2"
+        }
+      },
+      "SodaFlow": {
+        "type": "Transitive",
+        "resolved": "5.0.0",
+        "contentHash": "6t16/75AZH8XbhSe/+54kMhBjpsub5gZREVDsZHRZu7rokiPqJYrXzt2n0eFQvkYBMulSOkz/ao4zU8DEsuV2g==",
+        "dependencies": {
+          "SodaFlow.Core": "[5.0.0, 6.0.0)",
+          "SodaFlow.Functional": "[3.0.1, 4.0.0)",
+          "System.ValueTuple": "4.6.2"
+        }
+      },
+      "SodaFlow.Bindable.ObjectModel.Core": {
+        "type": "Transitive",
+        "resolved": "4.0.0",
+        "contentHash": "nMHa+5uFX2ZYjOCb+hvitsmMeO2VknrOe7nSxfhSlRq5h7h8FUj78k8a4pW4AoI2aMJwxUcaZ0CLmrSsx1tvRQ==",
+        "dependencies": {
+          "SodaFlow.Core": "[5.0.0, 6.0.0)",
+          "System.ValueTuple": "4.6.2"
+        }
+      },
+      "SodaFlow.Core": {
+        "type": "Transitive",
+        "resolved": "5.0.0",
+        "contentHash": "LSJtWDGie+NbVqOzY/s9PxiNO3d5hAFgiFqne2I6dYOHH/9zcKd0oVZtlobkQBU1lh7eFB5Qz1pzJHiG7ERlug==",
+        "dependencies": {
+          "System.ValueTuple": "4.6.2"
+        }
+      },
+      "SodaFlow.Functional": {
+        "type": "Transitive",
+        "resolved": "3.0.1",
+        "contentHash": "EmrkuXTuIZ6HB55Yg7ZARNzCVEk4mq9y+2WI/aO6NhJ02uLMGZKK+FLDSCizfA6QRRdqWnMwFy51F1BA2tfkHA=="
+      },
+      "System.ValueTuple": {
+        "type": "Transitive",
+        "resolved": "4.6.2",
+        "contentHash": "yQgmjfFximrNm9LIV3mL6T5MzjeC+epeE5rl4hXxAlYmxby7RM1dPSkIKXk9HNkl6G54h2JHOmLD46+Pey+IRg=="
+      },
+      "morsecode.stagedconstruction": {
+        "type": "Project"
       }
     }
   }
