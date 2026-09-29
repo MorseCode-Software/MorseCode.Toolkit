@@ -15,6 +15,20 @@ namespace MorseCode.Mvvm.Tests;
 public sealed class ViewModelBaseTests
 {
     [Test]
+    public async Task NullSchedulerFailsAtTheCall()
+    {
+        Exception caught = Catch(
+            action: () => ViewModelBase.CreateBase(
+                // ReSharper disable once NullableWarningSuppressionIsUsed - The null scheduler is the input under test: CreateBase must refuse it at run time.
+                bindingScheduler: null!,
+                continuation: static (_, construct) =>
+                    construct.Construct(constructor: static viewModelBase => viewModelBase)));
+
+        await Assert.That(caught).IsTypeOf<ArgumentNullException>();
+        await Assert.That(((ArgumentNullException)caught).ParamName).IsEqualTo(expected: "bindingScheduler");
+    }
+
+    [Test]
     public async Task NullDisposableFailsAtRegistration()
     {
         Exception? caught = null;

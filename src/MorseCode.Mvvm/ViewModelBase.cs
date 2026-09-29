@@ -20,7 +20,10 @@ public sealed class ViewModelBase : IViewModel
         IBindingScheduler bindingScheduler,
         StageContinuation<IOutput, IConstruct<ViewModelBase>, T> continuation)
     {
-        Output output = new(bindingScheduler);
+        // The null check occurs here, where the caller is on the stack.
+        ArgumentNullException.ThrowIfNull(argument: bindingScheduler);
+
+        Output output = new(bindingScheduler: bindingScheduler);
 
         return continuation(
             output: output,
@@ -61,7 +64,7 @@ public sealed class ViewModelBase : IViewModel
         private readonly List<IDisposable> registrations = [];
 
         private readonly BindableFactory bindableFactory =
-            new(bindingScheduler ?? throw new ArgumentNullException(nameof(bindingScheduler)));
+            new(bindingScheduler: bindingScheduler);
 
         private bool isSealed;
 
