@@ -158,7 +158,9 @@ public sealed class ViewModelBase : IViewModel
         IBindableFactory BindableFactory { get; }
     }
 
-    private sealed class Output(IBindingScheduler bindingScheduler) : IOutput, IBindableFactory
+    // The in modifier makes the parameter readonly, and the compiler refuses to capture it in a member.
+    // Thus, only the field initializer uses the parameter, and the parameter cannot become mutable state.
+    private sealed class Output(in IBindingScheduler bindingScheduler) : IOutput, IBindableFactory
     {
         // One list, so that Dispose releases the entries in the order of their registration.
         private readonly List<IDisposable> registrations = [];
