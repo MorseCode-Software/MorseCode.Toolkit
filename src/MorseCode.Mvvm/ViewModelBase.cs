@@ -222,6 +222,8 @@ public sealed class ViewModelBase : IViewModel
                 this.ThrowIfSealed();
                 this.isSealed = true;
 
+                // Keep the static call. The Reverse method of List<T> reverses the list in place and
+                // returns nothing. An extension call uses that method and not the method of LINQ.
                 return Disposable.Composite(disposables: Enumerable.Reverse(source: this.registrations));
             }
         }
