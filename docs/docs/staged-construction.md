@@ -87,12 +87,18 @@ The compiler infers `TResult` from the lambdas, so a `Create` method writes no t
   }
   ```
 
-## What it does not guarantee
+## Each handle is used once
 
-The handles do not check how many times you use them. A subclass must call
-`IConstruct<T>.Construct` one time only, and must call `IStage<,,>.Advance` one time only. A
-second call is a bug, and the handle does not stop it. (A base that needs the check, for example
-`ViewModelBase`, makes it itself.)
+A subclass calls `IConstruct<T>.Construct` one time, and `IStage<,,>.Advance` one time. The handles
+that `Construct.From`, `Select`, and `Stage.From` make enforce this: a second call throws an
+`InvalidOperationException` that names the method, even when two threads call at the same moment.
+
+The first call uses the handle up before it runs your constructor or stage. If that code throws,
+the handle stays used, so a failed construction cannot be run a second time.
+
+A base that implements `IConstruct<T>` or `IStage<,,>` by hand should make the same check. The
+handle that `Select` makes checks for itself, so it refuses a second `Construct` even when its
+source is a hand-written handle that does not.
 
 ## The types
 

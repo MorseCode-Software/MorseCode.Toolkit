@@ -15,6 +15,14 @@ internal sealed class SelectedConstruct<TSourceValues, TBaseValues>(
 
     private Func<TSourceValues, TBaseValues> Selector { get; } = selector;
 
-    public TResult Construct<TResult>(Func<TBaseValues, TResult> constructor) =>
-        this.Source.Construct(constructor: sourceValues => constructor(arg: this.Selector(arg: sourceValues)));
+    // This handle makes its own claim. The source can be a handle that a base implements, and such a
+    // handle does not always make the claim.
+    private bool used;
+
+    public TResult Construct<TResult>(Func<TBaseValues, TResult> constructor)
+    {
+        SingleUse.Claim(used: ref this.used, member: nameof(this.Construct));
+
+        return this.Source.Construct(constructor: sourceValues => constructor(arg: this.Selector(arg: sourceValues)));
+    }
 }

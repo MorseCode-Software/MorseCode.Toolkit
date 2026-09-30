@@ -10,5 +10,12 @@ internal sealed class ValuesConstruct<TBaseValues>(TBaseValues values) : IConstr
 {
     private TBaseValues Values { get; } = values;
 
-    public TResult Construct<TResult>(Func<TBaseValues, TResult> constructor) => constructor(arg: this.Values);
+    private bool used;
+
+    public TResult Construct<TResult>(Func<TBaseValues, TResult> constructor)
+    {
+        SingleUse.Claim(used: ref this.used, member: nameof(this.Construct));
+
+        return constructor(arg: this.Values);
+    }
 }

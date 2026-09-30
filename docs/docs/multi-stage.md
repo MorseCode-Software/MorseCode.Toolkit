@@ -62,7 +62,8 @@ the closure around it.
 
 `Stage.From` runs `body` when the subclass calls `Advance`, and not when the stage is made. It does
 no work after the subclass continues. A stage that must do work around the later steps, for example
-in a transaction, implements `IStage<,,>` directly.
+in a transaction, implements `IStage<,,>` directly, and should refuse a second `Advance` the way
+the stage from `Stage.From` does. See [Each handle is used once](staged-construction.md#each-handle-is-used-once).
 
 `Stage.From` refuses a null `body` when you call it, and not later in `Advance`.
 
@@ -83,7 +84,8 @@ public static TResult CreateBase<TResult>(
 
 `Select` gives a new handle. When the subclass calls `Construct` on it, the handle calls the
 selector with the values of the animal, and gives the result to the constructor. The selector runs
-at that time, and not when `Select` is called. A null selector fails at the call to `Select`.
+at that time, and not when `Select` is called. A null selector fails at the call to `Select`. Like
+the other handles, the new one refuses a second `Construct`.
 
 The order of the work is then: the animal base, the mammal base, the subclass, the selector, and the
 constructor.
