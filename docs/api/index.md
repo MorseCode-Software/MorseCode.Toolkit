@@ -9,7 +9,7 @@ the code exactly. Pick a namespace from the sidebar, or start with the types you
 
 | Type | Namespace | What it is |
 | --- | --- | --- |
-| @MorseCode.StagedConstruction.Construct | `MorseCode.StagedConstruction` | Makes the final handle a base gives its subclass. |
+| @MorseCode.StagedConstruction.Constructor | `MorseCode.StagedConstruction` | Makes the final handle a base gives its subclass. |
 | @MorseCode.StagedConstruction.Stage | `MorseCode.StagedConstruction` | Makes a stage from a function. |
 | @MorseCode.StagedConstruction.Constructor`1 | `MorseCode.StagedConstruction` | The handle that gives a base's values to the subclass constructor. |
 | @MorseCode.StagedConstruction.Stage`3 | `MorseCode.StagedConstruction` | The handle for a stage after the first. |

@@ -87,18 +87,38 @@
     </ItemGroup>
 
     <!--
-        A dependency between two packages here is emitted with the next major version as its
+        A dependency between two packages here is emitted with the next breaking version as its
         ceiling, so NuGet refuses a pairing across a breaking change rather than resolving it and
         failing at run time. Pack writes a bare version, which NuGet reads as a minimum with no
         ceiling; this target widens it into a range between the target that collects the versions
         and GenerateNuspec, which reads them.
+
+        The next breaking version is the next major, except below 1.0.0, where it is the next
+        minor: 1.4.2 gets [1.4.2, 2.0.0), and 0.2.0 gets [0.2.0, 0.3.0). A 0.x package takes its
+        breaking changes in the minor version, so a ceiling at 1.0.0 would let MorseCode.Mvvm 0.2.0
+        resolve against a MorseCode.StagedConstruction 0.3.0 that it does not compile against.
+        MorseCode.Mvvm 0.1.0 was released with [0.1.0, 1.0.0), before this rule, and that range
+        cannot be changed now.
     -->
     <Target Name="AddUpperBoundToProjectReferenceVersions"
             AfterTargets="_GetProjectReferenceVersions"
             Condition="'$(NuspecFile)' == ''">
         <ItemGroup>
             <_ProjectReferencesWithVersions Update="@(_ProjectReferencesWithVersions)">
-                <ProjectVersion>[%(ProjectVersion), $([MSBuild]::Add($([System.Text.RegularExpressions.Regex]::Match(%(ProjectVersion), `^[0-9]+`).Value), 1)).0.0)</ProjectVersion>
+                <_Major>$([System.Text.RegularExpressions.Regex]::Match(%(ProjectVersion), `^[0-9]+`).Value)</_Major>
+                <_Minor>$([System.Text.RegularExpressions.Regex]::Match(%(ProjectVersion), `(?&lt;=^[0-9]+\.)[0-9]+`).Value)</_Minor>
+            </_ProjectReferencesWithVersions>
+
+            <_ProjectReferencesWithVersions Update="@(_ProjectReferencesWithVersions)" Condition="'%(_Major)' == '0'">
+                <_Ceiling>0.$([MSBuild]::Add(%(_Minor), 1)).0</_Ceiling>
+            </_ProjectReferencesWithVersions>
+
+            <_ProjectReferencesWithVersions Update="@(_ProjectReferencesWithVersions)" Condition="'%(_Major)' != '0'">
+                <_Ceiling>$([MSBuild]::Add(%(_Major), 1)).0.0</_Ceiling>
+            </_ProjectReferencesWithVersions>
+
+            <_ProjectReferencesWithVersions Update="@(_ProjectReferencesWithVersions)">
+                <ProjectVersion>[%(ProjectVersion), %(_Ceiling))</ProjectVersion>
             </_ProjectReferencesWithVersions>
         </ItemGroup>
     </Target>

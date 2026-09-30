@@ -1,4 +1,4 @@
-0.1.1
+0.2.0
 
 This package now targets net472, net6.0, and netstandard2.0, and not net10.0
 only. The behavior is the same on every target.
@@ -13,6 +13,10 @@ same time, and also when the first call fails. Then it calls a method that a
 derived class implements: ConstructCore or AdvanceCore. The static class that
 made the usual handles, Construct, is now Constructor. Select is a virtual
 method of Constructor, and a derived class can override it.
+
+MorseCode.Mvvm 0.1.0 does not work with this version, although the dependency
+range that it was released with admits this version. Use MorseCode.Mvvm 0.2.0
+or later.
 
 You must change every signature that names the old types. For example,
 StageContinuation<string, IConstruct<AnimalValues>, TResult> becomes

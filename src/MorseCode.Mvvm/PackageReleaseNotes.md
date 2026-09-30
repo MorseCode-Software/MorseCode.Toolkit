@@ -1,14 +1,19 @@
-0.1.1
+0.2.0
 
 This package now targets net472, net6.0, and netstandard2.0, and not net10.0
 only. The behavior is the same on every target.
 
 Breaking change: ViewModelBase.CreateBase takes a
 StageContinuation<IOutput, Constructor<ViewModelBase>, TResult>, and not an
-IConstruct<ViewModelBase>. MorseCode.StagedConstruction 0.1.1 replaced the
+IConstruct<ViewModelBase>. MorseCode.StagedConstruction 0.2.0 replaced the
 IConstruct interface with the Constructor class, and this package depends on
-that version or later. Change the signature of each view model that calls
+0.2.0 or a later 0.2.x. Change the signature of each view model that calls
 CreateBase, and compile it again.
+
+The dependency on MorseCode.StagedConstruction now has the next minor version as
+its ceiling while the version is below 1.0.0, and not 1.0.0. MorseCode.Mvvm
+0.1.0 admits MorseCode.StagedConstruction 0.2.0, and does not work with it. Do
+not use MorseCode.Mvvm 0.1.0 with MorseCode.StagedConstruction 0.2.0 or later.
 
 0.1.0
 
