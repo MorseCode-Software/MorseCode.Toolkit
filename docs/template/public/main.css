@@ -2,9 +2,9 @@
     The MorseCode Toolkit theme for the docfx "modern" template.
 
     docfx loads this file after docfx.min.css, so everything here is an override. The colors come
-    from SodaFlow, which this toolkit builds on: one green, #157551, and a set of tints and shades
+    from the MorseCode Software logo in images/: one blue, #264790, and a set of tints and shades
     of it. A color that is not the brand color is a neutral that holds a small quantity of the same
-    green, which keeps the page from looking like two designs at the same time.
+    blue, which keeps the page from looking like two designs at the same time.
 
     The file has two parts. The tokens come first, set one time for the light theme and again for
     the dark theme. The components come after, and they read the tokens and never name a color.
@@ -16,32 +16,32 @@
 
 :root,
 :root[data-bs-theme="light"] {
-    --sf-brand: #157551;
-    --sf-brand-strong: #0f5a3e;
-    --sf-ink: #0e2a21;
-    --sf-text: #2c3d36;
-    --sf-muted: #5c6f67;
+    --sf-brand: #264790;
+    --sf-brand-strong: #1b3568;
+    --sf-ink: #0f1a33;
+    --sf-text: #2a3550;
+    --sf-muted: #5b6885;
 
-    --sf-page: #f5faf7;
+    --sf-page: #f6f8fc;
     --sf-surface: #ffffff;
-    --sf-raised: #edf6f1;
-    --sf-tint: #e2f2ea;
-    --sf-line: #d9e8e1;
-    --sf-line-strong: #c2d9cf;
+    --sf-raised: #eef2f9;
+    --sf-tint: #e3eaf6;
+    --sf-line: #dce3f0;
+    --sf-line-strong: #c5d0e6;
 
-    --sf-shadow: 0 1px 2px rgba(14, 42, 33, .04), 0 8px 24px rgba(14, 42, 33, .05);
-    --sf-focus: rgba(21, 117, 81, .28);
+    --sf-shadow: 0 1px 2px rgba(15, 26, 51, .04), 0 8px 24px rgba(15, 26, 51, .05);
+    --sf-focus: rgba(38, 71, 144, .28);
 
-    /* Syntax colors. Two hues beside the brand green, so that a keyword is never read as a link. */
-    --sf-code-keyword: #116a8e;
-    --sf-code-type: #1c7a57;
+    /* Syntax colors. Two hues beside the brand blue, so that a keyword is never read as a link. */
+    --sf-code-keyword: #6b3fa0;
+    --sf-code-type: #0d6e7a;
     --sf-code-string: #9a5a00;
-    --sf-code-number: #8e3a64;
-    --sf-code-comment: #6b8078;
+    --sf-code-number: #b03a5b;
+    --sf-code-comment: #6b7a95;
 
     /* The alert colors, one pair for each severity. */
-    --sf-note: #157551;
-    --sf-note-bg: #e6f4ed;
+    --sf-note: #264790;
+    --sf-note-bg: #e6ecf8;
     --sf-tip: #0d6e7a;
     --sf-tip-bg: #e2f3f5;
     --sf-warning: #9a5a00;
@@ -52,51 +52,51 @@
     /* Bootstrap reads these, and docfx reads Bootstrap. The -rgb forms are necessary: the base
        rule for a link is rgba(var(--bs-link-color-rgb), ...), thus a color alone does nothing. */
     --bs-body-bg: var(--sf-page);
-    --bs-body-bg-rgb: 245, 250, 247;
+    --bs-body-bg-rgb: 246, 248, 252;
     --bs-body-color: var(--sf-text);
-    --bs-body-color-rgb: 44, 61, 54;
+    --bs-body-color-rgb: 42, 53, 80;
     --bs-emphasis-color: var(--sf-ink);
-    --bs-emphasis-color-rgb: 14, 42, 33;
+    --bs-emphasis-color-rgb: 15, 26, 51;
     --bs-secondary-color: var(--sf-muted);
-    --bs-secondary-color-rgb: 92, 111, 103;
+    --bs-secondary-color-rgb: 91, 104, 133;
     --bs-secondary-bg: var(--sf-raised);
     --bs-tertiary-bg: var(--sf-raised);
     --bs-border-color: var(--sf-line);
     --bs-link-color: var(--sf-brand);
-    --bs-link-color-rgb: 21, 117, 81;
+    --bs-link-color-rgb: 38, 71, 144;
     --bs-link-hover-color: var(--sf-brand-strong);
-    --bs-link-hover-color-rgb: 15, 90, 62;
+    --bs-link-hover-color-rgb: 27, 53, 104;
     --bs-code-color: var(--sf-brand-strong);
     --bs-highlight-bg: #fdf2c8;
     --bs-primary: var(--sf-brand);
-    --bs-primary-rgb: 21, 117, 81;
+    --bs-primary-rgb: 38, 71, 144;
 }
 
 :root[data-bs-theme="dark"] {
-    --sf-brand: #4fd39c;
-    --sf-brand-strong: #7ae2b8;
-    --sf-ink: #e8f4ef;
-    --sf-text: #c3d5cd;
-    --sf-muted: #8ba49a;
+    --sf-brand: #7d9fe8;
+    --sf-brand-strong: #a6bdf0;
+    --sf-ink: #e9eef9;
+    --sf-text: #c5cfe4;
+    --sf-muted: #8f9cba;
 
-    --sf-page: #0b1310;
-    --sf-surface: #101a16;
-    --sf-raised: #16241e;
-    --sf-tint: #173025;
-    --sf-line: #1f3129;
-    --sf-line-strong: #2b4237;
+    --sf-page: #0b0f1a;
+    --sf-surface: #101626;
+    --sf-raised: #171f33;
+    --sf-tint: #1a2645;
+    --sf-line: #222c45;
+    --sf-line-strong: #2f3b5a;
 
     --sf-shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px rgba(0, 0, 0, .25);
-    --sf-focus: rgba(79, 211, 156, .3);
+    --sf-focus: rgba(125, 159, 232, .3);
 
-    --sf-code-keyword: #62b8dc;
-    --sf-code-type: #58d39d;
+    --sf-code-keyword: #b99af0;
+    --sf-code-type: #5fd0d8;
     --sf-code-string: #e0a96a;
-    --sf-code-number: #e58fb4;
-    --sf-code-comment: #7e958c;
+    --sf-code-number: #f08fae;
+    --sf-code-comment: #7f8db0;
 
-    --sf-note: #4fd39c;
-    --sf-note-bg: #12251d;
+    --sf-note: #7d9fe8;
+    --sf-note-bg: #131d38;
     --sf-tip: #4fc3d3;
     --sf-tip-bg: #10262a;
     --sf-warning: #e0a96a;
@@ -105,24 +105,24 @@
     --sf-danger-bg: #2c1817;
 
     --bs-body-bg: var(--sf-page);
-    --bs-body-bg-rgb: 11, 19, 16;
+    --bs-body-bg-rgb: 11, 15, 26;
     --bs-body-color: var(--sf-text);
-    --bs-body-color-rgb: 195, 213, 205;
+    --bs-body-color-rgb: 197, 207, 228;
     --bs-emphasis-color: var(--sf-ink);
-    --bs-emphasis-color-rgb: 232, 244, 239;
+    --bs-emphasis-color-rgb: 233, 238, 249;
     --bs-secondary-color: var(--sf-muted);
-    --bs-secondary-color-rgb: 139, 164, 154;
+    --bs-secondary-color-rgb: 143, 156, 186;
     --bs-secondary-bg: var(--sf-raised);
     --bs-tertiary-bg: var(--sf-raised);
     --bs-border-color: var(--sf-line);
     --bs-link-color: var(--sf-brand);
-    --bs-link-color-rgb: 79, 211, 156;
+    --bs-link-color-rgb: 125, 159, 232;
     --bs-link-hover-color: var(--sf-brand-strong);
-    --bs-link-hover-color-rgb: 122, 226, 184;
+    --bs-link-hover-color-rgb: 166, 189, 240;
     --bs-code-color: var(--sf-brand);
     --bs-highlight-bg: #4a3f13;
     --bs-primary: var(--sf-brand);
-    --bs-primary-rgb: 79, 211, 156;
+    --bs-primary-rgb: 125, 159, 232;
 }
 
 /* ------------------------------------------------------------ page shell */
@@ -167,11 +167,13 @@ body > header {
     width: auto;
 }
 
-/* The marks are one color, #177a56, which is too dark to read on the dark page. The filter lifts
-   that green to approximately the brand color the dark theme uses for everything else. */
-:root[data-bs-theme="dark"] #logo,
+/* The square mark is opaque and reads on both themes as it is. The wordmark's letters are the
+   brand blue on a transparent ground, which is too dark to read on the dark page, so on that theme
+   the hero puts it on a light card. */
 :root[data-bs-theme="dark"] .sf-hero-logo {
-    filter: brightness(1.6) saturate(.85);
+    background-color: #ffffff;
+    border-radius: 10px;
+    padding: .75rem 1rem;
 }
 
 .navbar .search {
@@ -672,15 +674,6 @@ body[data-layout="landing"] > main > .content > article {
     max-width: 340px;
     height: auto;
     margin-bottom: 1.5rem;
-}
-
-.sf-hero-name {
-    font-size: .95rem;
-    font-weight: 650;
-    letter-spacing: .08em;
-    text-transform: uppercase;
-    color: var(--sf-brand);
-    margin-bottom: .75rem;
 }
 
 .sf-hero-tagline {

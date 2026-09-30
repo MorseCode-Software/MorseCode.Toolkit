@@ -4,7 +4,7 @@ layout: landing
 ---
 
 <div class="sf-hero">
-<p class="sf-hero-name">MorseCode Toolkit</p>
+<img class="sf-hero-logo" src="images/morsecode-wordmark.png" alt="MorseCode Software">
 <p class="sf-hero-tagline">Applications on SodaFlow, built one way.</p>
 <p class="sf-hero-lede">SodaFlow is a general-purpose library and leaves the shape of your application to you. This toolkit holds the opinions MorseCode Software builds its own applications with: how a view model is put together, how its graph is constructed, and how it releases what it built.</p>
 <p class="sf-actions">

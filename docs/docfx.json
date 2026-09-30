@@ -51,6 +51,8 @@
       "_appName": "MorseCode Toolkit",
       "_appTitle": "MorseCode Toolkit for .NET",
       "_appFooter": "MorseCode Software &mdash; BSD-3-Clause",
+      "_appLogoPath": "images/morsecode-mark.png",
+      "_appFaviconPath": "images/morsecode-mark.png",
       "_enableSearch": true,
       "_gitContribute": {
         "repo": "https://github.com/MorseCode-Software/MorseCode.Toolkit",
