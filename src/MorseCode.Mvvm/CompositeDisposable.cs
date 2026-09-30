@@ -90,15 +90,15 @@ public static partial class Disposable
                 }
             }
 
-            switch (exceptions.Count)
+            // ReSharper disable once ConvertIfStatementToSwitchStatement - A switch case must end in a jump, and a jump after ExceptionDispatchInfo.Throw is a line that cannot run.
+            if (exceptions.Count == 1)
             {
-                case 0:
-                    return;
-                case 1:
-                    ExceptionDispatchInfo.Throw(exceptions[0]);
-                    return;
-                default:
-                    throw new AggregateException(exceptions);
+                ExceptionDispatchInfo.Throw(exceptions[0]);
+            }
+
+            if (exceptions.Count > 1)
+            {
+                throw new AggregateException(exceptions);
             }
         }
     }

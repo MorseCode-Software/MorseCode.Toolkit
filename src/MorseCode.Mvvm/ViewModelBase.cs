@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Threading;
 using JetBrains.Annotations;
 using MorseCode.StagedConstruction;
 using SodaFlow;
@@ -108,7 +109,8 @@ public sealed class ViewModelBase : IViewModel
     /// <remarks>
     ///     Use this during the construction only. After the subclass calls
     ///     <see cref="IConstruct{TBaseValues}.Construct{TResult}" />, each member fails with an
-    ///     <see cref="InvalidOperationException" />.
+    ///     <see cref="InvalidOperationException" />. This is also true on a different thread. A
+    ///     registration either gets into the registrations that Dispose releases, or fails.
     /// </remarks>
     [PublicAPI]
     public interface IOutput
@@ -153,7 +155,9 @@ public sealed class ViewModelBase : IViewModel
         /// <remarks>
         ///     After the subclass calls Construct, each method fails with an
         ///     <see cref="InvalidOperationException" />. The method does this check before it makes the
-        ///     object. Thus, a refused call attaches nothing to the graph.
+        ///     object. Thus, a refused call attaches nothing to the graph. A Construct on a different
+        ///     thread can occur while the method makes the object. Then, the method disposes the object
+        ///     and fails.
         /// </remarks>
         IBindableFactory BindableFactory { get; }
     }
@@ -168,6 +172,12 @@ public sealed class ViewModelBase : IViewModel
         private readonly BindableFactory bindableFactory =
             new(bindingScheduler: bindingScheduler);
 
+        // This code reads and writes isSealed and registrations only while it holds this lock. Thus, a
+        // registration on a different thread either gets into the composite or fails, and it does not
+        // leak. This code does not hold the lock while SodaFlow makes a bindable. SodaFlow can hold a
+        // lock of its own, and a thread that holds that lock can call this output.
+        private readonly Lock gate = new();
+
         private bool isSealed;
 
         /// <inheritdoc />
@@ -177,11 +187,10 @@ public sealed class ViewModelBase : IViewModel
             // The null check occurs here, where the caller is on the stack. A null entry that gets to
             // Dispose stops the disposal of all of the entries.
             ArgumentNullException.ThrowIfNull(argument: listener);
-            this.ThrowIfSealed();
 
             // The delegate refers to the listener. Thus, the list keeps a weak listener alive for the
             // life of the view model.
-            this.registrations.Add(Disposable.FromAction(onDispose: listener.Unlisten));
+            this.Add(registration: Disposable.FromAction(onDispose: listener.Unlisten));
             return listener;
         }
 
@@ -192,9 +201,8 @@ public sealed class ViewModelBase : IViewModel
             // The null check occurs here, where the caller is on the stack. A null entry that gets to
             // Dispose stops the disposal of all of the entries.
             ArgumentNullException.ThrowIfNull(argument: disposable);
-            this.ThrowIfSealed();
 
-            this.registrations.Add(disposable);
+            this.Add(registration: disposable);
             return disposable;
         }
 
@@ -205,148 +213,129 @@ public sealed class ViewModelBase : IViewModel
         // that the construction registered, and a registration after it fails and does not leak.
         public IDisposable Seal()
         {
-            this.ThrowIfSealed();
-            this.isSealed = true;
+            lock (this.gate)
+            {
+                this.ThrowIfSealed();
+                this.isSealed = true;
 
-            return Disposable.Composite(disposables: this.registrations);
+                return Disposable.Composite(disposables: this.registrations);
+            }
         }
 
         /// <inheritdoc />
-        public IOneWayBindableValue<T> CreateOneWay<T>(Cell<T> cell, IEqualityComparer<T>? comparer = null)
-        {
-            this.ThrowIfSealed();
-
-            IOneWayBindableValue<T> oneWayBindableValue =
-                this.bindableFactory.CreateOneWay(cell: cell, comparer: comparer);
-
-            this.registrations.Add(oneWayBindableValue);
-
-            return oneWayBindableValue;
-        }
+        public IOneWayBindableValue<T> CreateOneWay<T>(Cell<T> cell, IEqualityComparer<T>? comparer = null) =>
+            this.Make(make: () => this.bindableFactory.CreateOneWay(cell: cell, comparer: comparer));
 
         /// <inheritdoc />
         public ITwoWayBindableValue<T> CreateTwoWay<T>(
             Cell<T> cell,
             StreamSink<T> editsStreamSink,
-            IEqualityComparer<T>? comparer = null)
-        {
-            this.ThrowIfSealed();
-
-            ITwoWayBindableValue<T> twoWayBindableValue =
-                this.bindableFactory.CreateTwoWay(cell: cell, editsStreamSink: editsStreamSink, comparer: comparer);
-
-            this.registrations.Add(twoWayBindableValue);
-
-            return twoWayBindableValue;
-        }
+            IEqualityComparer<T>? comparer = null) =>
+            this.Make(
+                make: () =>
+                    this.bindableFactory.CreateTwoWay(cell: cell, editsStreamSink: editsStreamSink, comparer: comparer));
 
         /// <inheritdoc />
-        public ITwoWayBindableValue<T> CreateTwoWay<T>(CellSink<T> sink, IEqualityComparer<T>? comparer = null)
-        {
-            this.ThrowIfSealed();
-
-            ITwoWayBindableValue<T> twoWayBindableValue =
-                this.bindableFactory.CreateTwoWay(sink: sink, comparer: comparer);
-
-            this.registrations.Add(twoWayBindableValue);
-
-            return twoWayBindableValue;
-        }
+        public ITwoWayBindableValue<T> CreateTwoWay<T>(CellSink<T> sink, IEqualityComparer<T>? comparer = null) =>
+            this.Make(make: () => this.bindableFactory.CreateTwoWay(sink: sink, comparer: comparer));
 
         /// <inheritdoc />
         public IOneWayToSourceBindableValue<T> CreateOneWayToSource<T>(
             StreamSink<T> editsStreamSink,
             T initialValue,
-            IEqualityComparer<T>? comparer = null)
-        {
-            this.ThrowIfSealed();
-
-            IOneWayToSourceBindableValue<T> oneWayToSourceBindableValue =
-                this.bindableFactory.CreateOneWayToSource(
-                    editsStreamSink: editsStreamSink,
-                    initialValue: initialValue,
-                    comparer: comparer);
-
-            this.registrations.Add(oneWayToSourceBindableValue);
-
-            return oneWayToSourceBindableValue;
-        }
+            IEqualityComparer<T>? comparer = null) =>
+            this.Make(
+                make: () =>
+                    this.bindableFactory.CreateOneWayToSource(
+                        editsStreamSink: editsStreamSink,
+                        initialValue: initialValue,
+                        comparer: comparer));
 
         /// <inheritdoc />
         public IOneWayToSourceBindableValue<T> CreateOneWayToSource<T>(
             CellSink<T> sink,
-            IEqualityComparer<T>? comparer = null)
-        {
-            this.ThrowIfSealed();
-
-            IOneWayToSourceBindableValue<T> oneWayToSourceBindableValue =
-                this.bindableFactory.CreateOneWayToSource(sink: sink, comparer: comparer);
-
-            this.registrations.Add(oneWayToSourceBindableValue);
-
-            return oneWayToSourceBindableValue;
-        }
+            IEqualityComparer<T>? comparer = null) =>
+            this.Make(make: () => this.bindableFactory.CreateOneWayToSource(sink: sink, comparer: comparer));
 
         /// <inheritdoc />
         public IBindableAction<T> CreateBindableAction<T>(
             StreamSink<T> firingsStreamSink,
             Cell<bool>? isEnabledCell = null)
-            where T : notnull
-        {
-            this.ThrowIfSealed();
-
-            IBindableAction<T> bindableAction =
-                this.bindableFactory.CreateBindableAction(
-                    firingsStreamSink: firingsStreamSink,
-                    isEnabledCell: isEnabledCell);
-
-            this.registrations.Add(bindableAction);
-
-            return bindableAction;
-        }
+            where T : notnull =>
+            this.Make(
+                make: () =>
+                    this.bindableFactory.CreateBindableAction(
+                        firingsStreamSink: firingsStreamSink,
+                        isEnabledCell: isEnabledCell));
 
         /// <inheritdoc />
         public IBindableAction CreateBindableAction(
             StreamSink<Unit> firingsStreamSink,
-            Cell<bool>? isEnabledCell = null)
-        {
-            this.ThrowIfSealed();
-
-            IBindableAction bindableAction =
-                this.bindableFactory.CreateBindableAction(
-                    firingsStreamSink: firingsStreamSink,
-                    isEnabledCell: isEnabledCell);
-
-            this.registrations.Add(bindableAction);
-
-            return bindableAction;
-        }
+            Cell<bool>? isEnabledCell = null) =>
+            this.Make(
+                make: () =>
+                    this.bindableFactory.CreateBindableAction(
+                        firingsStreamSink: firingsStreamSink,
+                        isEnabledCell: isEnabledCell));
 
         /// <inheritdoc />
         public IBindableAction<Maybe<T>> CreateBindableAction<T>(
             StreamSink<Maybe<T>> firingsStreamSink,
             Cell<bool>? isEnabledCell = null)
-            where T : notnull
+            where T : notnull =>
+            this.Make(
+                make: () =>
+                    this.bindableFactory.CreateBindableAction(
+                        firingsStreamSink: firingsStreamSink,
+                        isEnabledCell: isEnabledCell));
+
+        private static InvalidOperationException SealedException() =>
+            new(
+                message: "The view model is already constructed. Register each disposable, listener, "
+                    + "and bindable before the subclass calls Construct.");
+
+        private void Add(IDisposable registration)
         {
-            this.ThrowIfSealed();
-
-            IBindableAction<Maybe<T>> bindableAction =
-                this.bindableFactory.CreateBindableAction(
-                    firingsStreamSink: firingsStreamSink,
-                    isEnabledCell: isEnabledCell);
-
-            this.registrations.Add(bindableAction);
-
-            return bindableAction;
+            lock (this.gate)
+            {
+                this.ThrowIfSealed();
+                this.registrations.Add(registration);
+            }
         }
 
+        // The first check refuses a late call before SodaFlow makes anything. A Construct can occur
+        // while SodaFlow makes the object. Then, the second check finds the seal, and this method
+        // disposes the object and fails. Thus, the object does not stay attached to the graph.
+        private T Make<T>(Func<T> make)
+            where T : IDisposable
+        {
+            lock (this.gate)
+            {
+                this.ThrowIfSealed();
+            }
+
+            T made = make();
+
+            lock (this.gate)
+            {
+                if (!this.isSealed)
+                {
+                    this.registrations.Add(made);
+                    return made;
+                }
+            }
+
+            made.Dispose();
+
+            throw SealedException();
+        }
+
+        // The caller must hold the lock.
         private void ThrowIfSealed()
         {
             if (this.isSealed)
             {
-                throw new InvalidOperationException(
-                    message: "The view model is already constructed. Register each disposable, listener, "
-                        + "and bindable before the subclass calls Construct.");
+                throw SealedException();
             }
         }
     }
