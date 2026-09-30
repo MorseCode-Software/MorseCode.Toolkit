@@ -3,23 +3,28 @@
 This package now targets net472, net6.0, and netstandard2.0, and not net10.0
 only. The behavior is the same on every target.
 
-Select on an IConstruct is now an extension method on the Construct class, and
-not a default member of the interface. .NET Framework and .NET Standard 2.0 do
-not support a default interface member. A call that lets the compiler infer the
-type arguments, such as construct.Select(values => ...), needs no change, but
-you must compile it again: a package built against 0.1.0 does not find the old
-member. A call that writes the type arguments must now write both, for example
-construct.Select<TBaseValues, TSelectedValues>(selector). A type that
-implements IConstruct no longer inherits a Select member from the interface.
+Breaking change: the IConstruct and IStage interfaces are gone. The abstract
+classes Constructor<TBaseValues> and Stage<TInput, TOutput, TNext> replace them.
+.NET Framework and .NET Standard 2.0 do not support a default interface member,
+so Select could not stay on the interface, and an interface cannot force an
+implementer to check for a second call. Each class has a public Construct or
+Advance method that checks for a second call, also when two threads call at the
+same time, and also when the first call fails. Then it calls a method that a
+derived class implements: ConstructCore or AdvanceCore. The static class that
+made the usual handles, Construct, is now Constructor. Select is a virtual
+method of Constructor, and a derived class can override it.
 
-New: ConstructBase<TBaseValues> and StageBase<TInput, TOutput, TNext> are base
-classes for a handle or a stage that a base writes itself. Each one checks for a
-second call, also when two threads call at the same time, and also when the
-first call fails, so the derived class does not make the check. A class that
-derives from ConstructBase implements ConstructCore, and a class that derives
-from StageBase implements AdvanceCore. ConstructBase also has a virtual Select.
-The Select extension method calls the override, also for a variable that has the
-type IConstruct.
+You must change every signature that names the old types. For example,
+StageContinuation<string, IConstruct<AnimalValues>, TResult> becomes
+StageContinuation<string, Constructor<AnimalValues>, TResult>, and
+Construct.From(values) becomes Constructor.From(values). Compile again any
+assembly that you built against 0.1.0.
+
+The classes are not variant, as the interfaces were. A Constructor<Dog> does not
+convert to a Constructor<Animal>. A helper that must accept both is generic in
+the values type, for example
+Describe<T>(Constructor<T> handle) where T : AnimalValues. To change the values
+type of a handle, call Select.
 
 0.1.0
 

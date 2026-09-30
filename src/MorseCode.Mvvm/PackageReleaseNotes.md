@@ -1,10 +1,14 @@
 0.1.1
 
 This package now targets net472, net6.0, and netstandard2.0, and not net10.0
-only. The behavior is the same on every target, and no member of the public API
-changed. It depends on MorseCode.StagedConstruction 0.1.1 or later, because that
-package made the same change and moved Select from the IConstruct interface to
-an extension method.
+only. The behavior is the same on every target.
+
+Breaking change: ViewModelBase.CreateBase takes a
+StageContinuation<IOutput, Constructor<ViewModelBase>, TResult>, and not an
+IConstruct<ViewModelBase>. MorseCode.StagedConstruction 0.1.1 replaced the
+IConstruct interface with the Constructor class, and this package depends on
+that version or later. Change the signature of each view model that calls
+CreateBase, and compile it again.
 
 0.1.0
 

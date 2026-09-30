@@ -12,11 +12,11 @@ has a base of its own.
 
 Sometimes the base needs a value that only the subclass can make, and the subclass needs a value
 that only the base can make. Each exchange is a **stage**. The first stage is the static
-`CreateBase` method. Each stage after it is an `IStage<TInput, TOutput, TNext>`:
+`CreateBase` method. Each stage after it is a `Stage<TInput, TOutput, TNext>`:
 
 - `TInput` is what the subclass gives to the stage.
 - `TOutput` is what the stage gives back.
-- `TNext` is the handle for the step after: another `IStage`, or an `IConstruct` after the last
+- `TNext` is the handle for the step after: another `Stage`, or a `Constructor` after the last
   stage.
 
 The type of the first continuation lists every stage in order:
@@ -26,9 +26,9 @@ public static TResult CreateBase<TResult>(
     int seed,
     StageContinuation<
         int,                                          // the output of stage 1
-        IStage<int, int,                              // stage 2: input int, output int
-            IStage<string, string,                    // stage 3: input string, output string
-                IConstruct<MachineValues>>>,          // then construct
+        Stage<int, int,                               // stage 2: input int, output int
+            Stage<string, string,                     // stage 3: input string, output string
+                Constructor<MachineValues>>>,         // then construct
         TResult> continuation)
 {
     return continuation(
@@ -41,7 +41,7 @@ public static TResult CreateBase<TResult>(
                     body: (string label) =>
                     (
                         Output: label.ToUpperInvariant(),
-                        Next: Construct.From(new MachineValues(seed, adjusted, label)))))));
+                        Next: Constructor.From(new MachineValues(seed, adjusted, label)))))));
 }
 ```
 
@@ -62,7 +62,7 @@ the closure around it.
 
 `Stage.From` runs `body` when the subclass calls `Advance`, and not when the stage is made. It does
 no work after the subclass continues. A stage that must do work around the later steps, for example
-in a transaction, derives from `StageBase<,,>` and does that work in `AdvanceCore`. The base class
+in a transaction, derives from `Stage<,,>` and does that work in `AdvanceCore`. The class
 refuses a second `Advance` the way the stage from `Stage.From` does. See
 [Each handle is used once](staged-construction.md#each-handle-is-used-once).
 
@@ -70,13 +70,13 @@ refuses a second `Advance` the way the stage from `Stage.From` does. See
 
 ## A base with a base of its own
 
-A base that has its own base adds its values to the values of that base. The `Select` extension
-method on `IConstruct<T>` does it:
+A base that has its own base adds its values to the values of that base. The `Select` method
+of `Constructor<T>` does it:
 
 ```csharp
 public static TResult CreateBase<TResult>(
     string name,
-    StageContinuation<string, IConstruct<MammalValues>, TResult> continuation) =>
+    StageContinuation<string, Constructor<MammalValues>, TResult> continuation) =>
     Animal.CreateBase(name, (output, construct) =>
         continuation(
             output,
