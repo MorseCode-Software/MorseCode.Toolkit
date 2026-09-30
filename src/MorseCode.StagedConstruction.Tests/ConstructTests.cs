@@ -82,7 +82,7 @@ public sealed class ConstructTests
         IConstruct<int> construct = Construct.From(values: 1);
 
         // ReSharper disable once NullableWarningSuppressionIsUsed - The null selector is the input under test: Select must refuse it at run time.
-        Exception caught = Catching.Catch(action: () => _ = construct.Select<int>(selector: null!));
+        Exception caught = Catching.Catch(action: () => _ = construct.Select<int, int>(selector: null!));
 
         await Assert.That(caught).IsTypeOf<ArgumentNullException>();
         await Assert.That(((ArgumentNullException)caught).ParamName).IsEqualTo(expected: "selector");

@@ -28,11 +28,8 @@ public static class Stage
     /// <returns>The stage.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="body" /> is null.</exception>
     public static IStage<TInput, TOutput, TNext> From<TInput, TOutput, TNext>(
-        Func<TInput, (TOutput Output, TNext Next)> body)
-    {
+        Func<TInput, (TOutput Output, TNext Next)> body) =>
         // The null check occurs here, where the caller is on the stack, and not subsequently in Advance.
-        ArgumentNullException.ThrowIfNull(argument: body);
-
-        return new StageFromBody<TInput, TOutput, TNext>(body: body);
-    }
+        new StageFromBody<TInput, TOutput, TNext>(
+            body: body ?? throw new ArgumentNullException(paramName: nameof(body)));
 }

@@ -10,7 +10,7 @@ internal sealed class ValuesConstruct<TBaseValues>(TBaseValues values) : IConstr
 {
     private TBaseValues Values { get; } = values;
 
-    private bool used;
+    private int used;
 
     public TResult Construct<TResult>(Func<TBaseValues, TResult> constructor)
     {

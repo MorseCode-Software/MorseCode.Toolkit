@@ -21,20 +21,16 @@ public static partial class Disposable
     /// <param name="onDispose">The action that releases the resource.</param>
     /// <returns>The disposable.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="onDispose" /> is null.</exception>
-    public static IDisposable FromAction(Action onDispose)
-    {
+    public static IDisposable FromAction(Action onDispose) =>
         // The null check occurs here, where the caller is on the stack, and not subsequently in Dispose.
-        ArgumentNullException.ThrowIfNull(argument: onDispose);
-
-        return new ActionDisposable(onDispose: onDispose);
-    }
+        new ActionDisposable(onDispose: onDispose ?? throw new ArgumentNullException(paramName: nameof(onDispose)));
 
     // ReSharper disable once InheritdocConsiderUsage - The summary of IDisposable does not say what this type disposes or in which order.
     private sealed class ActionDisposable : IDisposable
     {
         private readonly Action onDispose;
 
-        private bool disposed;
+        private int disposed;
 
         /// <summary>Creates a disposable which runs an action.</summary>
         /// <param name="onDispose">The action to run on <see cref="Dispose"/>.</param>
@@ -46,7 +42,7 @@ public static partial class Disposable
         /// </remarks>
         public void Dispose()
         {
-            if (Interlocked.Exchange(location1: ref this.disposed, value: true))
+            if (Interlocked.Exchange(location1: ref this.disposed, value: 1) != 0)
             {
                 return;
             }

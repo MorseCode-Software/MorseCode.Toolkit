@@ -11,7 +11,7 @@ internal sealed class StageFromBody<TInput, TOutput, TNext>(Func<TInput, (TOutpu
 {
     private Func<TInput, (TOutput Output, TNext Next)> Body { get; } = body;
 
-    private bool used;
+    private int used;
 
     public TResult Advance<TResult>(TInput input, StageContinuation<TOutput, TNext, TResult> continuation)
     {

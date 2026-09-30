@@ -11,7 +11,7 @@ namespace MorseCode.StagedConstruction;
 ///     <para>
 ///         The subclass must call <see cref="Construct{TResult}" /> one time only. The handles that
 ///         <see cref="StagedConstruction.Construct.From{TBaseValues}" /> and
-///         <see cref="Select{TSelectedValues}" /> make fail at a second call, also when two threads call
+///         <c>Select</c> make fail at a second call, also when two threads call
 ///         at the same time. The first call uses the handle, also when the constructor fails. A base
 ///         that implements this interface itself must do the same.
 ///     </para>
@@ -39,25 +39,4 @@ public interface IConstruct<out TBaseValues>
     /// <returns>The value that <paramref name="constructor" /> returns.</returns>
     /// <exception cref="InvalidOperationException">A caller used this handle before.</exception>
     TResult Construct<TResult>(Func<TBaseValues, TResult> constructor);
-
-    /// <summary>
-    ///     Makes a handle that gives the result of <paramref name="selector" /> to the constructor, and
-    ///     not the values of this handle.
-    /// </summary>
-    /// <remarks>
-    ///     A base that has a base of its own uses this to add its values to the values of that base.
-    ///     The new handle calls <paramref name="selector" /> when the subclass calls
-    ///     <see cref="Construct{TResult}" /> on it, and not before.
-    /// </remarks>
-    /// <param name="selector">The function that makes the new values from the values of this handle.</param>
-    /// <typeparam name="TSelectedValues">The type of the new values.</typeparam>
-    /// <returns>The new handle.</returns>
-    /// <exception cref="ArgumentNullException"><paramref name="selector" /> is null.</exception>
-    IConstruct<TSelectedValues> Select<TSelectedValues>(Func<TBaseValues, TSelectedValues> selector)
-    {
-        // The null check occurs here, where the caller is on the stack, and not subsequently in Construct.
-        ArgumentNullException.ThrowIfNull(argument: selector);
-
-        return new SelectedConstruct<TBaseValues, TSelectedValues>(source: this, selector: selector);
-    }
 }

@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
-using System.Threading;
 using JetBrains.Annotations;
 using MorseCode.StagedConstruction;
 using SodaFlow;
@@ -61,7 +60,10 @@ public sealed class ViewModelBase : IViewModel
         StageContinuation<IOutput, IConstruct<ViewModelBase>, TResult> continuation)
     {
         // The null check occurs here, where the caller is on the stack.
-        ArgumentNullException.ThrowIfNull(argument: bindingScheduler);
+        if (bindingScheduler is null)
+        {
+            throw new ArgumentNullException(paramName: nameof(bindingScheduler));
+        }
 
         Output output = new(bindingScheduler: bindingScheduler);
 
@@ -180,7 +182,7 @@ public sealed class ViewModelBase : IViewModel
         // registration on a different thread either gets into the composite or fails, and it does not
         // leak. This code does not hold the lock while SodaFlow makes a bindable. SodaFlow can hold a
         // lock of its own, and a thread that holds that lock can call this output.
-        private readonly Lock gate = new();
+        private readonly object gate = new();
 
         private bool isSealed;
 
@@ -190,7 +192,10 @@ public sealed class ViewModelBase : IViewModel
         {
             // The null check occurs here, where the caller is on the stack. A null entry that gets to
             // Dispose stops the disposal of all of the entries.
-            ArgumentNullException.ThrowIfNull(argument: listener);
+            if (listener is null)
+            {
+                throw new ArgumentNullException(paramName: nameof(listener));
+            }
 
             // The delegate refers to the listener. Thus, the list keeps a weak listener alive for the
             // life of the view model.
@@ -204,7 +209,10 @@ public sealed class ViewModelBase : IViewModel
         {
             // The null check occurs here, where the caller is on the stack. A null entry that gets to
             // Dispose stops the disposal of all of the entries.
-            ArgumentNullException.ThrowIfNull(argument: disposable);
+            if (disposable is null)
+            {
+                throw new ArgumentNullException(paramName: nameof(disposable));
+            }
 
             this.Add(registration: disposable);
             return disposable;
