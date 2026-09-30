@@ -35,7 +35,7 @@ public sealed class ActionDisposableTests
         // the signal when the count is equal to the number of threads. Thus, the calls overlap and
         // do not occur in sequence.
         int ready = 0;
-        TaskCompletionSource start = new();
+        TaskCompletionSource<bool> start = new();
 
         Task[] disposals =
         [
@@ -53,7 +53,7 @@ public sealed class ActionDisposableTests
         ];
 
         SpinWait.SpinUntil(condition: () => Volatile.Read(location: ref ready) == threads);
-        start.SetResult();
+        start.SetResult(result: true);
 
         await Task.WhenAll(tasks: disposals);
 

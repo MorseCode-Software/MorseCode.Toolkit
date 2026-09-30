@@ -158,7 +158,7 @@ public sealed class SingleUseTests
     private static async Task<int[]> RunTogether(Action call)
     {
         int ready = 0;
-        TaskCompletionSource start = new();
+        TaskCompletionSource<bool> start = new();
 
         Task<int>[] calls =
         [
@@ -186,7 +186,7 @@ public sealed class SingleUseTests
         ];
 
         SpinWait.SpinUntil(condition: () => Volatile.Read(location: ref ready) == Threads);
-        start.SetResult();
+        start.SetResult(result: true);
 
         return await Task.WhenAll(tasks: calls);
     }

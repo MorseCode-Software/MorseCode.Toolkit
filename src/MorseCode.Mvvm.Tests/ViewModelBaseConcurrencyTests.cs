@@ -248,7 +248,7 @@ public sealed class ViewModelBaseConcurrencyTests
 
         public void Start(Func<bool> register)
         {
-            TaskCompletionSource start = new();
+            TaskCompletionSource<bool> start = new();
 
             this.tasks =
             [
@@ -271,7 +271,7 @@ public sealed class ViewModelBaseConcurrencyTests
             ];
 
             SpinWait.SpinUntil(condition: () => Volatile.Read(location: ref this.ready) == this.threads);
-            start.SetResult();
+            start.SetResult(result: true);
             SpinWait.SpinUntil(condition: () => Volatile.Read(location: ref this.attempts) >= this.threads * 4);
         }
     }
