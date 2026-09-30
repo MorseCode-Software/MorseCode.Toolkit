@@ -12,6 +12,15 @@ member. A call that writes the type arguments must now write both, for example
 construct.Select<TBaseValues, TSelectedValues>(selector). A type that
 implements IConstruct no longer inherits a Select member from the interface.
 
+New: ConstructBase<TBaseValues> and StageBase<TInput, TOutput, TNext> are base
+classes for a handle or a stage that a base writes itself. Each one checks for a
+second call, also when two threads call at the same time, and also when the
+first call fails, so the derived class does not make the check. A class that
+derives from ConstructBase implements ConstructCore, and a class that derives
+from StageBase implements AdvanceCore. ConstructBase also has a virtual Select.
+The Select extension method calls the override, also for a variable that has the
+type IConstruct.
+
 0.1.0
 
 The first release. It contains the types for staged construction: the

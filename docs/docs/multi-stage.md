@@ -62,8 +62,9 @@ the closure around it.
 
 `Stage.From` runs `body` when the subclass calls `Advance`, and not when the stage is made. It does
 no work after the subclass continues. A stage that must do work around the later steps, for example
-in a transaction, implements `IStage<,,>` directly, and should refuse a second `Advance` the way
-the stage from `Stage.From` does. See [Each handle is used once](staged-construction.md#each-handle-is-used-once).
+in a transaction, derives from `StageBase<,,>` and does that work in `AdvanceCore`. The base class
+refuses a second `Advance` the way the stage from `Stage.From` does. See
+[Each handle is used once](staged-construction.md#each-handle-is-used-once).
 
 `Stage.From` refuses a null `body` when you call it, and not later in `Advance`.
 

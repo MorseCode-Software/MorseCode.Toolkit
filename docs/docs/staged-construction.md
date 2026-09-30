@@ -96,9 +96,17 @@ that `Construct.From`, `Select`, and `Stage.From` make enforce this: a second ca
 The first call uses the handle up before it runs your constructor or stage. If that code throws,
 the handle stays used, so a failed construction cannot be run a second time.
 
-A base that implements `IConstruct<T>` or `IStage<,,>` by hand should make the same check. The
-handle that `Select` makes checks for itself, so it refuses a second `Construct` even when its
-source is a hand-written handle that does not.
+A base that needs its own handle should derive from `ConstructBase<T>` or `StageBase<,,>`. Each one
+makes this check for you, before it calls the method you write: `ConstructCore` or `AdvanceCore`.
+That method runs at most once, so it needs no check of its own.
+
+`ConstructBase<T>` also has a virtual `Select`. The default makes the usual handle, and you can
+override it when your handle can do better. The `Select` extension method calls your override, also
+when the variable has the type `IConstruct<T>`.
+
+If you implement `IConstruct<T>` or `IStage<,,>` directly instead, you must make the check
+yourself. The handle that `Select` makes checks for itself, so it refuses a second `Construct` even
+when its source is a hand-written handle that does not.
 
 ## The types
 
@@ -109,6 +117,8 @@ source is a hand-written handle that does not.
 | @MorseCode.StagedConstruction.IStage`3 | The handle for a stage after the first. The subclass gives input to it. |
 | @MorseCode.StagedConstruction.Construct | `Construct.From(values)` makes the usual final handle. |
 | @MorseCode.StagedConstruction.Stage | `Stage.From(body)` makes a stage from a function. |
+| @MorseCode.StagedConstruction.ConstructBase`1 | The base class for your own `IConstruct<T>`. It checks that the handle is used once. |
+| @MorseCode.StagedConstruction.StageBase`3 | The base class for your own `IStage<,,>`. It checks that the stage is used once. |
 
 A base with more than one stage, or a base that has a base of its own, uses more of these. See
 [Bases with several stages](multi-stage.md).
