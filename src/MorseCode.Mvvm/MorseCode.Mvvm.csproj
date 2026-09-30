@@ -12,6 +12,7 @@
         <Product>MorseCode.Mvvm</Product>
         <Title>MorseCode.Mvvm</Title>
         <Description>Building blocks for view models written in a functional reactive style on SodaFlow.</Description>
+        <PackageIcon>MorseCode.png</PackageIcon>
         <AssemblyName>MorseCode.Mvvm</AssemblyName>
         <RootNamespace>MorseCode.Mvvm</RootNamespace>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
@@ -31,6 +32,12 @@
 
     <ItemGroup>
         <ProjectReference Include="..\MorseCode.StagedConstruction\MorseCode.StagedConstruction.csproj"/>
+    </ItemGroup>
+
+    <ItemGroup>
+      <None Include="..\..\logo\MorseCode.png" Pack="true" PackagePath="\">
+        <Link>MorseCode.png</Link>
+      </None>
     </ItemGroup>
 
 </Project>

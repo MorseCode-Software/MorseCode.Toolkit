@@ -12,6 +12,7 @@
         <Product>MorseCode.StagedConstruction</Product>
         <Title>MorseCode.StagedConstruction</Title>
         <Description>Construction of immutable objects in ordered stages, with no access to a partly built object.</Description>
+        <PackageIcon>MorseCode.png</PackageIcon>
         <AssemblyName>MorseCode.StagedConstruction</AssemblyName>
         <RootNamespace>MorseCode.StagedConstruction</RootNamespace>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
@@ -27,6 +28,12 @@
         <Compile Include="StageContinuation.cs"/>
         <Compile Include="StageFromBody.cs"/>
         <Compile Include="ValuesConstruct.cs"/>
+    </ItemGroup>
+
+    <ItemGroup>
+      <None Include="..\..\logo\MorseCode.png" Pack="true" PackagePath="\">
+        <Link>MorseCode.png</Link>
+      </None>
     </ItemGroup>
 
 </Project>
