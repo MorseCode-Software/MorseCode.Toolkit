@@ -40,7 +40,12 @@ makes a stage from a function that takes the input of the subclass and returns
 the output and the next handle. A null selector or body fails when Select or
 Stage.From is called, and not later.
 
-A subclass must use each handle one time only. The handles do not check this.
+A subclass must use each handle one time only, and the handles that
+Construct.From, Select, and Stage.From make check this: a second Construct or
+Advance throws an InvalidOperationException, also when two threads call at the
+same time. The first call uses the handle even if the constructor or stage
+throws, so a failed construction cannot be run again. A base that implements
+IConstruct or IStage by hand should make the same check.
 
 This package is pre-1.0. Its API can change in a minor version until 1.0.0.
 
