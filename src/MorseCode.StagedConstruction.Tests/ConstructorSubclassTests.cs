@@ -86,15 +86,70 @@ public sealed class ConstructorSubclassTests
         await Assert.That(selectorCalls).IsEqualTo(expected: 1);
     }
 
+    // Select uses the source. Thus, only the selected handle can give the values of the source to a
+    // constructor, and the source cannot construct a second time.
     [Test]
-    public async Task DefaultSelectDoesNotUseTheSource()
+    public async Task SelectUsesTheSource()
     {
         Recording source = new(values: 1);
 
         _ = source.Select(selector: static values => values);
-        int result = source.Construct(constructor: static values => values);
+        Exception caught = Catching.Catch(action: () => _ = source.Construct(constructor: static values => values));
 
-        await Assert.That(result).IsEqualTo(expected: 1);
+        await Assert.That(caught).IsTypeOf<InvalidOperationException>();
+        await Assert.That(caught.Message).Contains(expected: "Select was already called");
+        await Assert.That(source.CoreCalls).IsEqualTo(expected: 0);
+    }
+
+    [Test]
+    public async Task SecondSelectFails()
+    {
+        Recording source = new(values: 1);
+
+        _ = source.Select(selector: static values => values);
+        Exception caught = Catching.Catch(action: () => _ = source.Select(selector: static values => values));
+
+        await Assert.That(caught).IsTypeOf<InvalidOperationException>();
+        await Assert.That(caught.Message).Contains(expected: "Select was already called");
+    }
+
+    [Test]
+    public async Task SelectAfterConstructFails()
+    {
+        Recording source = new(values: 1);
+
+        _ = source.Construct(constructor: static values => values);
+        Exception caught = Catching.Catch(action: () => _ = source.Select(selector: static values => values));
+
+        await Assert.That(caught).IsTypeOf<InvalidOperationException>();
+        await Assert.That(caught.Message).Contains(expected: "Construct was already called");
+    }
+
+    [Test]
+    public async Task ConcurrentSelectAndConstructSucceedOnce()
+    {
+        Recording source = new(values: 1);
+        int calls = 0;
+
+        // Half of the threads call Select, and the other half call Construct.
+        int[] results = await Concurrency.RunTogether(
+            call: () =>
+            {
+                if (Interlocked.Increment(location: ref calls) % 2 == 0)
+                {
+                    _ = source.Select(selector: static values => values);
+                }
+                else
+                {
+                    _ = source.Construct(constructor: static values => values);
+                }
+            });
+
+        int succeeded = results.Count(predicate: static result => result == Concurrency.Succeeded);
+        int refused = results.Count(predicate: static result => result == Concurrency.Refused);
+
+        await Assert.That(succeeded).IsEqualTo(expected: 1);
+        await Assert.That(refused).IsEqualTo(expected: Concurrency.Threads - 1);
     }
 
     [Test]
@@ -111,7 +166,7 @@ public sealed class ConstructorSubclassTests
     }
 
     [Test]
-    public async Task DefaultSelectRefusesANullSelectorWhenItIsCalled()
+    public async Task SelectRefusesANullSelectorAndDoesNotUseTheHandle()
     {
         Recording source = new(values: 1);
 
@@ -120,20 +175,60 @@ public sealed class ConstructorSubclassTests
 
         await Assert.That(caught).IsTypeOf<ArgumentNullException>();
         await Assert.That(((ArgumentNullException)caught).ParamName).IsEqualTo(expected: "selector");
-        await Assert.That(source.CoreCalls).IsEqualTo(expected: 0);
+        await Assert.That(source.Construct(constructor: static values => values)).IsEqualTo(expected: 1);
     }
 
     // The override selects at once, and the default selects when the subclass constructs. Thus, the
     // count of the calls shows which one ran.
     [Test]
-    public async Task OverrideOfSelectRunsInPlaceOfTheDefault()
+    public async Task OverrideOfSelectCoreRunsInPlaceOfTheDefault()
     {
         Overriding source = new(values: 1);
 
         Constructor<int> selected = source.Select(selector: static values => values + 1);
 
-        await Assert.That(source.SelectCalls).IsEqualTo(expected: 1);
+        await Assert.That(source.SelectCoreCalls).IsEqualTo(expected: 1);
         await Assert.That(selected.Construct(constructor: static values => values)).IsEqualTo(expected: 2);
+    }
+
+    // The override does not use the source itself: it reads the values from a field. Select uses the
+    // source before it calls the override. Thus, the source cannot also construct.
+    [Test]
+    public async Task OverrideOfSelectCoreCannotLetTheSourceConstructAgain()
+    {
+        Overriding source = new(values: 1);
+
+        _ = source.Select(selector: static values => values + 1);
+        Exception caught = Catching.Catch(action: () => _ = source.Construct(constructor: static values => values));
+
+        await Assert.That(caught).IsTypeOf<InvalidOperationException>();
+        await Assert.That(caught.Message).Contains(expected: "Select was already called");
+    }
+
+    [Test]
+    public async Task SelectRefusesANullSelectorWithoutCallingTheOverride()
+    {
+        Overriding source = new(values: 1);
+
+        // ReSharper disable once NullableWarningSuppressionIsUsed - The null selector is the input under test: Select must refuse it at run time.
+        Exception caught = Catching.Catch(action: () => _ = source.Select<int>(selector: null!));
+
+        await Assert.That(caught).IsTypeOf<ArgumentNullException>();
+        await Assert.That(source.SelectCoreCalls).IsEqualTo(expected: 0);
+    }
+
+    [Test]
+    public async Task ConstructRefusesANullConstructorAndDoesNotUseTheHandle()
+    {
+        Recording construct = new(values: 1);
+
+        // ReSharper disable once NullableWarningSuppressionIsUsed - The null constructor is the input under test: Construct must refuse it at run time.
+        Exception caught = Catching.Catch(action: () => _ = construct.Construct<int>(constructor: null!));
+
+        await Assert.That(caught).IsTypeOf<ArgumentNullException>();
+        await Assert.That(((ArgumentNullException)caught).ParamName).IsEqualTo(expected: "constructor");
+        await Assert.That(construct.CoreCalls).IsEqualTo(expected: 0);
+        await Assert.That(construct.Construct(constructor: static values => values)).IsEqualTo(expected: 1);
     }
 
     private sealed class Recording(in int values, in Exception? failure = null) : Constructor<int>
@@ -158,13 +253,13 @@ public sealed class ConstructorSubclassTests
     {
         private readonly int values = values;
 
-        private int selectCalls;
+        private int selectCoreCalls;
 
-        public int SelectCalls => Volatile.Read(location: ref this.selectCalls);
+        public int SelectCoreCalls => Volatile.Read(location: ref this.selectCoreCalls);
 
-        public override Constructor<TSelectedValues> Select<TSelectedValues>(Func<int, TSelectedValues> selector)
+        protected override Constructor<TSelectedValues> SelectCore<TSelectedValues>(Func<int, TSelectedValues> selector)
         {
-            Interlocked.Increment(location: ref this.selectCalls);
+            Interlocked.Increment(location: ref this.selectCoreCalls);
 
             return Constructor.From(values: selector(arg: this.values));
         }

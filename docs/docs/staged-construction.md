@@ -89,9 +89,10 @@ The compiler infers `TResult` from the lambdas, so a `Create` method writes no t
 
 ## Each handle is used once
 
-A subclass calls `Constructor<T>.Construct` one time, and `Stage<,,>.Advance` one time. Every
-handle enforces this: a second call throws an `InvalidOperationException` that names the method,
-even when two threads call at the same moment.
+A subclass uses each handle one time: it calls `Stage<,,>.Advance` one time, and it calls either
+`Constructor<T>.Construct` or `Constructor<T>.Select` one time. Every handle enforces this: a second
+call throws an `InvalidOperationException` that names the method that used the handle, even when
+two threads call at the same moment.
 
 The first call uses the handle up before it runs your constructor or stage. If that code throws,
 the handle stays used, so a failed construction cannot be run a second time.
@@ -101,8 +102,12 @@ instead. `Construct` and `Advance` make the check, and then call the method you 
 `ConstructCore` or `AdvanceCore`. That method runs at most once, so it needs no check of its own.
 The handles that `Constructor.From`, `Select`, and `Stage.From` make work the same way.
 
-`Constructor<T>` also has a virtual `Select`. The default makes the usual handle, and you can
-override it when your handle can do better.
+`Select` follows the same pattern. It refuses a null selector, uses the handle, and then calls
+`SelectCore`, which is virtual. The default `SelectCore` makes a handle that runs the selector when
+the subclass constructs. An override can make a different handle, for example one that selects at
+once. The handle is already used when `SelectCore` runs, so an override gets the values from
+`ConstructCore` or from its own fields, and not from `Construct`. Whatever the override does, the
+values reach only one constructor.
 
 ## Handles do not convert between value types
 

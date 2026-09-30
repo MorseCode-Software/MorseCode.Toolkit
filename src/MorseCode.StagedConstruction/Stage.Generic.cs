@@ -1,3 +1,4 @@
+using System;
 using JetBrains.Annotations;
 
 namespace MorseCode.StagedConstruction;
@@ -37,7 +38,7 @@ namespace MorseCode.StagedConstruction;
 [PublicAPI]
 public abstract class Stage<TInput, TOutput, TNext>
 {
-    private int used;
+    private string? usedBy;
 
     /// <summary>
     ///     Does the work of the stage with <paramref name="input" />. Then, calls
@@ -47,7 +48,8 @@ public abstract class Stage<TInput, TOutput, TNext>
     /// <remarks>
     ///     This method claims the stage, and then calls <see cref="AdvanceCore{TResult}" />. The claim
     ///     occurs first. Thus, a call that fails also uses the stage, and a second call does not run the
-    ///     stage again.
+    ///     stage again. A null <paramref name="continuation" /> fails before the claim, and does not use
+    ///     the stage.
     /// </remarks>
     /// <param name="input">The values that the subclass gives to the stage.</param>
     /// <param name="continuation">The callback that receives the output and the handle.</param>
@@ -56,10 +58,18 @@ public abstract class Stage<TInput, TOutput, TNext>
     ///     thus the caller does not write it.
     /// </typeparam>
     /// <returns>The value that <paramref name="continuation" /> returns.</returns>
-    /// <exception cref="System.InvalidOperationException">A caller used this stage before.</exception>
+    /// <exception cref="ArgumentNullException"><paramref name="continuation" /> is null.</exception>
+    /// <exception cref="InvalidOperationException">A caller used this stage before.</exception>
     public TResult Advance<TResult>(TInput input, StageContinuation<TOutput, TNext, TResult> continuation)
     {
-        SingleUse.Claim(used: ref this.used, member: nameof(this.Advance));
+        // The null check occurs before the claim. Thus, a null continuation does not use the stage. The input
+        // is not checked: its type is the choice of the base, and null can be a valid input.
+        if (continuation is null)
+        {
+            throw new ArgumentNullException(paramName: nameof(continuation));
+        }
+
+        SingleUse.Claim(usedBy: ref this.usedBy, member: nameof(this.Advance));
 
         return this.AdvanceCore(input: input, continuation: continuation);
     }
@@ -70,7 +80,8 @@ public abstract class Stage<TInput, TOutput, TNext>
     ///     subsequent step.
     /// </summary>
     /// <remarks>
-    ///     <see cref="Advance{TResult}" /> calls this method one time only.
+    ///     <see cref="Advance{TResult}" /> calls this method one time only, with a
+    ///     <paramref name="continuation" /> that is not null.
     /// </remarks>
     /// <param name="input">The values that the subclass gives to the stage.</param>
     /// <param name="continuation">The callback that receives the output and the handle.</param>

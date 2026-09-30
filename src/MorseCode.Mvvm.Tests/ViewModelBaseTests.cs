@@ -29,6 +29,19 @@ public sealed class ViewModelBaseTests
     }
 
     [Test]
+    public async Task NullContinuationFailsAtTheCall()
+    {
+        Exception caught = Catch(
+            action: static () => ViewModelBase.CreateBase<ViewModelBase>(
+                bindingScheduler: BindingScheduler.Immediate,
+                // ReSharper disable once NullableWarningSuppressionIsUsed - The null continuation is the input under test: CreateBase must refuse it at run time.
+                continuation: null!));
+
+        await Assert.That(caught).IsTypeOf<ArgumentNullException>();
+        await Assert.That(((ArgumentNullException)caught).ParamName).IsEqualTo(expected: "continuation");
+    }
+
+    [Test]
     public async Task NullDisposableFailsAtRegistration()
     {
         Exception? caught = null;

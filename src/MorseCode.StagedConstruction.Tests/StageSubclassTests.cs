@@ -66,6 +66,20 @@ public sealed class StageSubclassTests
         await Assert.That(stage.CoreCalls).IsEqualTo(expected: 1);
     }
 
+    [Test]
+    public async Task AdvanceRefusesANullContinuationAndDoesNotUseTheStage()
+    {
+        Recording stage = new();
+
+        // ReSharper disable once NullableWarningSuppressionIsUsed - The null continuation is the input under test: Advance must refuse it at run time.
+        Exception caught = Catching.Catch(action: () => _ = stage.Advance<int>(input: 1, continuation: null!));
+
+        await Assert.That(caught).IsTypeOf<ArgumentNullException>();
+        await Assert.That(((ArgumentNullException)caught).ParamName).IsEqualTo(expected: "continuation");
+        await Assert.That(stage.CoreCalls).IsEqualTo(expected: 0);
+        await Assert.That(stage.Advance(input: 1, continuation: static (output, _) => output)).IsEqualTo(expected: 2);
+    }
+
     private sealed class Recording(in Exception? failure = null) : Stage<int, int, int>
     {
         private readonly Exception? failure = failure;

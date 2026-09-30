@@ -11,8 +11,22 @@ implementer to check for a second call. Each class has a public Construct or
 Advance method that checks for a second call, also when two threads call at the
 same time, and also when the first call fails. Then it calls a method that a
 derived class implements: ConstructCore or AdvanceCore. The static class that
-made the usual handles, Construct, is now Constructor. Select is a virtual
-method of Constructor, and a derived class can override it.
+made the usual handles, Construct, is now Constructor.
+
+Select works the same way. It is not virtual: it refuses a null selector, uses
+the handle, and then calls the virtual method SelectCore, which a derived class
+can override.
+
+Behavior change: Select now uses the handle that it is called on. In 0.1.0, a
+Construct on the source after a Select succeeded, and the selected handle then
+failed. Now the Construct on the source fails, with a message that says Select
+used the handle. A second Select on the same handle also fails. Thus, the
+values of a base reach one constructor only, also when a derived class
+overrides SelectCore.
+
+Construct and Advance now refuse a null constructor or continuation with an
+ArgumentNullException, before they use the handle. In 0.1.0, the call used the
+handle and then failed with a NullReferenceException.
 
 MorseCode.Mvvm 0.1.0 does not work with this version, although the dependency
 range that it was released with admits this version. Use MorseCode.Mvvm 0.2.0

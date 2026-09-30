@@ -88,5 +88,8 @@ selector with the values of the animal, and gives the result to the constructor.
 at that time, and not when `Select` is called. A null selector fails at the call to `Select`. Like
 the other handles, the new one refuses a second `Construct`.
 
+`Select` uses the handle it is called on, as `Construct` does. After it, a `Construct` or a second
+`Select` on the animal handle fails, so the values of the animal can reach only one constructor.
+
 The order of the work is then: the animal base, the mammal base, the subclass, the selector, and the
 constructor.

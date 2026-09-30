@@ -9,17 +9,17 @@ namespace MorseCode.StagedConstruction;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         The subclass must call <see cref="Construct{TResult}" /> one time only. The handles that
-///         <see cref="StagedConstruction.Constructor.From{TBaseValues}" /> and
-///         <see cref="Select{TSelectedValues}" /> make fail at a second call, also when two threads call
-///         at the same time. The first call uses the handle, also when the constructor fails.
+///         The subclass must use a handle one time only: it calls <see cref="Construct{TResult}" /> or
+///         <see cref="Select{TSelectedValues}" />, one time. A second call to either fails, also when
+///         two threads call at the same time. The first call uses the handle, also when it fails.
 ///     </para>
 ///     <para>
 ///         A base that needs a handle of its own derives from this class and implements
-///         <see cref="ConstructCore{TResult}" />. It does not check for a second call.
-///         <see cref="Construct{TResult}" /> claims the handle before it calls
-///         <see cref="ConstructCore{TResult}" />. Thus, a second call fails, also when two threads call
-///         at the same time, and also when the first call fails.
+///         <see cref="ConstructCore{TResult}" />. It can also override
+///         <see cref="SelectCore{TSelectedValues}" />. Neither method checks for a second call.
+///         <see cref="Construct{TResult}" /> and <see cref="Select{TSelectedValues}" /> claim the handle
+///         before they call them. Thus, a second call fails, also when two threads call at the same
+///         time, and also when the first call fails.
 ///     </para>
 ///     <para>
 ///         A base can keep the constructor of <typeparamref name="TBaseValues" /> private. Then, this
@@ -34,7 +34,7 @@ namespace MorseCode.StagedConstruction;
 [PublicAPI]
 public abstract class Constructor<TBaseValues>
 {
-    private int used;
+    private string? usedBy;
 
     /// <summary>
     ///     Calls <paramref name="constructor" /> with the values of the base.
@@ -42,7 +42,8 @@ public abstract class Constructor<TBaseValues>
     /// <remarks>
     ///     This method claims the handle, and then calls <see cref="ConstructCore{TResult}" />. The
     ///     claim occurs first. Thus, a call that fails also uses the handle, and a second call does not
-    ///     run the constructor again.
+    ///     run the constructor again. A null <paramref name="constructor" /> fails before the claim,
+    ///     and does not use the handle.
     /// </remarks>
     /// <param name="constructor">The constructor of the subclass, or a function that calls it.</param>
     /// <typeparam name="TResult">
@@ -50,10 +51,17 @@ public abstract class Constructor<TBaseValues>
     ///     thus the caller does not write it.
     /// </typeparam>
     /// <returns>The value that <paramref name="constructor" /> returns.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="constructor" /> is null.</exception>
     /// <exception cref="InvalidOperationException">A caller used this handle before.</exception>
     public TResult Construct<TResult>(Func<TBaseValues, TResult> constructor)
     {
-        SingleUse.Claim(used: ref this.used, member: nameof(this.Construct));
+        // The null check occurs before the claim. Thus, a null constructor does not use the handle.
+        if (constructor is null)
+        {
+            throw new ArgumentNullException(paramName: nameof(constructor));
+        }
+
+        SingleUse.Claim(usedBy: ref this.usedBy, member: nameof(this.Construct));
 
         return this.ConstructCore(constructor: constructor);
     }
@@ -62,7 +70,8 @@ public abstract class Constructor<TBaseValues>
     ///     Makes the values of the base and calls <paramref name="constructor" /> with them.
     /// </summary>
     /// <remarks>
-    ///     <see cref="Construct{TResult}" /> calls this method one time only.
+    ///     <see cref="Construct{TResult}" /> calls this method one time only, with a
+    ///     <paramref name="constructor" /> that is not null.
     /// </remarks>
     /// <param name="constructor">The constructor of the subclass, or a function that calls it.</param>
     /// <typeparam name="TResult">The type that <paramref name="constructor" /> returns.</typeparam>
@@ -74,25 +83,56 @@ public abstract class Constructor<TBaseValues>
     ///     not the values of this handle.
     /// </summary>
     /// <remarks>
-    ///     <para>
-    ///         A base that has a base of its own uses this to add its values to the values of that base.
-    ///         The default handle calls <paramref name="selector" /> when the subclass calls
-    ///         <see cref="Construct{TResult}" /> on it, and not before. Then, it calls
-    ///         <see cref="Construct{TResult}" /> on this handle. Thus, this method does not use this
-    ///         handle.
-    ///     </para>
-    ///     <para>
-    ///         An override must refuse a null <paramref name="selector" /> as this method does. It must
-    ///         return a handle that a caller can use one time only.
-    ///     </para>
+    ///     A base that has a base of its own uses this to add its values to the values of that base.
+    ///     This method claims this handle, and then calls <see cref="SelectCore{TSelectedValues}" />.
+    ///     Thus, after a call to this method, a call to <see cref="Construct{TResult}" /> or to this
+    ///     method on this handle fails, and only the new handle can give the values to a constructor.
+    ///     A null <paramref name="selector" /> fails before the claim, and does not use the handle.
     /// </remarks>
     /// <param name="selector">The function that makes the new values from the values of this handle.</param>
     /// <typeparam name="TSelectedValues">The type of the new values.</typeparam>
     /// <returns>The new handle.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="selector" /> is null.</exception>
-    public virtual Constructor<TSelectedValues> Select<TSelectedValues>(Func<TBaseValues, TSelectedValues> selector) =>
-        // The null check occurs here, where the caller is on the stack, and not subsequently in Construct.
-        new SelectedConstruct<TBaseValues, TSelectedValues>(
-            source: this,
-            selector: selector ?? throw new ArgumentNullException(paramName: nameof(selector)));
+    /// <exception cref="InvalidOperationException">A caller used this handle before.</exception>
+    public Constructor<TSelectedValues> Select<TSelectedValues>(Func<TBaseValues, TSelectedValues> selector)
+    {
+        // The null check occurs here, where the caller is on the stack, and before the claim. Thus, a null
+        // selector does not use the handle.
+        if (selector is null)
+        {
+            throw new ArgumentNullException(paramName: nameof(selector));
+        }
+
+        SingleUse.Claim(usedBy: ref this.usedBy, member: nameof(this.Select));
+
+        return this.SelectCore(selector: selector);
+    }
+
+    /// <summary>
+    ///     Makes the handle that <see cref="Select{TSelectedValues}" /> returns.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <see cref="Select{TSelectedValues}" /> calls this method one time only, with a
+    ///         <paramref name="selector" /> that is not null, after it claims this handle. Thus, an
+    ///         override cannot call <see cref="Construct{TResult}" /> on this handle. It gets the
+    ///         values from <see cref="ConstructCore{TResult}" />, or from its own fields.
+    ///     </para>
+    ///     <para>
+    ///         The default handle calls <paramref name="selector" /> when the subclass calls
+    ///         <see cref="Construct{TResult}" /> on it, and not before. Then, it calls
+    ///         <see cref="ConstructCore{TResult}" /> on this handle.
+    ///     </para>
+    /// </remarks>
+    /// <param name="selector">The function that makes the new values from the values of this handle.</param>
+    /// <typeparam name="TSelectedValues">The type of the new values.</typeparam>
+    /// <returns>The new handle.</returns>
+    protected virtual Constructor<TSelectedValues> SelectCore<TSelectedValues>(Func<TBaseValues, TSelectedValues> selector) =>
+        new SelectedConstruct<TBaseValues, TSelectedValues>(source: this, selector: selector);
+
+    // The handle that the default SelectCore makes calls this. Select claimed this handle, so Construct
+    // refuses it, and the protected ConstructCore cannot be called through a handle of a different
+    // values type.
+    internal TResult ConstructAfterSelect<TResult>(Func<TBaseValues, TResult> constructor) =>
+        this.ConstructCore(constructor: constructor);
 }

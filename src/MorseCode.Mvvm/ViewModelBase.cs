@@ -54,15 +54,22 @@ public sealed class ViewModelBase : IViewModel
     ///     The type that <paramref name="continuation" /> returns. Usually, it is the subclass.
     /// </typeparam>
     /// <returns>The value that <paramref name="continuation" /> returns.</returns>
-    /// <exception cref="ArgumentNullException"><paramref name="bindingScheduler" /> is null.</exception>
+    /// <exception cref="ArgumentNullException">
+    ///     <paramref name="bindingScheduler" /> or <paramref name="continuation" /> is null.
+    /// </exception>
     public static TResult CreateBase<TResult>(
         IBindingScheduler bindingScheduler,
         StageContinuation<IOutput, Constructor<ViewModelBase>, TResult> continuation)
     {
-        // The null check occurs here, where the caller is on the stack.
+        // The null checks occur here, where the caller is on the stack, and before the output exists.
         if (bindingScheduler is null)
         {
             throw new ArgumentNullException(paramName: nameof(bindingScheduler));
+        }
+
+        if (continuation is null)
+        {
+            throw new ArgumentNullException(paramName: nameof(continuation));
         }
 
         Output output = new(bindingScheduler: bindingScheduler);

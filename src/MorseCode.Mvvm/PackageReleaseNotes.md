@@ -10,6 +10,9 @@ IConstruct interface with the Constructor class, and this package depends on
 0.2.0 or a later 0.2.x. Change the signature of each view model that calls
 CreateBase, and compile it again.
 
+CreateBase now refuses a null continuation with an ArgumentNullException, as it
+refuses a null scheduler.
+
 The dependency on MorseCode.StagedConstruction now has the next minor version as
 its ceiling while the version is below 1.0.0, and not 1.0.0. MorseCode.Mvvm
 0.1.0 admits MorseCode.StagedConstruction 0.2.0, and does not work with it. Do
