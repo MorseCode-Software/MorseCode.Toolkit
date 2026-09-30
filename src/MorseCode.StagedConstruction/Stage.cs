@@ -4,7 +4,7 @@ using JetBrains.Annotations;
 namespace MorseCode.StagedConstruction;
 
 /// <summary>
-///     Makes the usual <see cref="IStage{TInput,TOutput,TNext}" /> handles.
+///     Makes the usual <see cref="Stage{TInput,TOutput,TNext}" /> handles.
 /// </summary>
 [PublicAPI]
 public static class Stage
@@ -15,8 +15,8 @@ public static class Stage
     /// </summary>
     /// <remarks>
     ///     This stage does not do work after the subclass continues. A stage that must do work around
-    ///     the subsequent steps, for example in a transaction, implements
-    ///     <see cref="IStage{TInput,TOutput,TNext}" /> directly.
+    ///     the subsequent steps, for example in a transaction, derives from
+    ///     <see cref="Stage{TInput,TOutput,TNext}" />.
     /// </remarks>
     /// <param name="body">
     ///     The work of the stage. It gets the values of the previous stages from the closure that
@@ -27,12 +27,9 @@ public static class Stage
     /// <typeparam name="TNext">The type of the handle for the subsequent step.</typeparam>
     /// <returns>The stage.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="body" /> is null.</exception>
-    public static IStage<TInput, TOutput, TNext> From<TInput, TOutput, TNext>(
-        Func<TInput, (TOutput Output, TNext Next)> body)
-    {
+    public static Stage<TInput, TOutput, TNext> From<TInput, TOutput, TNext>(
+        Func<TInput, (TOutput Output, TNext Next)> body) =>
         // The null check occurs here, where the caller is on the stack, and not subsequently in Advance.
-        ArgumentNullException.ThrowIfNull(argument: body);
-
-        return new StageFromBody<TInput, TOutput, TNext>(body: body);
-    }
+        new StageFromBody<TInput, TOutput, TNext>(
+            body: body ?? throw new ArgumentNullException(paramName: nameof(body)));
 }

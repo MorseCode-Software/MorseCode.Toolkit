@@ -3,26 +3,21 @@ using System;
 namespace MorseCode.StagedConstruction;
 
 /// <summary>
-///     The handle that <see cref="IConstruct{TBaseValues}.Select{TSelectedValues}" /> makes.
+///     The handle that the default <c>SelectCore</c> method of <see cref="Constructor{TBaseValues}" />
+///     makes.
 /// </summary>
-// ReSharper disable once InheritdocConsiderUsage - The summary of IConstruct does not say which method makes this handle.
+// ReSharper disable once InheritdocConsiderUsage - The summary of Constructor does not say which method makes this handle.
 internal sealed class SelectedConstruct<TSourceValues, TBaseValues>(
-    IConstruct<TSourceValues> source,
+    Constructor<TSourceValues> source,
     Func<TSourceValues, TBaseValues> selector)
-    : IConstruct<TBaseValues>
+    : Constructor<TBaseValues>
 {
-    private IConstruct<TSourceValues> Source { get; } = source;
+    private Constructor<TSourceValues> Source { get; } = source;
 
     private Func<TSourceValues, TBaseValues> Selector { get; } = selector;
 
-    // This handle makes its own claim. The source can be a handle that a base implements, and such a
-    // handle does not always make the claim.
-    private bool used;
-
-    public TResult Construct<TResult>(Func<TBaseValues, TResult> constructor)
-    {
-        SingleUse.Claim(used: ref this.used, member: nameof(this.Construct));
-
-        return this.Source.Construct(constructor: sourceValues => constructor(arg: this.Selector(arg: sourceValues)));
-    }
+    // Select claimed the source when it made this handle. Thus, this handle is the only one that can give
+    // the values of the source to a constructor, and it calls the core of the source directly.
+    protected override TResult ConstructCore<TResult>(Func<TBaseValues, TResult> constructor) =>
+        this.Source.ConstructAfterSelect(constructor: sourceValues => constructor(arg: this.Selector(arg: sourceValues)));
 }

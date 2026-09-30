@@ -6,14 +6,14 @@ using TUnit.Core;
 
 namespace MorseCode.StagedConstruction.Tests;
 
-public sealed class ConstructTests
+public sealed class ConstructorTests
 {
     [Test]
     public async Task FromGivesTheSameValuesToTheConstructor()
     {
         object values = new();
 
-        object received = Construct.From(values: values).Construct(constructor: static v => v);
+        object received = Constructor.From(values: values).Construct(constructor: static v => v);
 
         await Assert.That(received).IsSameReferenceAs(expected: values);
     }
@@ -23,7 +23,7 @@ public sealed class ConstructTests
     {
         object result = new();
 
-        object returned = Construct.From(values: 1).Construct(constructor: _ => result);
+        object returned = Constructor.From(values: 1).Construct(constructor: _ => result);
 
         await Assert.That(returned).IsSameReferenceAs(expected: result);
     }
@@ -33,7 +33,7 @@ public sealed class ConstructTests
     {
         int calls = 0;
 
-        IConstruct<int> selected = Construct.From(values: 1).Select(
+        Constructor<int> selected = Constructor.From(values: 1).Select(
             selector: v =>
             {
                 calls++;
@@ -57,7 +57,7 @@ public sealed class ConstructTests
     [Arguments(int.MaxValue)]
     public async Task SelectChainMatchesTheCompositionOfItsSelectors(int values)
     {
-        string bySelect = Construct
+        string bySelect = Constructor
             .From(values: values)
             .Select(selector: Double)
             .Select(selector: Describe)
@@ -79,7 +79,7 @@ public sealed class ConstructTests
     [Test]
     public async Task SelectRefusesANullSelectorWhenItIsCalled()
     {
-        IConstruct<int> construct = Construct.From(values: 1);
+        Constructor<int> construct = Constructor.From(values: 1);
 
         // ReSharper disable once NullableWarningSuppressionIsUsed - The null selector is the input under test: Select must refuse it at run time.
         Exception caught = Catching.Catch(action: () => _ = construct.Select<int>(selector: null!));
@@ -88,15 +88,28 @@ public sealed class ConstructTests
         await Assert.That(((ArgumentNullException)caught).ParamName).IsEqualTo(expected: "selector");
     }
 
+    // The handle does not convert between value types. A helper that is generic in the value type takes
+    // a handle of any derived value type instead.
     [Test]
-    public async Task HandleIsCovariantInItsValues()
+    public async Task AHelperThatIsGenericInTheValuesTypeAcceptsAHandleOfADerivedValuesType()
     {
-        const string values = "values";
+        Constructor<Derived> handle = Constructor.From(values: new Derived(name: "rex"));
 
-        IConstruct<object> construct = Construct.From(values: values);
+        string described = Describe(handle: handle);
 
-        object received = construct.Construct(constructor: static v => v);
+        await Assert.That(described).IsEqualTo(expected: "rex");
 
-        await Assert.That(received).IsSameReferenceAs(expected: values);
+        return;
+
+        static string Describe<T>(Constructor<T> handle)
+            where T : Base =>
+            handle.Construct(constructor: static values => values.Name);
     }
+
+    private class Base(in string name)
+    {
+        public string Name { get; } = name;
+    }
+
+    private sealed class Derived(in string name) : Base(name);
 }

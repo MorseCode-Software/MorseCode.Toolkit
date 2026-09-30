@@ -51,7 +51,7 @@ GitHub and NuGet icon links in the navigation bar.
 Add a Markdown file under `docs/` and an entry in `docs/docs/toc.yml`. These conventions matter:
 
 **Cross-references into the API.** Link to a type with
-`@MorseCode.StagedConstruction.IConstruct\`1` or `<xref:MorseCode.Mvvm.ViewModelBase>` rather than
+`@MorseCode.StagedConstruction.Constructor\`1` or `<xref:MorseCode.Mvvm.ViewModelBase>` rather than
 a hand-written URL, so the link survives refactoring. Backtick-N is the arity suffix for generic
 types.
 

@@ -38,7 +38,7 @@ public static partial class Disposable
     {
         private readonly IDisposable[] disposables;
 
-        private bool disposed;
+        private int disposed;
 
         /// <summary>
         ///     Makes a composite of <paramref name="disposables" />.
@@ -71,7 +71,7 @@ public static partial class Disposable
         /// <exception cref="AggregateException">Two or more entries threw an exception.</exception>
         public void Dispose()
         {
-            if (Interlocked.Exchange(location1: ref this.disposed, value: true))
+            if (Interlocked.Exchange(location1: ref this.disposed, value: 1) != 0)
             {
                 return;
             }
@@ -93,7 +93,7 @@ public static partial class Disposable
             // ReSharper disable once ConvertIfStatementToSwitchStatement - A switch case must end in a jump, and a jump after ExceptionDispatchInfo.Throw is a line that cannot run.
             if (exceptions.Count == 1)
             {
-                ExceptionDispatchInfo.Throw(exceptions[0]);
+                ExceptionDispatchInfo.Capture(source: exceptions[0]).Throw();
             }
 
             if (exceptions.Count > 1)

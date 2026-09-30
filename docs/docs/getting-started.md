@@ -17,7 +17,7 @@ If you want only the construction pattern, without view models or SodaFlow, inst
 `MorseCode.StagedConstruction` alone. [Which package do I install?](packages.md) has the
 details.
 
-Both packages target `net10.0`.
+Both packages target .NET Framework 4.7.2, .NET 6, and .NET Standard 2.0.
 
 ## Your first view model
 

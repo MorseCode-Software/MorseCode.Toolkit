@@ -41,13 +41,13 @@ public sealed class StagedConstructionTests
 
         TResult CreateAnimal<TResult>(
             string name,
-            StageContinuation<string, IConstruct<AnimalValues>, TResult> continuation)
+            StageContinuation<string, Constructor<AnimalValues>, TResult> continuation)
         {
             log.Add(item: "base");
             AnimalValues values = new(Name: name);
             made.Add(item: values);
 
-            return continuation(output: name.ToUpperInvariant(), next: Construct.From(values: values));
+            return continuation(output: name.ToUpperInvariant(), next: Constructor.From(values: values));
         }
     }
 
@@ -108,7 +108,7 @@ public sealed class StagedConstructionTests
 
         TResult CreateMachine<TResult>(
             int seed,
-            StageContinuation<int, IStage<int, int, IStage<string, string, IConstruct<MachineValues>>>, TResult> continuation)
+            StageContinuation<int, Stage<int, int, Stage<string, string, Constructor<MachineValues>>>, TResult> continuation)
         {
             log.Add(item: $"base 1 got {seed}");
 
@@ -128,7 +128,7 @@ public sealed class StagedConstructionTests
 
                                     return (
                                         Output: label.ToUpperInvariant(),
-                                        Next: Construct.From(values: new MachineValues(Seed: seed, Adjusted: adjusted, Label: label)));
+                                        Next: Constructor.From(values: new MachineValues(Seed: seed, Adjusted: adjusted, Label: label)));
                                 }));
                     }));
         }
@@ -169,16 +169,16 @@ public sealed class StagedConstructionTests
 
         TResult CreateAnimal<TResult>(
             string name,
-            StageContinuation<string, IConstruct<AnimalValues>, TResult> continuation)
+            StageContinuation<string, Constructor<AnimalValues>, TResult> continuation)
         {
             log.Add(item: "animal base");
 
-            return continuation(output: name.ToUpperInvariant(), next: Construct.From(values: new AnimalValues(Name: name)));
+            return continuation(output: name.ToUpperInvariant(), next: Constructor.From(values: new AnimalValues(Name: name)));
         }
 
         TResult CreateMammal<TResult>(
             string name,
-            StageContinuation<string, IConstruct<MammalValues>, TResult> continuation) =>
+            StageContinuation<string, Constructor<MammalValues>, TResult> continuation) =>
             CreateAnimal(
                 name: name,
                 continuation: (output, construct) =>
@@ -226,13 +226,13 @@ public sealed class StagedConstructionTests
 
         TResult CreateScopedAnimal<TResult>(
             string name,
-            StageContinuation<string, IConstruct<AnimalValues>, TResult> continuation)
+            StageContinuation<string, Constructor<AnimalValues>, TResult> continuation)
         {
             log.Add(item: "open");
 
             try
             {
-                return continuation(output: name, next: Construct.From(values: new AnimalValues(Name: name)));
+                return continuation(output: name, next: Constructor.From(values: new AnimalValues(Name: name)));
             }
             finally
             {
@@ -267,8 +267,8 @@ public sealed class StagedConstructionTests
 
         static TResult CreateNamedBase<TResult>(
             string name,
-            StageContinuation<string, IConstruct<string>, TResult> continuation) =>
-            continuation(output: name, next: Construct.From(values: name));
+            StageContinuation<string, Constructor<string>, TResult> continuation) =>
+            continuation(output: name, next: Constructor.From(values: name));
     }
 
     private sealed record AnimalValues(string Name);

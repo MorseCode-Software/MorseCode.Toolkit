@@ -15,7 +15,7 @@ public sealed class StageTests
     {
         List<string> log = [];
 
-        IStage<int, int, int> stage = Stage.From(
+        Stage<int, int, int> stage = Stage.From(
             body: (int input) =>
             {
                 log.Add(item: $"body got {input}");
@@ -44,7 +44,7 @@ public sealed class StageTests
         object output = new();
         object next = new();
 
-        IStage<int, object, object> stage = Stage.From(body: (int _) => (Output: output, Next: next));
+        Stage<int, object, object> stage = Stage.From(body: (int _) => (Output: output, Next: next));
 
         (object receivedOutput, object receivedNext) = stage.Advance(input: 0, continuation: static (o, n) => (o, n));
 
@@ -57,7 +57,7 @@ public sealed class StageTests
     {
         object result = new();
 
-        IStage<int, int, int> stage = Stage.From(body: static (int input) => (Output: input, Next: input));
+        Stage<int, int, int> stage = Stage.From(body: static (int input) => (Output: input, Next: input));
 
         object returned = stage.Advance(input: 0, continuation: (_, _) => result);
 
@@ -72,19 +72,5 @@ public sealed class StageTests
 
         await Assert.That(caught).IsTypeOf<ArgumentNullException>();
         await Assert.That(((ArgumentNullException)caught).ParamName).IsEqualTo(expected: "body");
-    }
-
-    [Test]
-    public async Task StageIsContravariantInItsInputAndCovariantInItsOutputAndHandle()
-    {
-        const string output = "output";
-        const string next = "next";
-
-        IStage<string, object, object> stage = Stage.From(body: static (object _) => (Output: output, Next: next));
-
-        (object receivedOutput, object receivedNext) = stage.Advance(input: "input", continuation: static (o, n) => (o, n));
-
-        await Assert.That(receivedOutput).IsSameReferenceAs(expected: output);
-        await Assert.That(receivedNext).IsSameReferenceAs(expected: next);
     }
 }

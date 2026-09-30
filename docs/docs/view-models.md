@@ -26,13 +26,13 @@ Every view model has the same shape:
 ```csharp
 public static TResult CreateBase<TResult>(
     IBindingScheduler bindingScheduler,
-    StageContinuation<IOutput, IConstruct<ViewModelBase>, TResult> continuation)
+    StageContinuation<IOutput, Constructor<ViewModelBase>, TResult> continuation)
 ```
 
 The base has one stage. It gives the view model two things:
 
 - An `IOutput`, for registrations.
-- An `IConstruct<ViewModelBase>`, the handle that makes the base.
+- A `Constructor<ViewModelBase>`, the handle that makes the base.
 
 `bindingScheduler` is the scheduler for the bindable values that the output's `BindableFactory`
 makes. Capture it on the UI thread with `SynchronizationContextBindingScheduler.Capture()`. A test

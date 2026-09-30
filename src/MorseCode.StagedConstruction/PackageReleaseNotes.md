@@ -1,3 +1,49 @@
+0.2.0
+
+This package now targets net472, net6.0, and netstandard2.0, and not net10.0
+only. The behavior is the same on every target.
+
+Breaking change: the IConstruct and IStage interfaces are gone. The abstract
+classes Constructor<TBaseValues> and Stage<TInput, TOutput, TNext> replace them.
+.NET Framework and .NET Standard 2.0 do not support a default interface member,
+so Select could not stay on the interface, and an interface cannot force an
+implementer to check for a second call. Each class has a public Construct or
+Advance method that checks for a second call, also when two threads call at the
+same time, and also when the first call fails. Then it calls a method that a
+derived class implements: ConstructCore or AdvanceCore. The static class that
+made the usual handles, Construct, is now Constructor.
+
+Select works the same way. It is not virtual: it refuses a null selector, uses
+the handle, and then calls the virtual method SelectCore, which a derived class
+can override.
+
+Behavior change: Select now uses the handle that it is called on. In 0.1.0, a
+Construct on the source after a Select succeeded, and the selected handle then
+failed. Now the Construct on the source fails, with a message that says Select
+used the handle. A second Select on the same handle also fails. Thus, the
+values of a base reach one constructor only, also when a derived class
+overrides SelectCore.
+
+Construct and Advance now refuse a null constructor or continuation with an
+ArgumentNullException, before they use the handle. In 0.1.0, the call used the
+handle and then failed with a NullReferenceException.
+
+MorseCode.Mvvm 0.1.0 does not work with this version, although the dependency
+range that it was released with admits this version. Use MorseCode.Mvvm 0.2.0
+or later.
+
+You must change every signature that names the old types. For example,
+StageContinuation<string, IConstruct<AnimalValues>, TResult> becomes
+StageContinuation<string, Constructor<AnimalValues>, TResult>, and
+Construct.From(values) becomes Constructor.From(values). Compile again any
+assembly that you built against 0.1.0.
+
+The classes are not variant, as the interfaces were. A Constructor<Dog> does not
+convert to a Constructor<Animal>. A helper that must accept both is generic in
+the values type, for example
+Describe<T>(Constructor<T> handle) where T : AnimalValues. To change the values
+type of a handle, call Select.
+
 0.1.0
 
 The first release. It contains the types for staged construction: the
@@ -57,6 +103,6 @@ Construction of immutable objects in ordered stages, with no access to a partly
 built object. It is part of the MorseCode toolkit, which holds the conventions
 that MorseCode Software builds its own applications with.
 
-Targets net10.0. No dependencies.
+Targets net472, net6.0, and netstandard2.0. No dependencies.
 
 Source: https://github.com/MorseCode-Software/MorseCode.Toolkit

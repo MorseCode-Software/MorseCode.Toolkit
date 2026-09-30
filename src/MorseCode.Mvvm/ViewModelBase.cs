@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
-using System.Threading;
 using JetBrains.Annotations;
 using MorseCode.StagedConstruction;
 using SodaFlow;
@@ -19,7 +18,7 @@ namespace MorseCode.Mvvm;
 /// <remarks>
 ///     <para>
 ///         During its construction, the view model adds each subscription to the registrations through
-///         <see cref="IOutput" />. The call to <see cref="IConstruct{TBaseValues}.Construct{TResult}" />
+///         <see cref="IOutput" />. The call to <see cref="Constructor{TBaseValues}.Construct{TResult}" />
 ///         closes the registration. After that call, each member of <see cref="IOutput" /> fails.
 ///     </para>
 ///     <para>
@@ -41,7 +40,7 @@ public sealed class ViewModelBase : IViewModel
     ///     registrations, and the handle that constructs the base.
     /// </summary>
     /// <remarks>
-    ///     The subclass must call <see cref="IConstruct{TBaseValues}.Construct{TResult}" /> one time only.
+    ///     The subclass must call <see cref="Constructor{TBaseValues}.Construct{TResult}" /> one time only.
     ///     A second call fails with an <see cref="InvalidOperationException" />, because two view
     ///     models cannot own the same registrations.
     /// </remarks>
@@ -55,19 +54,29 @@ public sealed class ViewModelBase : IViewModel
     ///     The type that <paramref name="continuation" /> returns. Usually, it is the subclass.
     /// </typeparam>
     /// <returns>The value that <paramref name="continuation" /> returns.</returns>
-    /// <exception cref="ArgumentNullException"><paramref name="bindingScheduler" /> is null.</exception>
+    /// <exception cref="ArgumentNullException">
+    ///     <paramref name="bindingScheduler" /> or <paramref name="continuation" /> is null.
+    /// </exception>
     public static TResult CreateBase<TResult>(
         IBindingScheduler bindingScheduler,
-        StageContinuation<IOutput, IConstruct<ViewModelBase>, TResult> continuation)
+        StageContinuation<IOutput, Constructor<ViewModelBase>, TResult> continuation)
     {
-        // The null check occurs here, where the caller is on the stack.
-        ArgumentNullException.ThrowIfNull(argument: bindingScheduler);
+        // The null checks occur here, where the caller is on the stack, and before the output exists.
+        if (bindingScheduler is null)
+        {
+            throw new ArgumentNullException(paramName: nameof(bindingScheduler));
+        }
+
+        if (continuation is null)
+        {
+            throw new ArgumentNullException(paramName: nameof(continuation));
+        }
 
         Output output = new(bindingScheduler: bindingScheduler);
 
         return continuation(
             output: output,
-            next: Construct
+            next: Constructor
                 .From(values: output)
                 .Select(
                     selector: static constructedOutput =>
@@ -112,7 +121,7 @@ public sealed class ViewModelBase : IViewModel
     /// </summary>
     /// <remarks>
     ///     Use this during the construction only. After the subclass calls
-    ///     <see cref="IConstruct{TBaseValues}.Construct{TResult}" />, each member fails with an
+    ///     <see cref="Constructor{TBaseValues}.Construct{TResult}" />, each member fails with an
     ///     <see cref="InvalidOperationException" />. This is also true on a different thread. A
     ///     registration either gets into the registrations that Dispose releases, or fails.
     /// </remarks>
@@ -180,7 +189,7 @@ public sealed class ViewModelBase : IViewModel
         // registration on a different thread either gets into the composite or fails, and it does not
         // leak. This code does not hold the lock while SodaFlow makes a bindable. SodaFlow can hold a
         // lock of its own, and a thread that holds that lock can call this output.
-        private readonly Lock gate = new();
+        private readonly object gate = new();
 
         private bool isSealed;
 
@@ -190,7 +199,10 @@ public sealed class ViewModelBase : IViewModel
         {
             // The null check occurs here, where the caller is on the stack. A null entry that gets to
             // Dispose stops the disposal of all of the entries.
-            ArgumentNullException.ThrowIfNull(argument: listener);
+            if (listener is null)
+            {
+                throw new ArgumentNullException(paramName: nameof(listener));
+            }
 
             // The delegate refers to the listener. Thus, the list keeps a weak listener alive for the
             // life of the view model.
@@ -204,7 +216,10 @@ public sealed class ViewModelBase : IViewModel
         {
             // The null check occurs here, where the caller is on the stack. A null entry that gets to
             // Dispose stops the disposal of all of the entries.
-            ArgumentNullException.ThrowIfNull(argument: disposable);
+            if (disposable is null)
+            {
+                throw new ArgumentNullException(paramName: nameof(disposable));
+            }
 
             this.Add(registration: disposable);
             return disposable;

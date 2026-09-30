@@ -38,8 +38,8 @@ public class Animal(AnimalValues values)
 
     public static TResult CreateBase<TResult>(
         string name,
-        StageContinuation<string, IConstruct<AnimalValues>, TResult> continuation) =>
-        continuation(name.ToUpperInvariant(), Construct.From(new AnimalValues(name)));
+        StageContinuation<string, Constructor<AnimalValues>, TResult> continuation) =>
+        continuation(name.ToUpperInvariant(), Constructor.From(new AnimalValues(name)));
 }
 
 public sealed class Dog : Animal
@@ -55,7 +55,7 @@ public sealed class Dog : Animal
 ```
 
 `Animal.CreateBase` gives `Dog.Create` two things: an output (the upper-case name), and a handle,
-an `IConstruct<AnimalValues>`. `Dog.Create` uses the output to make its own values, and then calls
+a `Constructor<AnimalValues>`. `Dog.Create` uses the output to make its own values, and then calls
 `construct.Construct` with a function that calls the constructor. The handle passes the values of
 the base to that function.
 
@@ -73,12 +73,12 @@ The compiler infers `TResult` from the lambdas, so a `Create` method writes no t
 
   ```csharp
   public static TResult CreateBase<TResult>(
-      StageContinuation<Output, IConstruct<Values>, TResult> continuation)
+      StageContinuation<Output, Constructor<Values>, TResult> continuation)
   {
       // open a scope
       try
       {
-          return continuation(output, Construct.From(values));
+          return continuation(output, Constructor.From(values));
       }
       finally
       {
@@ -89,25 +89,49 @@ The compiler infers `TResult` from the lambdas, so a `Create` method writes no t
 
 ## Each handle is used once
 
-A subclass calls `IConstruct<T>.Construct` one time, and `IStage<,,>.Advance` one time. The handles
-that `Construct.From`, `Select`, and `Stage.From` make enforce this: a second call throws an
-`InvalidOperationException` that names the method, even when two threads call at the same moment.
+A subclass uses each handle one time: it calls `Stage<,,>.Advance` one time, and it calls either
+`Constructor<T>.Construct` or `Constructor<T>.Select` one time. Every handle enforces this: a second
+call throws an `InvalidOperationException` that names the method that used the handle, even when
+two threads call at the same moment.
 
 The first call uses the handle up before it runs your constructor or stage. If that code throws,
 the handle stays used, so a failed construction cannot be run a second time.
 
-A base that implements `IConstruct<T>` or `IStage<,,>` by hand should make the same check. The
-handle that `Select` makes checks for itself, so it refuses a second `Construct` even when its
-source is a hand-written handle that does not.
+`Constructor<T>` and `Stage<,,>` are abstract classes, and there is no interface to implement
+instead. `Construct` and `Advance` make the check, and then call the method you write:
+`ConstructCore` or `AdvanceCore`. That method runs at most once, so it needs no check of its own.
+The handles that `Constructor.From`, `Select`, and `Stage.From` make work the same way.
+
+`Select` follows the same pattern. It refuses a null selector, uses the handle, and then calls
+`SelectCore`, which is virtual. The default `SelectCore` makes a handle that runs the selector when
+the subclass constructs. An override can make a different handle, for example one that selects at
+once. The handle is already used when `SelectCore` runs, so an override gets the values from
+`ConstructCore` or from its own fields, and not from `Construct`. Whatever the override does, the
+values reach only one constructor.
+
+## Handles do not convert between value types
+
+A `Constructor<Dog>` is not a `Constructor<Animal>`, even when `Dog` derives from `Animal`. If a
+helper must accept a handle for any kind of animal, make the helper generic in the values type:
+
+```csharp
+public static Pet MakePet<T>(string output, Constructor<T> animal)
+    where T : AnimalValues =>
+    animal.Construct(values => new Pet(values.Name, output));
+```
+
+You can pass this method, as a method group, wherever a callback for an animal base or a mammal
+base is expected. A lambda cannot be generic, so a callback that you write as a lambda must name the
+values type. To change the values type of a handle, call `Select`.
 
 ## The types
 
 | Type | What it is |
 | --- | --- |
 | @MorseCode.StagedConstruction.StageContinuation`3 | The callback a subclass gives to a stage of its base. It gets the output of the stage and the handle for the next step. |
-| @MorseCode.StagedConstruction.IConstruct`1 | The handle for the step after the last stage. It gives the values of the base to the constructor of the subclass. |
-| @MorseCode.StagedConstruction.IStage`3 | The handle for a stage after the first. The subclass gives input to it. |
-| @MorseCode.StagedConstruction.Construct | `Construct.From(values)` makes the usual final handle. |
+| @MorseCode.StagedConstruction.Constructor`1 | The handle for the step after the last stage. It gives the values of the base to the constructor of the subclass. Derive from it for a handle of your own. |
+| @MorseCode.StagedConstruction.Stage`3 | The handle for a stage after the first. The subclass gives input to it. Derive from it for a stage of your own. |
+| @MorseCode.StagedConstruction.Constructor | `Constructor.From(values)` makes the usual final handle. |
 | @MorseCode.StagedConstruction.Stage | `Stage.From(body)` makes a stage from a function. |
 
 A base with more than one stage, or a base that has a base of its own, uses more of these. See
