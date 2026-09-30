@@ -35,3 +35,6 @@ Desktop.ini
 # slash: git treats a link as a file. See the same entries in SodaFlow's .gitignore for the reasons.
 CLAUDE.md
 .ste
+
+# The generated documentation site. See docs/README.md.
+docs/_site/

@@ -1,0 +1,20 @@
+- name: Getting started
+  href: getting-started.md
+- name: Which package do I install?
+  href: packages.md
+
+- name: Staged construction
+  items:
+    - name: Staged construction
+      href: staged-construction.md
+    - name: Bases with several stages
+      href: multi-stage.md
+
+- name: View models
+  items:
+    - name: View models
+      href: view-models.md
+    - name: Disposal and lifetimes
+      href: disposal.md
+    - name: The Disposable helpers
+      href: disposable.md

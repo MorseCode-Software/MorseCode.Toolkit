@@ -15,6 +15,11 @@ software the same way can.
 The packages are published under the `MorseCode.*` prefix and version independently. They are
 pre-1.0, and their APIs will change as the applications built on them teach us what they need.
 
+## Documentation
+
+The documentation site is at <https://morsecode-software.github.io/MorseCode.Toolkit/>. It is built from
+[`docs/`](docs) by [`.github/workflows/docs.yml`](.github/workflows/docs.yml).
+
 ## Packages
 
 - **MorseCode.Mvvm**: building blocks for view models. `ViewModelBase` is the base a view model

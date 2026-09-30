@@ -1,0 +1,80 @@
+# Builds the DocFX site under docs/ and publishes it to GitHub Pages.
+#
+# This is independent of build.yml, which builds, tests, packs and releases the .NET solution. The
+# two do not share state: that one owns NuGet releases, this owns the documentation site. It follows
+# SodaFlow's docs.yml.
+#
+# Publishing needs GitHub Pages enabled for the repository, with the source set to "GitHub Actions"
+# (Settings > Pages). Until then the deploy job fails; the build job, which pull requests run, does
+# not depend on it.
+name: Documentation
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'docs/**'
+      - 'src/**'
+      - '.config/dotnet-tools.json'
+      - '.github/workflows/docs.yml'
+  pull_request:
+    paths:
+      - 'docs/**'
+      - 'src/**'
+      - '.config/dotnet-tools.json'
+      - '.github/workflows/docs.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never let two publishes race. In-progress runs are allowed to finish so a deploy is not left
+# half-applied.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          # 10.0 to build the projects DocFX extracts, which target net10.0, and 8.0 to run DocFX
+          # itself, which is built for net8.0.
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Restore tools
+        run: dotnet tool restore
+
+      # Only the projects DocFX extracts. The test projects are not part of the site. Mvvm restores
+      # StagedConstruction with it, through the project reference.
+      - name: Restore projects
+        run: |
+          dotnet restore src/MorseCode.StagedConstruction/MorseCode.StagedConstruction.csproj
+          dotnet restore src/MorseCode.Mvvm/MorseCode.Mvvm.csproj
+
+      - name: Build site
+        run: dotnet docfx docs/docfx.json --warningsAsErrors
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: docs/_site
+
+  # Pull requests build the site to catch breakage, but only main publishes it.
+  deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5
