@@ -210,12 +210,12 @@ public sealed class ViewModelBase : IViewModel
         public IBindableFactory BindableFactory => this;
 
         // The base calls this when the subclass calls Construct. Thus, the composite holds each entry
-        // that the construction registered, and a registration after it fails and does not leak.
+        // that the construction registered, and a registration after it fails and does not leak. The
+        // handle that Select makes refuses a second Construct. Thus, this method runs one time only.
         public IDisposable Seal()
         {
             lock (this.gate)
             {
-                this.ThrowIfSealed();
                 this.isSealed = true;
 
                 return Disposable.Composite(disposables: this.registrations);

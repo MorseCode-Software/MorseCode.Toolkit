@@ -184,7 +184,8 @@ public sealed class ViewModelBaseTests
         await Assert.That(caught).IsTypeOf<InvalidOperationException>();
     }
 
-    // A second Construct call cannot make a second owner of the same entries.
+    // A second Construct call cannot make a second owner of the same entries. The handle that Select
+    // makes refuses the call, and the base does not seal the output a second time.
     [Test]
     public async Task SecondConstructFails()
     {
@@ -199,6 +200,7 @@ public sealed class ViewModelBaseTests
                 }));
 
         await Assert.That(caught).IsTypeOf<InvalidOperationException>();
+        await Assert.That(caught.Message).Contains(expected: "Construct was already called");
     }
 
     // A field-like event keeps each handler, and the target of the handler, alive with the view model.
