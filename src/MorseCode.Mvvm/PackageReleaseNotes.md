@@ -30,10 +30,11 @@ Dispose and PropertyChanged to it:
                   new CounterViewModel(viewModelBase, countValue, increment));
           }));
 
-Dispose releases each registration one time, in the order of registration,
-listeners and disposables together. A second call does nothing, also when two
-threads call at the same time. An exception from one registration does not stop
-the others.
+Dispose releases each registration one time, the last registration first,
+listeners and disposables together. Thus, a registration stops before the
+registrations that it uses. A second call does nothing, also when two threads
+call at the same time. An exception from one registration does not stop the
+others.
 
 A registration after Construct fails with an InvalidOperationException, and so
 does a second Construct. Thus, nothing that the construction made can be left
@@ -50,9 +51,9 @@ without that interface through a PropertyDescriptor, which keeps the source
 alive.
 
 Disposable.Composite, Disposable.FromAction, and Disposable.Empty are public
-too. Composite disposes a fixed list as one, with the order, once-only, and
-exception behavior above. FromAction calls an action at the first Dispose only.
-Empty does nothing.
+too. Composite disposes a fixed list as one, in the order of the list, with the
+once-only and exception behavior above. FromAction calls an action at the first
+Dispose only. Empty does nothing.
 
 This package is pre-1.0. Its API can change in a minor version until 1.0.0.
 
