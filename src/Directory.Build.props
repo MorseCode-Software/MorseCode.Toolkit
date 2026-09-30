@@ -28,6 +28,25 @@
     </PropertyGroup>
 
     <!--
+        The .NET Framework reference assemblies come from this package on every operating system,
+        rather than from whatever is installed on the machine. This follows SodaFlow's
+        src/Directory.Build.props, which records the reasoning.
+
+        The SDK adds this reference itself when it cannot use an installed targeting pack, which is
+        Linux and macOS but not Windows. Then, a lock file that Windows writes does not describe a
+        restore on Linux, and docs.yml, which builds on ubuntu, failed NU1004 naming this package.
+        Declaring the reference and turning the automatic one off makes one lock file true
+        everywhere.
+    -->
+    <PropertyGroup>
+        <AutomaticallyUseReferenceAssemblyPackages>false</AutomaticallyUseReferenceAssemblyPackages>
+    </PropertyGroup>
+
+    <ItemGroup Condition="'$(TargetFrameworkIdentifier)' == '.NETFramework'">
+        <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all"/>
+    </ItemGroup>
+
+    <!--
         Package metadata shared by every packable project. Anything that identifies one package -
         PackageId, Title, Product, Description, AssemblyName, RootNamespace, MinVerTagPrefix -
         stays in that project's own file.

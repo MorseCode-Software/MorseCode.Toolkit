@@ -44,8 +44,8 @@ jobs:
 
       - uses: actions/setup-dotnet@v6
         with:
-          # 10.0 to build the projects DocFX extracts, which target net10.0, and 8.0 to run DocFX
-          # itself, which is built for net8.0.
+          # 10.0 to build the projects DocFX extracts, which need its C# 14 compiler, and 8.0 to
+          # run DocFX itself, which is built for net8.0.
           dotnet-version: |
             8.0.x
             10.0.x
