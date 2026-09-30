@@ -20,11 +20,13 @@
 
     <ItemGroup>
         <Compile Include="Construct.cs"/>
+        <Compile Include="ConstructBase.cs"/>
         <Compile Include="IConstruct.cs"/>
         <Compile Include="IStage.cs"/>
         <Compile Include="SelectedConstruct.cs"/>
         <Compile Include="SingleUse.cs"/>
         <Compile Include="Stage.cs"/>
+        <Compile Include="StageBase.cs"/>
         <Compile Include="StageContinuation.cs"/>
         <Compile Include="StageFromBody.cs"/>
         <Compile Include="ValuesConstruct.cs"/>

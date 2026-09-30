@@ -19,7 +19,8 @@ namespace MorseCode.StagedConstruction;
 ///         The subclass must call <see cref="Advance{TResult}" /> one time only. The stage that
 ///         <see cref="Stage.From{TInput,TOutput,TNext}" /> makes fails at a second call, also when two
 ///         threads call at the same time. The first call uses the stage, also when the stage fails. A
-///         base that implements this interface itself must do the same.
+///         base that implements this interface itself must do the same. To do it, derive from
+///         <see cref="StageBase{TInput,TOutput,TNext}" />.
 ///     </para>
 /// </remarks>
 /// <typeparam name="TInput">The type of the values that the subclass gives to the stage.</typeparam>

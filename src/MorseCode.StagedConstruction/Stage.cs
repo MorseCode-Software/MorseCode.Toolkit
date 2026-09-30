@@ -15,8 +15,8 @@ public static class Stage
     /// </summary>
     /// <remarks>
     ///     This stage does not do work after the subclass continues. A stage that must do work around
-    ///     the subsequent steps, for example in a transaction, implements
-    ///     <see cref="IStage{TInput,TOutput,TNext}" /> directly.
+    ///     the subsequent steps, for example in a transaction, derives from
+    ///     <see cref="StageBase{TInput,TOutput,TNext}" />.
     /// </remarks>
     /// <param name="body">
     ///     The work of the stage. It gets the values of the previous stages from the closure that

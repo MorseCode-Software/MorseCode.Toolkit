@@ -45,8 +45,11 @@ public static class Construct
     public static IConstruct<TSelectedValues> Select<TBaseValues, TSelectedValues>(
         this IConstruct<TBaseValues> construct,
         Func<TBaseValues, TSelectedValues> selector) =>
-        // The null check occurs here, where the caller is on the stack, and not subsequently in Construct.
-        new SelectedConstruct<TBaseValues, TSelectedValues>(
-            source: construct,
-            selector: selector ?? throw new ArgumentNullException(paramName: nameof(selector)));
+        // A handle that derives from ConstructBase can override Select, so the call goes to it. The null
+        // check occurs here, where the caller is on the stack, and not subsequently in Construct.
+        construct is ConstructBase<TBaseValues> constructBase
+            ? constructBase.Select(selector: selector)
+            : new SelectedConstruct<TBaseValues, TSelectedValues>(
+                source: construct,
+                selector: selector ?? throw new ArgumentNullException(paramName: nameof(selector)));
 }

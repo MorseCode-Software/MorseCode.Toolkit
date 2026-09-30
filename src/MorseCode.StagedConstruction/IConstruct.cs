@@ -13,7 +13,8 @@ namespace MorseCode.StagedConstruction;
 ///         <see cref="StagedConstruction.Construct.From{TBaseValues}" /> and
 ///         <c>Select</c> make fail at a second call, also when two threads call
 ///         at the same time. The first call uses the handle, also when the constructor fails. A base
-///         that implements this interface itself must do the same.
+///         that implements this interface itself must do the same. To do it, derive from
+///         <see cref="ConstructBase{TBaseValues}" />.
 ///     </para>
 ///     <para>
 ///         A base can keep the constructor of <typeparamref name="TBaseValues" /> private. Then, this
