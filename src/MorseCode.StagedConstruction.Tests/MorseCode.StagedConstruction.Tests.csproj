@@ -23,6 +23,7 @@
     <ItemGroup>
         <Compile Include="Catching.cs"/>
         <Compile Include="ConstructTests.cs"/>
+        <Compile Include="SingleUseTests.cs"/>
         <Compile Include="StagedConstructionTests.cs"/>
         <Compile Include="StageTests.cs"/>
     </ItemGroup>

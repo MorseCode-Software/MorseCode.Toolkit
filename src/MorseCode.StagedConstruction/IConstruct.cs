@@ -9,8 +9,11 @@ namespace MorseCode.StagedConstruction;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         The subclass must call <see cref="Construct{TResult}" /> one time only. The handle does not
-///         make sure of this.
+///         The subclass must call <see cref="Construct{TResult}" /> one time only. The handles that
+///         <see cref="StagedConstruction.Construct.From{TBaseValues}" /> and
+///         <see cref="Select{TSelectedValues}" /> make fail at a second call, also when two threads call
+///         at the same time. The first call uses the handle, also when the constructor fails. A base
+///         that implements this interface itself must do the same.
 ///     </para>
 ///     <para>
 ///         A base can keep the constructor of <typeparamref name="TBaseValues" /> private. Then, this
@@ -34,6 +37,7 @@ public interface IConstruct<out TBaseValues>
     ///     thus the caller does not write it.
     /// </typeparam>
     /// <returns>The value that <paramref name="constructor" /> returns.</returns>
+    /// <exception cref="InvalidOperationException">A caller used this handle before.</exception>
     TResult Construct<TResult>(Func<TBaseValues, TResult> constructor);
 
     /// <summary>

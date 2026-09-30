@@ -1,3 +1,4 @@
+using System;
 using JetBrains.Annotations;
 
 namespace MorseCode.StagedConstruction;
@@ -15,8 +16,10 @@ namespace MorseCode.StagedConstruction;
 ///         sequence.
 ///     </para>
 ///     <para>
-///         The subclass must call <see cref="Advance{TResult}" /> one time only. The handle does not make
-///         sure of this.
+///         The subclass must call <see cref="Advance{TResult}" /> one time only. The stage that
+///         <see cref="Stage.From{TInput,TOutput,TNext}" /> makes fails at a second call, also when two
+///         threads call at the same time. The first call uses the stage, also when the stage fails. A
+///         base that implements this interface itself must do the same.
 ///     </para>
 /// </remarks>
 /// <typeparam name="TInput">The type of the values that the subclass gives to the stage.</typeparam>
@@ -40,5 +43,6 @@ public interface IStage<in TInput, out TOutput, out TNext>
     ///     thus the caller does not write it.
     /// </typeparam>
     /// <returns>The value that <paramref name="continuation" /> returns.</returns>
+    /// <exception cref="InvalidOperationException">A caller used this stage before.</exception>
     TResult Advance<TResult>(TInput input, StageContinuation<TOutput, TNext, TResult> continuation);
 }
