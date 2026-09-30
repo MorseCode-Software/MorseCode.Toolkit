@@ -1,0 +1,61 @@
+{
+  "$schema": "https://raw.githubusercontent.com/dotnet/docfx/main/schemas/docfx.schema.json",
+
+  "metadata": [
+    {
+      "//": [
+        "Both packages are listed. Each sets GenerateDocumentationFile, so DocFX reads the XML",
+        "documentation comments and renders them. Both target net10.0 and nothing else, so unlike",
+        "SodaFlow's docs there is no TargetFramework to pin against duplicate members."
+      ],
+      "src": [
+        {
+          "src": "../src",
+          "files": [
+            "MorseCode.StagedConstruction/MorseCode.StagedConstruction.csproj",
+            "MorseCode.Mvvm/MorseCode.Mvvm.csproj"
+          ]
+        }
+      ],
+      "dest": "api",
+      "properties": {
+        "Configuration": "Release"
+      },
+      "memberLayout": "separatePages",
+      "namespaceLayout": "nested"
+    }
+  ],
+
+  "build": {
+    "content": [
+      {
+        "files": [ "**/*.{md,yml}" ],
+        "exclude": [ "_site/**", "**/bin/**", "**/obj/**", "README.md" ]
+      }
+    ],
+    "resource": [
+      {
+        "files": [ "images/**" ],
+        "exclude": [ "_site/**" ]
+      }
+    ],
+    "output": "_site",
+    "//": [
+      "template lists the overrides last, because docfx applies them in order: 'template' is this",
+      "repository's folder, and its public/main.css and public/main.js replace the empty files of",
+      "the same names that 'modern' supplies for exactly this purpose."
+    ],
+    "template": [ "default", "modern", "template" ],
+    "postProcessors": [ "ExtractSearchIndex" ],
+    "globalMetadata": {
+      "_appName": "MorseCode Toolkit",
+      "_appTitle": "MorseCode Toolkit for .NET",
+      "_appFooter": "MorseCode Software &mdash; BSD-3-Clause",
+      "_enableSearch": true,
+      "_gitContribute": {
+        "repo": "https://github.com/MorseCode-Software/MorseCode.Toolkit",
+        "branch": "main"
+      }
+    }
+  }
+}
