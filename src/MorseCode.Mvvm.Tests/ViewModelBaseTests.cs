@@ -74,7 +74,7 @@ public sealed class ViewModelBaseTests
 
         viewModel.Dispose();
 
-        await Assert.That(log).IsEquivalentTo(expected: ["A", "B"], ordering: CollectionOrdering.Matching);
+        await Assert.That(log).IsEquivalentTo(expected: ["B", "A"], ordering: CollectionOrdering.Matching);
     }
 
     [Test]
@@ -92,13 +92,14 @@ public sealed class ViewModelBaseTests
         viewModel.Dispose();
         viewModel.Dispose();
 
-        await Assert.That(log).IsEquivalentTo(expected: ["A", "B"], ordering: CollectionOrdering.Matching);
+        await Assert.That(log).IsEquivalentTo(expected: ["B", "A"], ordering: CollectionOrdering.Matching);
     }
 
     // Before one list held the two kinds, Dispose stopped each listener before it disposed any
-    // disposable, in the sequence B, A, C.
+    // disposable, in the sequence B, A, C. After that, one list released them in the sequence A, B, C.
+    // That sequence stopped a registration after the registrations that it can use.
     [Test]
-    public async Task DisposeReleasesListenersAndDisposablesInTheOrderOfTheirRegistration()
+    public async Task DisposeReleasesListenersAndDisposablesInTheReverseOrderOfTheirRegistration()
     {
         List<string> log = [];
 
@@ -112,7 +113,29 @@ public sealed class ViewModelBaseTests
 
         viewModel.Dispose();
 
-        await Assert.That(log).IsEquivalentTo(expected: ["A", "B", "C"], ordering: CollectionOrdering.Matching);
+        await Assert.That(log).IsEquivalentTo(expected: ["C", "B", "A"], ordering: CollectionOrdering.Matching);
+    }
+
+    [Test]
+    public async Task TwoFailuresThrowOneAggregateInTheOrderOfTheirRelease()
+    {
+        Exception first = new InvalidOperationException(message: "A failed.");
+        Exception second = new InvalidOperationException(message: "B failed.");
+
+        ViewModelBase viewModel = Create(
+            register: output =>
+            {
+                output.AddDisposable(disposable: Disposable.FromAction(onDispose: () => throw first));
+                output.AddDisposable(disposable: Disposable.FromAction(onDispose: () => throw second));
+            });
+
+        Exception caught = Catch(action: viewModel.Dispose);
+
+        await Assert.That(caught).IsTypeOf<AggregateException>();
+
+        await Assert
+            .That(((AggregateException)caught).InnerExceptions)
+            .IsEquivalentTo(expected: [second, first], ordering: CollectionOrdering.Matching);
     }
 
     // Before the seal, the composite read the registrations in Dispose. Thus, Dispose released an

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Linq;
 using System.Threading;
 using JetBrains.Annotations;
 using MorseCode.StagedConstruction;
@@ -22,7 +23,9 @@ namespace MorseCode.Mvvm;
 ///         closes the registration. After that call, each member of <see cref="IOutput" /> fails.
 ///     </para>
 ///     <para>
-///         <see cref="Dispose" /> releases the registrations in the order of their registration.
+///         <see cref="Dispose" /> releases the last registration first and the first registration last.
+///         Usually, a registration uses only the registrations before it. Thus, each registration
+///         stops before the registrations that it uses.
 ///     </para>
 /// </remarks>
 [PublicAPI]
@@ -73,9 +76,10 @@ public sealed class ViewModelBase : IViewModel
 
     /// <inheritdoc />
     /// <remarks>
-    ///     The first call releases each registration one time, in the order of their registration. Each
-    ///     subsequent call does nothing, also when two threads call at the same time. The remarks of
-    ///     <see cref="Disposable.Composite" /> give the result of an exception.
+    ///     The first call releases each registration one time, the last registration first. Each
+    ///     subsequent call does nothing, also when two threads call at the same time.
+    ///     The remarks of <see cref="Disposable.Composite" /> give the result of an exception. An
+    ///     <see cref="AggregateException" /> holds the exceptions in the order of their release.
     /// </remarks>
     public void Dispose() => this.registrations.Dispose();
 
@@ -166,7 +170,7 @@ public sealed class ViewModelBase : IViewModel
     // Thus, only the field initializer uses the parameter, and the parameter cannot become mutable state.
     private sealed class Output(in IBindingScheduler bindingScheduler) : IOutput, IBindableFactory
     {
-        // One list, so that Dispose releases the entries in the order of their registration.
+        // One list, so that Dispose releases the last entry first, whatever its type.
         private readonly List<IDisposable> registrations = [];
 
         private readonly BindableFactory bindableFactory =
@@ -218,7 +222,7 @@ public sealed class ViewModelBase : IViewModel
                 this.ThrowIfSealed();
                 this.isSealed = true;
 
-                return Disposable.Composite(disposables: this.registrations);
+                return Disposable.Composite(disposables: Enumerable.Reverse(source: this.registrations));
             }
         }
 
