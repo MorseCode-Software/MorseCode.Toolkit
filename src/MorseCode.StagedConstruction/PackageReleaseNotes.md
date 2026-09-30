@@ -1,3 +1,17 @@
+0.1.1
+
+This package now targets net472, net6.0, and netstandard2.0, and not net10.0
+only. The behavior is the same on every target.
+
+Select on an IConstruct is now an extension method on the Construct class, and
+not a default member of the interface. .NET Framework and .NET Standard 2.0 do
+not support a default interface member. A call that lets the compiler infer the
+type arguments, such as construct.Select(values => ...), needs no change, but
+you must compile it again: a package built against 0.1.0 does not find the old
+member. A call that writes the type arguments must now write both, for example
+construct.Select<TBaseValues, TSelectedValues>(selector). A type that
+implements IConstruct no longer inherits a Select member from the interface.
+
 0.1.0
 
 The first release. It contains the types for staged construction: the
@@ -57,6 +71,6 @@ Construction of immutable objects in ordered stages, with no access to a partly
 built object. It is part of the MorseCode toolkit, which holds the conventions
 that MorseCode Software builds its own applications with.
 
-Targets net10.0. No dependencies.
+Targets net472, net6.0, and netstandard2.0. No dependencies.
 
 Source: https://github.com/MorseCode-Software/MorseCode.Toolkit

@@ -1,3 +1,11 @@
+0.1.1
+
+This package now targets net472, net6.0, and netstandard2.0, and not net10.0
+only. The behavior is the same on every target, and no member of the public API
+changed. It depends on MorseCode.StagedConstruction 0.1.1 or later, because that
+package made the same change and moved Select from the IConstruct interface to
+an extension method.
+
 0.1.0
 
 The first release. It contains ViewModelBase, the IViewModel interface, and the
@@ -65,7 +73,7 @@ Building blocks for view models written in a functional reactive style on
 SodaFlow. It is part of the MorseCode toolkit, which holds the conventions that
 MorseCode Software builds its own applications with.
 
-Targets net10.0. Depends on SodaFlow.Bindable.ObjectModel and
+Targets net472, net6.0, and netstandard2.0. Depends on SodaFlow.Bindable.ObjectModel and
 MorseCode.StagedConstruction.
 
 Source: https://github.com/MorseCode-Software/MorseCode.Toolkit

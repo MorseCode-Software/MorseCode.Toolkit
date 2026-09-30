@@ -69,8 +69,8 @@ the stage from `Stage.From` does. See [Each handle is used once](staged-construc
 
 ## A base with a base of its own
 
-A base that has its own base adds its values to the values of that base. `IConstruct<T>.Select`
-does it:
+A base that has its own base adds its values to the values of that base. The `Select` extension
+method on `IConstruct<T>` does it:
 
 ```csharp
 public static TResult CreateBase<TResult>(
