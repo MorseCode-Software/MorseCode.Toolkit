@@ -12,13 +12,13 @@ does not release them stays in memory, and its listeners keep running, after its
 
 `ViewModelBase.Dispose` releases each registration:
 
-- **In the order of registration.** Listeners and disposables share one list, so the order is the
-  order in which the construction registered them.
+- **Last registered, first released.** Listeners and disposables share one list, and `Dispose`
+  walks it from the end, whatever kind each entry is.
 - **One time.** The first call releases. Each later call does nothing, also when two threads call
   at the same time.
 - **Without one failure hiding the rest.** When a registration throws, the others still release.
   After all of them finish, a single exception reaches the caller unchanged. Two or more reach the
-  caller in one `AggregateException`, in the order of registration.
+  caller in one `AggregateException`, in the order they were released.
 
 ```csharp
 public void Dispose() => this.viewModelBase.Dispose();
@@ -29,8 +29,14 @@ public void Dispose() => this.viewModelBase.Dispose();
 Anything you pass to `output.AddListener` or `output.AddDisposable`, and every bindable value and
 action that `output.BindableFactory` makes. Anything you do not register is your job to release.
 
-Register in the order the objects should be released. If one registration depends on another,
-register the dependency first, because `Dispose` releases in registration order.
+Construction order usually takes care of release order. You can only register something that
+already exists, so anything a registration uses was normally registered before it, and `Dispose`
+stops the registration before it releases what it uses. For example, a listener registered after a
+disposable it writes to is stopped first, so it cannot fire into that disposable once it is gone.
+
+The exception is a loop. `ForwardReference` lets an earlier registration refer to one made later,
+and no fixed order suits every such graph. If release order matters there, check it with a test like
+the one below.
 
 ## Null and late registrations
 
@@ -67,7 +73,7 @@ ViewModelBase viewModel = ViewModelBase.CreateBase(
 viewModel.Dispose();
 viewModel.Dispose();   // does nothing
 
-// log is ["A", "B"]: each entry once, in the order of registration.
+// log is ["B", "A"]: each entry once, last registered first.
 ```
 
 Because a second `Dispose` does nothing, a test can call it as many times as it needs.
