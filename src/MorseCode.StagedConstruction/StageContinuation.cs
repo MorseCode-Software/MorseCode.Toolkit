@@ -8,8 +8,8 @@ namespace MorseCode.StagedConstruction;
 /// </summary>
 /// <param name="output">The values that the stage makes for the subclass.</param>
 /// <param name="next">
-///     The handle for the subsequent step. It is an <see cref="IStage{TInput,TOutput,TNext}" /> when
-///     the base has more stages. It is an <see cref="IConstruct{TBaseValues}" /> after the last stage.
+///     The handle for the subsequent step. It is a <see cref="Stage{TInput,TOutput,TNext}" /> when
+///     the base has more stages. It is a <see cref="Constructor{TBaseValues}" /> after the last stage.
 /// </param>
 /// <typeparam name="TOutput">The type of the values that the stage makes for the subclass.</typeparam>
 /// <typeparam name="TNext">The type of the handle for the subsequent step.</typeparam>

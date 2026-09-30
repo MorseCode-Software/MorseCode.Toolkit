@@ -34,11 +34,11 @@
     <ItemGroup>
         <Compile Include="Catching.cs"/>
         <Compile Include="Concurrency.cs"/>
-        <Compile Include="ConstructBaseTests.cs"/>
-        <Compile Include="ConstructTests.cs"/>
+        <Compile Include="ConstructorSubclassTests.cs"/>
+        <Compile Include="ConstructorTests.cs"/>
         <Compile Include="SingleUseTests.cs"/>
         <Compile Include="StagedConstructionTests.cs"/>
-        <Compile Include="StageBaseTests.cs"/>
+        <Compile Include="StageSubclassTests.cs"/>
         <Compile Include="StageTests.cs"/>
     </ItemGroup>
 

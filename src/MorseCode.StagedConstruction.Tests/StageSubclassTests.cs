@@ -8,7 +8,7 @@ using TUnit.Core;
 
 namespace MorseCode.StagedConstruction.Tests;
 
-public sealed class StageBaseTests
+public sealed class StageSubclassTests
 {
     [Test]
     public async Task SecondAdvanceFailsAndTheCoreRunsOnce()
@@ -66,7 +66,7 @@ public sealed class StageBaseTests
         await Assert.That(stage.CoreCalls).IsEqualTo(expected: 1);
     }
 
-    private sealed class Recording(in Exception? failure = null) : StageBase<int, int, int>
+    private sealed class Recording(in Exception? failure = null) : Stage<int, int, int>
     {
         private readonly Exception? failure = failure;
 

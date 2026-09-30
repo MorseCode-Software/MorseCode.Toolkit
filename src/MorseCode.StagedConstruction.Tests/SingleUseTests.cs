@@ -14,7 +14,7 @@ public sealed class SingleUseTests
     public async Task FromFailsAtASecondConstruct()
     {
         Counting constructorCalls = new();
-        IConstruct<int> construct = Construct.From(values: 1);
+        Constructor<int> construct = Constructor.From(values: 1);
 
         _ = construct.Construct(constructor: constructorCalls.Pass);
         Exception caught = Catching.Catch(action: () => _ = construct.Construct(constructor: constructorCalls.Pass));
@@ -28,23 +28,7 @@ public sealed class SingleUseTests
     public async Task SelectFailsAtASecondConstructAndCallsTheSelectorOnce()
     {
         Counting selectorCalls = new();
-        IConstruct<int> selected = Construct.From(values: 1).Select(selector: selectorCalls.Pass);
-
-        _ = selected.Construct(constructor: static values => values);
-        Exception caught = Catching.Catch(action: () => _ = selected.Construct(constructor: static values => values));
-
-        await Assert.That(caught).IsTypeOf<InvalidOperationException>();
-        await Assert.That(selectorCalls.Count).IsEqualTo(expected: 1);
-    }
-
-    // A handle that a base implements does not have to make the claim. The handle that Select makes over
-    // it must make the claim itself.
-    [Test]
-    public async Task SelectChecksOverASourceThatDoesNotCheck()
-    {
-        Counting selectorCalls = new();
-        IConstruct<int> source = new Reusable(values: 1);
-        IConstruct<int> selected = source.Select(selector: selectorCalls.Pass);
+        Constructor<int> selected = Constructor.From(values: 1).Select(selector: selectorCalls.Pass);
 
         _ = selected.Construct(constructor: static values => values);
         Exception caught = Catching.Catch(action: () => _ = selected.Construct(constructor: static values => values));
@@ -57,7 +41,7 @@ public sealed class SingleUseTests
     public async Task AdvanceFailsAtASecondCallAndCallsTheBodyOnce()
     {
         Counting bodyCalls = new();
-        IStage<int, int, int> stage = Stage.From(body: (int input) => (Output: bodyCalls.Pass(value: input), Next: input));
+        Stage<int, int, int> stage = Stage.From(body: (int input) => (Output: bodyCalls.Pass(value: input), Next: input));
 
         _ = stage.Advance(input: 1, continuation: static (output, _) => output);
 
@@ -76,7 +60,7 @@ public sealed class SingleUseTests
     {
         Counting constructorCalls = new();
         InvalidOperationException failure = new(message: "The constructor failed.");
-        IConstruct<int> construct = Construct.From(values: 1);
+        Constructor<int> construct = Constructor.From(values: 1);
 
         Exception first = Catching.Catch(action: () => _ = construct.Construct(constructor: Fail));
         Exception second = Catching.Catch(action: () => _ = construct.Construct(constructor: Fail));
@@ -100,7 +84,7 @@ public sealed class SingleUseTests
     {
         Counting bodyCalls = new();
         InvalidOperationException failure = new(message: "The stage failed.");
-        IStage<int, int, int> stage = Stage.From<int, int, int>(body: Fail);
+        Stage<int, int, int> stage = Stage.From<int, int, int>(body: Fail);
 
         Exception first = Catching.Catch(action: () => _ = stage.Advance(input: 1, continuation: static (output, _) => output));
         Exception second = Catching.Catch(action: () => _ = stage.Advance(input: 1, continuation: static (output, _) => output));
@@ -123,7 +107,7 @@ public sealed class SingleUseTests
     public async Task ConcurrentConstructSucceedsOnce()
     {
         Counting constructorCalls = new();
-        IConstruct<int> construct = Construct.From(values: 1);
+        Constructor<int> construct = Constructor.From(values: 1);
 
         int[] results = await Concurrency.RunTogether(call: () => _ = construct.Construct(constructor: constructorCalls.Pass));
 
@@ -136,7 +120,7 @@ public sealed class SingleUseTests
     public async Task ConcurrentAdvanceSucceedsOnce()
     {
         Counting bodyCalls = new();
-        IStage<int, int, int> stage = Stage.From(body: (int input) => (Output: bodyCalls.Pass(value: input), Next: input));
+        Stage<int, int, int> stage = Stage.From(body: (int input) => (Output: bodyCalls.Pass(value: input), Next: input));
 
         int[] results =
             await Concurrency.RunTogether(call: () => _ = stage.Advance(input: 1, continuation: static (output, _) => output));
@@ -158,12 +142,5 @@ public sealed class SingleUseTests
 
             return value;
         }
-    }
-
-    private sealed class Reusable(in int values) : IConstruct<int>
-    {
-        private readonly int values = values;
-
-        public TResult Construct<TResult>(Func<int, TResult> constructor) => constructor(arg: this.values);
     }
 }

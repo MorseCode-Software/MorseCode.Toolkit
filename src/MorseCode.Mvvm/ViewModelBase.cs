@@ -18,7 +18,7 @@ namespace MorseCode.Mvvm;
 /// <remarks>
 ///     <para>
 ///         During its construction, the view model adds each subscription to the registrations through
-///         <see cref="IOutput" />. The call to <see cref="IConstruct{TBaseValues}.Construct{TResult}" />
+///         <see cref="IOutput" />. The call to <see cref="Constructor{TBaseValues}.Construct{TResult}" />
 ///         closes the registration. After that call, each member of <see cref="IOutput" /> fails.
 ///     </para>
 ///     <para>
@@ -40,7 +40,7 @@ public sealed class ViewModelBase : IViewModel
     ///     registrations, and the handle that constructs the base.
     /// </summary>
     /// <remarks>
-    ///     The subclass must call <see cref="IConstruct{TBaseValues}.Construct{TResult}" /> one time only.
+    ///     The subclass must call <see cref="Constructor{TBaseValues}.Construct{TResult}" /> one time only.
     ///     A second call fails with an <see cref="InvalidOperationException" />, because two view
     ///     models cannot own the same registrations.
     /// </remarks>
@@ -57,7 +57,7 @@ public sealed class ViewModelBase : IViewModel
     /// <exception cref="ArgumentNullException"><paramref name="bindingScheduler" /> is null.</exception>
     public static TResult CreateBase<TResult>(
         IBindingScheduler bindingScheduler,
-        StageContinuation<IOutput, IConstruct<ViewModelBase>, TResult> continuation)
+        StageContinuation<IOutput, Constructor<ViewModelBase>, TResult> continuation)
     {
         // The null check occurs here, where the caller is on the stack.
         if (bindingScheduler is null)
@@ -69,7 +69,7 @@ public sealed class ViewModelBase : IViewModel
 
         return continuation(
             output: output,
-            next: Construct
+            next: Constructor
                 .From(values: output)
                 .Select(
                     selector: static constructedOutput =>
@@ -114,7 +114,7 @@ public sealed class ViewModelBase : IViewModel
     /// </summary>
     /// <remarks>
     ///     Use this during the construction only. After the subclass calls
-    ///     <see cref="IConstruct{TBaseValues}.Construct{TResult}" />, each member fails with an
+    ///     <see cref="Constructor{TBaseValues}.Construct{TResult}" />, each member fails with an
     ///     <see cref="InvalidOperationException" />. This is also true on a different thread. A
     ///     registration either gets into the registrations that Dispose releases, or fails.
     /// </remarks>

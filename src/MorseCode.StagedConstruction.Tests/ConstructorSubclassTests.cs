@@ -8,7 +8,7 @@ using TUnit.Core;
 
 namespace MorseCode.StagedConstruction.Tests;
 
-public sealed class ConstructBaseTests
+public sealed class ConstructorSubclassTests
 {
     [Test]
     public async Task SecondConstructFailsAndTheCoreRunsOnce()
@@ -70,7 +70,7 @@ public sealed class ConstructBaseTests
         Recording source = new(values: 20);
         int selectorCalls = 0;
 
-        IConstruct<int> selected = source.Select(
+        Constructor<int> selected = source.Select(
             selector: values =>
             {
                 Interlocked.Increment(location: ref selectorCalls);
@@ -101,7 +101,7 @@ public sealed class ConstructBaseTests
     public async Task DefaultSelectHandleIsUsedOnce()
     {
         Recording source = new(values: 1);
-        IConstruct<int> selected = source.Select(selector: static values => values);
+        Constructor<int> selected = source.Select(selector: static values => values);
 
         _ = selected.Construct(constructor: static values => values);
         Exception caught = Catching.Catch(action: () => _ = selected.Construct(constructor: static values => values));
@@ -126,29 +126,17 @@ public sealed class ConstructBaseTests
     // The override selects at once, and the default selects when the subclass constructs. Thus, the
     // count of the calls shows which one ran.
     [Test]
-    public async Task OverrideOfSelectRunsForAReceiverOfTheClassType()
+    public async Task OverrideOfSelectRunsInPlaceOfTheDefault()
     {
         Overriding source = new(values: 1);
 
-        IConstruct<int> selected = source.Select(selector: static values => values + 1);
+        Constructor<int> selected = source.Select(selector: static values => values + 1);
 
         await Assert.That(source.SelectCalls).IsEqualTo(expected: 1);
         await Assert.That(selected.Construct(constructor: static values => values)).IsEqualTo(expected: 2);
     }
 
-    [Test]
-    public async Task OverrideOfSelectRunsForAReceiverOfTheInterfaceType()
-    {
-        Overriding source = new(values: 1);
-        IConstruct<int> asInterface = source;
-
-        IConstruct<int> selected = asInterface.Select(selector: static values => values + 1);
-
-        await Assert.That(source.SelectCalls).IsEqualTo(expected: 1);
-        await Assert.That(selected.Construct(constructor: static values => values)).IsEqualTo(expected: 2);
-    }
-
-    private sealed class Recording(in int values, in Exception? failure = null) : ConstructBase<int>
+    private sealed class Recording(in int values, in Exception? failure = null) : Constructor<int>
     {
         private readonly int values = values;
 
@@ -166,7 +154,7 @@ public sealed class ConstructBaseTests
         }
     }
 
-    private sealed class Overriding(in int values) : ConstructBase<int>
+    private sealed class Overriding(in int values) : Constructor<int>
     {
         private readonly int values = values;
 
@@ -174,11 +162,11 @@ public sealed class ConstructBaseTests
 
         public int SelectCalls => Volatile.Read(location: ref this.selectCalls);
 
-        public override IConstruct<TSelectedValues> Select<TSelectedValues>(Func<int, TSelectedValues> selector)
+        public override Constructor<TSelectedValues> Select<TSelectedValues>(Func<int, TSelectedValues> selector)
         {
             Interlocked.Increment(location: ref this.selectCalls);
 
-            return StagedConstruction.Construct.From(values: selector(arg: this.values));
+            return Constructor.From(values: selector(arg: this.values));
         }
 
         protected override TResult ConstructCore<TResult>(Func<int, TResult> constructor) =>
