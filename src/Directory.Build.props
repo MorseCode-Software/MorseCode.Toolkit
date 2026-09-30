@@ -47,6 +47,23 @@
     </ItemGroup>
 
     <!--
+        TUnit.Core adds a reference to Polyfill to every .NET Framework and netstandard project, from
+        an MSBuild file inside the package. This follows SodaFlow's src/Directory.Build.props, which
+        records the same problem.
+
+        Restore evaluates a project with package imports switched off, so the command line and CI
+        never see that reference. An IDE evaluates with them on, so an IDE restore writes Polyfill
+        into the net472 group of each test project's lock file, and the next locked restore on CI
+        fails NU1004 naming it. Rider did that after the test projects gained net472.
+
+        So the reference is turned off where it starts. Nothing is lost: CI builds never had the
+        package, and TestPolyfills.cs supplies the two compiler types that the tests need on net472.
+    -->
+    <PropertyGroup>
+        <EnableTUnitPolyfills>false</EnableTUnitPolyfills>
+    </PropertyGroup>
+
+    <!--
         Package metadata shared by every packable project. Anything that identifies one package -
         PackageId, Title, Product, Description, AssemblyName, RootNamespace, MinVerTagPrefix -
         stays in that project's own file.
