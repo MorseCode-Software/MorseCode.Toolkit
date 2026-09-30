@@ -25,23 +25,20 @@ A view model built on `MorseCode.Mvvm` has a private constructor that only assig
 static `Create` method that does the work. This one counts button clicks.
 
 ```csharp
-using System.ComponentModel;
 using MorseCode.Mvvm;
 using MorseCode.StagedConstruction;
 using SodaFlow;
 using SodaFlow.Bindable.ObjectModel;
 using SodaFlow.Functional;
 
-public sealed class CounterViewModel : IViewModel
+public sealed class CounterViewModel : ViewModelBase
 {
-    private readonly ViewModelBase viewModelBase;
-
     private CounterViewModel(
         ViewModelBase viewModelBase,
         IOneWayBindableValue<int> count,
         IBindableAction increment)
+        : base(viewModelBase)
     {
-        this.viewModelBase = viewModelBase;
         this.Count = count;
         this.Increment = increment;
     }
@@ -63,14 +60,6 @@ public sealed class CounterViewModel : IViewModel
                 return construct.Construct(viewModelBase =>
                     new CounterViewModel(viewModelBase, countValue, increment));
             }));
-
-    public void Dispose() => this.viewModelBase.Dispose();
-
-    public event PropertyChangedEventHandler? PropertyChanged
-    {
-        add => this.viewModelBase.PropertyChanged += value;
-        remove => this.viewModelBase.PropertyChanged -= value;
-    }
 }
 ```
 
@@ -82,6 +71,8 @@ Three things to see in it:
   view model is disposed, each one is released.
 - `construct.Construct` closes the registrations and hands the finished base to the
   constructor. After that, `output` refuses any further registration.
+- The constructor gives that base to the protected constructor of `ViewModelBase`. The view model
+  then is an `IViewModel`, and its `Dispose` releases what `Create` registered.
 
 The [view models](view-models.md) page explains each part. To create the view model, capture
 the binding scheduler on the UI thread:

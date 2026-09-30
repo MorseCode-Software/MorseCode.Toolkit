@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
+using System.Threading;
 using JetBrains.Annotations;
 using MorseCode.StagedConstruction;
 using SodaFlow;
@@ -12,8 +13,10 @@ namespace MorseCode.Mvvm;
 
 /// <summary>
 ///     The base of a view model in staged construction. The static <c>Create</c> method of a view
-///     model calls <see cref="CreateBase{TResult}" />. The view model keeps the base that it gets, and
-///     its <see cref="IViewModel" /> members call the members of the base.
+///     model calls <see cref="CreateBase{TResult}" />. The view model derives from this class and
+///     gives the base that it gets to <see cref="ViewModelBase(ViewModelBase)" />. Or, the view model
+///     keeps the base that it gets, and its <see cref="IViewModel" /> members call the members of the
+///     base.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -29,11 +32,51 @@ namespace MorseCode.Mvvm;
 /// </remarks>
 [PublicAPI]
 // ReSharper disable once InheritdocConsiderUsage - The summary of IViewModel does not say how a view model uses this base.
-public sealed class ViewModelBase : IViewModel
+public class ViewModelBase : IViewModel
 {
+    // The registrations of a base that CreateBase makes, or the base that a subclass gives to the
+    // protected constructor. Thus, Dispose on a subclass calls Dispose on that base.
     private readonly IDisposable registrations;
 
+    // 1 after a subclass gives this base to the protected constructor. Two view models cannot own the
+    // same registrations, so a second subclass cannot take this base.
+    private int adopted;
+
     private ViewModelBase(IDisposable registrations) => this.registrations = registrations;
+
+    /// <summary>
+    ///     Makes a view model that delegates to <paramref name="viewModelBase" />. A subclass calls
+    ///     this constructor with the base that <see cref="Constructor{TBaseValues}.Construct{TResult}" />
+    ///     gives to it.
+    /// </summary>
+    /// <remarks>
+    ///     <see cref="Dispose" /> on the subclass calls <see cref="Dispose" /> on
+    ///     <paramref name="viewModelBase" />, and releases the registrations of its construction. One
+    ///     subclass only can take a base. A second call with the same base fails with an
+    ///     <see cref="InvalidOperationException" />, because two view models cannot own the same
+    ///     registrations.
+    /// </remarks>
+    /// <param name="viewModelBase">The base that the subclass delegates to.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="viewModelBase" /> is null.</exception>
+    /// <exception cref="InvalidOperationException">
+    ///     A different subclass took <paramref name="viewModelBase" /> before.
+    /// </exception>
+    protected ViewModelBase(ViewModelBase viewModelBase)
+    {
+        if (viewModelBase is null)
+        {
+            throw new ArgumentNullException(paramName: nameof(viewModelBase));
+        }
+
+        if (Interlocked.Exchange(location1: ref viewModelBase.adopted, value: 1) != 0)
+        {
+            throw new InvalidOperationException(
+                message: "A different view model already derives from this base. Two view models "
+                    + "cannot own the same registrations.");
+        }
+
+        this.registrations = viewModelBase;
+    }
 
     /// <summary>
     ///     The only stage of the base. It gives the subclass an <see cref="IOutput" /> for its
@@ -90,7 +133,14 @@ public sealed class ViewModelBase : IViewModel
     ///     The remarks of <see cref="Disposable.Composite" /> give the result of an exception. An
     ///     <see cref="AggregateException" /> holds the exceptions in the order of their release.
     /// </remarks>
-    public void Dispose() => this.registrations.Dispose();
+    public void Dispose()
+    {
+        this.registrations.Dispose();
+
+        // A subclass can add a finalizer. This call makes that finalizer unnecessary after Dispose, and the
+        // subclass does not have to implement IDisposable again to make it.
+        GC.SuppressFinalize(obj: this);
+    }
 
     /// <summary>
     ///     This event does not occur, and it keeps no handler.

@@ -16,8 +16,8 @@ Every view model has the same shape:
 1. A static `Create` method calls `ViewModelBase.CreateBase`. It builds every value in local
    variables, and registers the subscriptions it makes.
 2. `Create` calls `construct.Construct` with a function that calls the private constructor.
-3. The constructor only assigns. It keeps the `ViewModelBase` it gets.
-4. The `IViewModel` members of the view model call the members of the kept base.
+3. The constructor gives the `ViewModelBase` it gets to the protected constructor of
+   `ViewModelBase`, and then only assigns.
 
 [Getting started](getting-started.md) has a complete example.
 
@@ -92,8 +92,16 @@ added to it later.
 public interface IViewModel : IDisposable, INotifyPropertyChanged;
 ```
 
-`IViewModel` is what a view model shows to its view. A view model that uses `ViewModelBase`
-implements it by sending its `Dispose` and `PropertyChanged` to the base it kept.
+`IViewModel` is what a view model shows to its view. A view model that derives from
+`ViewModelBase` implements it through the base: the protected constructor takes the base that
+`Construct` gives, and `Dispose` on the view model disposes that base.
+
+One view model only can take a base. A second call to the protected constructor with the same base
+fails with an `InvalidOperationException`, because two view models cannot own the same
+registrations. A null base fails with an `ArgumentNullException`.
+
+A view model that must derive from a different class can keep the base in a field instead, and
+implement `IViewModel` itself by sending its `Dispose` and `PropertyChanged` to the kept base.
 
 ### Why is INotifyPropertyChanged there?
 
