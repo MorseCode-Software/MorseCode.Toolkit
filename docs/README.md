@@ -35,15 +35,15 @@ Metadata extraction compiles the projects, so the first run takes a while and ne
 | `api/index.md` | Hand-written API landing page. |
 | `api/*.yml` | **Generated.** Git-ignored; produced by `docfx metadata`. |
 | `template/` | The theme: `public/main.css` and `public/main.js`. |
-| `images/` | Site images. |
+| `images/` | Site images: the MorseCode Software mark (navbar and favicon) and wordmark (landing page). |
 | `_site/` | **Generated.** Git-ignored build output. |
 
 ## Theme
 
 `template/` is a DocFX template that carries two files, and `docfx.json` lists it after `default`
 and `modern` so that they override the empty ones `modern` ships. `main.css` sets its colors once
-as custom properties, for the light theme and again for the dark one. The colors are SodaFlow's
-brand green plus neutrals mixed toward it, so the two sites look related. `main.js` holds the
+as custom properties, for the light theme and again for the dark one. The colors are the blue of the
+MorseCode Software logo plus neutrals mixed toward it. `main.js` holds the
 GitHub and NuGet icon links in the navigation bar.
 
 ## Writing pages
