@@ -34,8 +34,6 @@ namespace MorseCode.Mvvm;
 // ReSharper disable once InheritdocConsiderUsage - The summary of IViewModel does not say how a view model uses this base.
 public class ViewModelBase : IViewModel
 {
-    // The registrations of a base that CreateBase makes, or the base that a subclass gives to the
-    // protected constructor. Thus, Dispose on a subclass calls Dispose on that base.
     private readonly IDisposable registrations;
 
     // 1 after a subclass gives this base to the protected constructor. Two view models cannot own the
@@ -45,37 +43,36 @@ public class ViewModelBase : IViewModel
     private ViewModelBase(IDisposable registrations) => this.registrations = registrations;
 
     /// <summary>
-    ///     Makes a view model that delegates to <paramref name="viewModelBase" />. A subclass calls
-    ///     this constructor with the base that <see cref="Constructor{TBaseValues}.Construct{TResult}" />
-    ///     gives to it.
+    ///     Makes a view model with the registrations of <paramref name="viewModelBase" />. A subclass
+    ///     calls this constructor with the base that
+    ///     <see cref="Constructor{TBaseValues}.Construct{TResult}" /> gives to it.
     /// </summary>
     /// <remarks>
-    ///     <see cref="Dispose" /> on the subclass calls <see cref="Dispose" /> on
-    ///     <paramref name="viewModelBase" />, and releases the registrations of its construction. One
-    ///     subclass only can take a base. A second call with the same base fails with an
-    ///     <see cref="InvalidOperationException" />, because two view models cannot own the same
-    ///     registrations.
+    ///     <see cref="Dispose" /> on the subclass releases the registrations of the construction of
+    ///     <paramref name="viewModelBase" />. One subclass only can take a base. A second call with the
+    ///     same base fails with an <see cref="InvalidOperationException" />, because two view models
+    ///     cannot own the same registrations.
     /// </remarks>
-    /// <param name="viewModelBase">The base that the subclass delegates to.</param>
+    /// <param name="viewModelBase">The base that gives its registrations to the subclass.</param>
     /// <exception cref="ArgumentNullException"><paramref name="viewModelBase" /> is null.</exception>
     /// <exception cref="InvalidOperationException">
     ///     A different subclass took <paramref name="viewModelBase" /> before.
     /// </exception>
     protected ViewModelBase(ViewModelBase viewModelBase)
+        // Each field of the base goes to the private constructor, which is the one place that assigns
+        // fields. No statement can run before this call, so the null check is part of the argument: a
+        // null base fails with an ArgumentNullException and not a NullReferenceException.
+        : this(
+            registrations: (viewModelBase ?? throw new ArgumentNullException(paramName: nameof(viewModelBase)))
+            .registrations)
     {
-        if (viewModelBase is null)
-        {
-            throw new ArgumentNullException(paramName: nameof(viewModelBase));
-        }
-
+        // The private constructor only assigns. Thus, a refusal here leaves no state behind.
         if (Interlocked.Exchange(location1: ref viewModelBase.adopted, value: 1) != 0)
         {
             throw new InvalidOperationException(
                 message: "A different view model already derives from this base. Two view models "
                     + "cannot own the same registrations.");
         }
-
-        this.registrations = viewModelBase;
     }
 
     /// <summary>

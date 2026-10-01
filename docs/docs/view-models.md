@@ -93,8 +93,8 @@ public interface IViewModel : IDisposable, INotifyPropertyChanged;
 ```
 
 `IViewModel` is what a view model shows to its view. A view model that derives from
-`ViewModelBase` implements it through the base: the protected constructor takes the base that
-`Construct` gives, and `Dispose` on the view model disposes that base.
+`ViewModelBase` implements it through the base: the protected constructor takes the registrations
+of the base that `Construct` gives, and `Dispose` on the view model releases them.
 
 One view model only can take a base. A second call to the protected constructor with the same base
 fails with an `InvalidOperationException`, because two view models cannot own the same

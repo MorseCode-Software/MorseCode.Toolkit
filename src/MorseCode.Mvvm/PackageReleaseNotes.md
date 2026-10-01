@@ -3,8 +3,8 @@
 ViewModelBase is no longer sealed. A view model can derive from it: its
 constructor gives the base that Construct gives to the new protected
 constructor, ViewModelBase(ViewModelBase), and the view model then is an
-IViewModel with no members of its own for that. Dispose on the view model
-disposes that base, and releases the registrations of the construction.
+IViewModel with no members of its own for that. The protected constructor takes
+the registrations of that base, and Dispose on the view model releases them.
 
 One view model only can take a base. A second call to the protected constructor
 with the same base fails with an InvalidOperationException, because two view
