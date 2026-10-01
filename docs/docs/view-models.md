@@ -73,15 +73,24 @@ weak listener while the view model is alive.
 The methods differ from a plain factory in one way: each one registers what it makes. You never
 call `AddDisposable` for a bindable value.
 
-## Construction closes registration
+## Registration closes when construction ends
 
-`construct.Construct` seals the registrations and gives the finished base to the constructor. After
-that:
+`construct.Construct` gives the finished base to the constructor, and the registrations stay open
+while that constructor runs. The constructor of a view model that derives from `ViewModelBase` can
+still add a subscription of its own to `output`, and `Dispose` releases it with the rest.
 
-- Each member of `IOutput` fails with an `InvalidOperationException`. The `BindableFactory` methods
-  check this before they make the object, so a refused call attaches nothing to the graph.
-- A second call to `Construct` also fails with an `InvalidOperationException`, because two view
-  models cannot own the same registrations.
+The registrations close in one of three ways:
+
+- The constructor returns.
+- The constructor throws. The base releases every registration made so far, and the exception goes to
+  the caller unchanged.
+- `Dispose` runs, including a call from inside the constructor. It releases the registrations made
+  so far.
+
+After that, each member of `IOutput` fails with an `InvalidOperationException`. The
+`BindableFactory` methods check this before they make the object, so a refused call attaches
+nothing to the graph. A second call to `Construct` also fails with an `InvalidOperationException`,
+because two view models cannot own the same registrations.
 
 Together these mean nothing the construction made can be left out of `Dispose`, and nothing can be
 added to it later.

@@ -69,8 +69,8 @@ Three things to see in it:
   `CounterViewModel` that does not exist yet, because none does.
 - Every bindable value goes through `output.BindableFactory`, so the base registers it. When the
   view model is disposed, each one is released.
-- `construct.Construct` closes the registrations and hands the finished base to the
-  constructor. After that, `output` refuses any further registration.
+- `construct.Construct` hands the finished base to the constructor. When the constructor returns,
+  `output` refuses any further registration.
 - The constructor gives that base to the protected constructor of `ViewModelBase`. The view model
   then is an `IViewModel`, and its `Dispose` releases what `Create` registered.
 
