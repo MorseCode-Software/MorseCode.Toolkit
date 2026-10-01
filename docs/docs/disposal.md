@@ -20,6 +20,9 @@ does not release them stays in memory, and its listeners keep running, after its
   After all of them finish, a single exception reaches the caller unchanged. Two or more reach the
   caller in one `AggregateException`, in the order they were released.
 
+A view model that derives from `ViewModelBase` gets this `Dispose` as it is. A view model that keeps
+the base in a field sends its own `Dispose` there:
+
 ```csharp
 public void Dispose() => this.viewModelBase.Dispose();
 ```

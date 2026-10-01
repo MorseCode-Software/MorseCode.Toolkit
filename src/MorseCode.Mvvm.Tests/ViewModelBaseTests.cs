@@ -268,6 +268,57 @@ public sealed class ViewModelBaseTests
         await Assert.That(viewModel).IsNotNull();
     }
 
+    [Test]
+    public async Task DisposeOnASubclassReleasesTheRegistrationsOfItsBase()
+    {
+        List<string> log = [];
+
+        Derived viewModel = ViewModelBase.CreateBase(
+            bindingScheduler: BindingScheduler.Immediate,
+            continuation: (output, construct) =>
+            {
+                output.AddDisposable(disposable: new Recording(log: log, name: "A"));
+                output.AddDisposable(disposable: new Recording(log: log, name: "B"));
+
+                return construct.Construct(constructor: static viewModelBase => new Derived(viewModelBase: viewModelBase));
+            });
+
+        viewModel.Dispose();
+        viewModel.Dispose();
+
+        await Assert.That(log).IsEquivalentTo(expected: ["B", "A"], ordering: CollectionOrdering.Matching);
+    }
+
+    [Test]
+    public async Task SubclassRefusesANullBase()
+    {
+        // ReSharper disable once NullableWarningSuppressionIsUsed - The null base is the input under test: the constructor must refuse it at run time.
+        Exception caught = Catch(action: static () => _ = new Derived(viewModelBase: null!));
+
+        await Assert.That(caught).IsTypeOf<ArgumentNullException>();
+        await Assert.That(((ArgumentNullException)caught).ParamName).IsEqualTo(expected: "viewModelBase");
+    }
+
+    // Two view models that own the same registrations could each dispose them while the other still
+    // uses them. Thus, one subclass only can take a base, and the first one keeps it.
+    [Test]
+    public async Task SecondSubclassOfTheSameBaseFails()
+    {
+        List<string> log = [];
+
+        ViewModelBase viewModelBase = Create(
+            register: output => output.AddDisposable(disposable: new Recording(log: log, name: "A")));
+
+        Derived first = new(viewModelBase: viewModelBase);
+        Exception caught = Catch(action: () => _ = new Derived(viewModelBase: viewModelBase));
+
+        first.Dispose();
+
+        await Assert.That(caught).IsTypeOf<InvalidOperationException>();
+        await Assert.That(caught.Message).Contains(expected: "already derives from this base");
+        await Assert.That(log).IsEquivalentTo(expected: ["A"], ordering: CollectionOrdering.Matching);
+    }
+
     // A different method, so that no local of the test keeps the subscriber alive.
     [MethodImpl(methodImplOptions: MethodImplOptions.NoInlining)]
     private static WeakReference Subscribe(INotifyPropertyChanged viewModel)
@@ -301,6 +352,8 @@ public sealed class ViewModelBaseTests
 
         throw new InvalidOperationException(message: "The action did not throw an exception.");
     }
+
+    private sealed class Derived(ViewModelBase viewModelBase) : ViewModelBase(viewModelBase: viewModelBase);
 
     private sealed class Recording(ICollection<string> log, string name) : IDisposable
     {
