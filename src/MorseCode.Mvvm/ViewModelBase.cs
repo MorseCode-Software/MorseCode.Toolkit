@@ -114,13 +114,27 @@ public class ViewModelBase : IViewModel
 
         Output output = new(bindingScheduler: bindingScheduler);
 
-        return continuation(
-            output: output,
-            next: Constructor
-                .From(values: output)
-                .Select(
-                    selector: static constructedOutput =>
-                        new ViewModelBase(registrations: constructedOutput.Seal())));
+        return continuation(output: output, next: new Constructor(output));
+    }
+
+    private class Constructor(in Output output) : Constructor<ViewModelBase>
+    {
+        private readonly Output output = output;
+
+        /// <inheritdoc />
+        protected override TResult ConstructCore<TResult>(Func<ViewModelBase, TResult> constructor)
+        {
+            IDisposable? disposable = null;
+
+            TResult result = constructor(new ViewModelBase(Disposable.FromAction(Dispose)));
+
+            disposable = this.output.Seal();
+
+            return result;
+
+            // ReSharper disable once AccessToModifiedClosure
+            void Dispose() => disposable?.Dispose();
+        }
     }
 
     /// <inheritdoc />
