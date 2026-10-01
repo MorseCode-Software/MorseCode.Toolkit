@@ -211,7 +211,7 @@ public sealed class ViewModelBaseConcurrencyTests
                 ordering: CollectionOrdering.Matching);
 
         await Assert.That(caught[0]).IsTypeOf<InvalidOperationException>();
-        await Assert.That(caught[0].Message).Contains(expected: "already constructed");
+        await Assert.That(caught[0].Message).Contains(expected: "registrations are closed");
         await Assert.That(postsAfterTheChange).IsEqualTo(expected: postsBeforeTheChange);
 
         viewModel.Dispose();
