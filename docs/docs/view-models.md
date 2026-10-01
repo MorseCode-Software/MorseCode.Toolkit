@@ -83,7 +83,8 @@ The registrations close in one of three ways:
 
 - The constructor returns.
 - The constructor throws. The base releases every registration made so far, and the exception goes to
-  the caller unchanged.
+  the caller unchanged. If a registration also throws as it is released, the caller gets an
+  `AggregateException` that holds the exception of the constructor first.
 - `Dispose` runs, including a call from inside the constructor. It releases the registrations made
   so far.
 

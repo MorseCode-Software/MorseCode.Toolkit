@@ -11,7 +11,9 @@ still fails with an InvalidOperationException.
 Dispose on the base now releases the registrations made so far, also when it
 runs inside the constructor or on a different thread, and it closes the
 registrations. If the constructor throws, the base releases the registrations
-made so far, and the exception goes to the caller unchanged. The message of the
+made so far, and the exception goes to the caller unchanged. If a registration
+also throws as it is released, the caller gets an AggregateException that holds
+the exception of the constructor first. The message of the
 InvalidOperationException for a late registration now says that the
 registrations are closed. No signature changed.
 

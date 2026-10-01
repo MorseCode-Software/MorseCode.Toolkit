@@ -28,7 +28,8 @@ namespace MorseCode.Mvvm;
 ///     </para>
 ///     <para>
 ///         If that constructor throws, the base releases the registrations and the exception goes to the
-///         caller unchanged.
+///         caller unchanged. If a registration also throws when the base releases it, the caller gets an
+///         <see cref="AggregateException" /> with the exception of the constructor first.
 ///     </para>
 ///     <para>
 ///         <see cref="Dispose" /> releases the last registration first and the first registration last.
@@ -139,12 +140,19 @@ public class ViewModelBase : IViewModel
             {
                 result = constructor(arg: new ViewModelBase(registrations: this.output));
             }
-            catch
+            catch (Exception constructionFailure)
             {
-                // The subclass cannot release a base that it never received, and nobody else can. The
-                // exception of the constructor is the error that the caller must see. Thus, a failure of
-                // a registration to stop does not replace it.
-                this.output.DisposeAfterFailedConstruction();
+                // The subclass cannot release a base that it never received, and nobody else can. If a
+                // registration also fails to stop, the caller gets both exceptions, and the exception of
+                // the constructor is the first.
+                try
+                {
+                    this.output.Dispose();
+                }
+                catch (Exception releaseFailure)
+                {
+                    throw new AggregateException(constructionFailure, releaseFailure);
+                }
 
                 throw;
             }
@@ -339,19 +347,6 @@ public class ViewModelBase : IViewModel
             }
 
             composite.Dispose();
-        }
-
-        // See ViewModelBaseConstructor.
-        public void DisposeAfterFailedConstruction()
-        {
-            try
-            {
-                this.Dispose();
-            }
-            catch (Exception)
-            {
-                // Intentionally empty: the exception of the constructor replaces this one.
-            }
         }
 
         /// <inheritdoc />

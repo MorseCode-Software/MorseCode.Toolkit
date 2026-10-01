@@ -325,11 +325,12 @@ public sealed class ViewModelBaseTests
         await Assert.That(late).IsTypeOf<InvalidOperationException>();
     }
 
-    // The exception of the constructor is the error that the caller must see.
+    // The caller must see both errors, and the exception of the constructor is the first.
     [Test]
-    public async Task FailedConstructorWithAFailingRegistrationRethrowsTheExceptionOfTheConstructor()
+    public async Task FailedConstructorWithAFailingRegistrationThrowsBothExceptions()
     {
-        InvalidOperationException failure = new(message: "The constructor failed.");
+        Exception failure = new InvalidOperationException(message: "The constructor failed.");
+        Exception releaseFailure = new InvalidOperationException(message: "The release failed.");
 
         Exception caught = Catch(
             action: () => ViewModelBase.CreateBase<ViewModelBase>(
@@ -338,12 +339,16 @@ public sealed class ViewModelBaseTests
                 {
                     output.AddDisposable(
                         disposable: Disposable.FromAction(
-                            onDispose: static () => throw new InvalidOperationException(message: "The release failed.")));
+                            onDispose: () => throw releaseFailure));
 
                     return construct.Construct<ViewModelBase>(constructor: _ => throw failure);
                 }));
 
-        await Assert.That(caught).IsSameReferenceAs(expected: failure);
+        await Assert.That(caught).IsTypeOf<AggregateException>();
+
+        await Assert
+            .That(((AggregateException)caught).InnerExceptions)
+            .IsEquivalentTo(expected: [failure, releaseFailure], ordering: CollectionOrdering.Matching);
     }
 
     // A second Construct call cannot make a second owner of the same entries. The handle that Select
