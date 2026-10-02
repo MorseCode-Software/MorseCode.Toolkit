@@ -331,12 +331,16 @@ public sealed class ViewModelBaseTests
     {
         Exception failure = new InvalidOperationException(message: "The constructor failed.");
         Exception releaseFailure = new InvalidOperationException(message: "The release failed.");
+        List<string> log = [];
+        List<ViewModelBase.IOutput> kept = [];
 
         Exception caught = Catch(
             action: () => ViewModelBase.CreateBase<ViewModelBase>(
                 bindingScheduler: BindingScheduler.Immediate,
                 continuation: (output, construct) =>
                 {
+                    kept.Add(output);
+
                     output.AddDisposable(
                         disposable: Disposable.FromAction(
                             onDispose: () => throw releaseFailure));
@@ -349,6 +353,13 @@ public sealed class ViewModelBaseTests
         await Assert
             .That(((AggregateException)caught).InnerExceptions)
             .IsEquivalentTo(expected: [failure, releaseFailure], ordering: CollectionOrdering.Matching);
+
+        // The output closes before the release runs. Thus, it is closed also when the release throws.
+        Exception late =
+            Catch(action: () => kept[0].AddDisposable(disposable: new Recording(log: log, name: "late")));
+
+        await Assert.That(late).IsTypeOf<InvalidOperationException>();
+        await Assert.That(log).IsEmpty();
     }
 
     // A second Construct call cannot make a second owner of the same entries. The handle that Select
