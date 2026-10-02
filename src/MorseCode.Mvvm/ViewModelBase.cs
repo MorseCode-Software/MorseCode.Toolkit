@@ -21,8 +21,15 @@ namespace MorseCode.Mvvm;
 /// <remarks>
 ///     <para>
 ///         During its construction, the view model adds each subscription to the registrations through
-///         <see cref="IOutput" />. The call to <see cref="Constructor{TBaseValues}.Construct{TResult}" />
-///         closes the registration. After that call, each member of <see cref="IOutput" /> fails.
+///         <see cref="IOutput" />. The registration stays open while the constructor that
+///         <see cref="Constructor{TBaseValues}.Construct{TResult}" /> calls runs, so that the constructor
+///         of the subclass can add its own subscriptions. It closes when that constructor returns, or
+///         when <see cref="Dispose" /> runs. After that, each member of <see cref="IOutput" /> fails.
+///     </para>
+///     <para>
+///         If that constructor throws, the base releases the registrations and the exception goes to the
+///         caller unchanged. If a registration also throws when the base releases it, the caller gets an
+///         <see cref="AggregateException" /> with the exception of the constructor first.
 ///     </para>
 ///     <para>
 ///         <see cref="Dispose" /> releases the last registration first and the first registration last.
@@ -114,19 +121,53 @@ public class ViewModelBase : IViewModel
 
         Output output = new(bindingScheduler: bindingScheduler);
 
-        return continuation(
-            output: output,
-            next: Constructor
-                .From(values: output)
-                .Select(
-                    selector: static constructedOutput =>
-                        new ViewModelBase(registrations: constructedOutput.Seal())));
+        return continuation(output: output, next: new ViewModelBaseConstructor(output: output));
+    }
+
+    // The base owns the output from the start, and the output releases what it holds on the first Dispose
+    // call. Thus, a Dispose call during the constructor, or on a different thread, releases the
+    // registrations that exist at that time, and each registration after it fails.
+    private sealed class ViewModelBaseConstructor(in Output output) : Constructor<ViewModelBase>
+    {
+        private readonly Output output = output;
+
+        /// <inheritdoc />
+        protected override TResult ConstructCore<TResult>(Func<ViewModelBase, TResult> constructor)
+        {
+            TResult result;
+
+            try
+            {
+                result = constructor(arg: new ViewModelBase(registrations: this.output));
+            }
+            catch (Exception constructionFailure)
+            {
+                // The subclass cannot release a base that it never received, and nobody else can. If a
+                // registration also fails to stop, the caller gets both exceptions, and the exception of
+                // the constructor is the first.
+                try
+                {
+                    this.output.Dispose();
+                }
+                catch (Exception releaseFailure)
+                {
+                    throw new AggregateException(constructionFailure, releaseFailure);
+                }
+
+                throw;
+            }
+
+            this.output.Seal();
+
+            return result;
+        }
     }
 
     /// <inheritdoc />
     /// <remarks>
     ///     The first call releases each registration one time, the last registration first. Each
-    ///     subsequent call does nothing, also when two threads call at the same time.
+    ///     subsequent call does nothing, also when two threads call at the same time. A call during
+    ///     the construction releases the registrations that exist then, and closes the registration.
     ///     The remarks of <see cref="Disposable.Composite" /> give the result of an exception. An
     ///     <see cref="AggregateException" /> holds the exceptions in the order of their release.
     /// </remarks>
@@ -167,8 +208,9 @@ public class ViewModelBase : IViewModel
     ///     construction to the registrations here, and <see cref="ViewModelBase.Dispose" /> releases them.
     /// </summary>
     /// <remarks>
-    ///     Use this during the construction only. After the subclass calls
-    ///     <see cref="Constructor{TBaseValues}.Construct{TResult}" />, each member fails with an
+    ///     Use this during the construction only. After the constructor that
+    ///     <see cref="Constructor{TBaseValues}.Construct{TResult}" /> calls returns or throws, or after
+    ///     <see cref="ViewModelBase.Dispose" /> runs, each member fails with an
     ///     <see cref="InvalidOperationException" />. This is also true on a different thread. A
     ///     registration either gets into the registrations that Dispose releases, or fails.
     /// </remarks>
@@ -190,7 +232,7 @@ public class ViewModelBase : IViewModel
         ///     it.
         /// </returns>
         /// <exception cref="ArgumentNullException"><paramref name="listener" /> is null.</exception>
-        /// <exception cref="InvalidOperationException">The subclass called Construct.</exception>
+        /// <exception cref="InvalidOperationException">The registrations are closed.</exception>
         T AddListener<T>(T listener)
             where T : IWeakListener;
 
@@ -205,7 +247,7 @@ public class ViewModelBase : IViewModel
         ///     makes it.
         /// </returns>
         /// <exception cref="ArgumentNullException"><paramref name="disposable" /> is null.</exception>
-        /// <exception cref="InvalidOperationException">The subclass called Construct.</exception>
+        /// <exception cref="InvalidOperationException">The registrations are closed.</exception>
         T AddDisposable<T>(T disposable)
             where T : IDisposable;
 
@@ -213,18 +255,18 @@ public class ViewModelBase : IViewModel
         ///     Makes bindable values and actions, and adds each object that it makes to the registrations.
         /// </summary>
         /// <remarks>
-        ///     After the subclass calls Construct, each method fails with an
+        ///     After the registrations close, each method fails with an
         ///     <see cref="InvalidOperationException" />. The method does this check before it makes the
-        ///     object. Thus, a refused call attaches nothing to the graph. A Construct on a different
-        ///     thread can occur while the method makes the object. Then, the method disposes the object
-        ///     and fails.
+        ///     object. Thus, a refused call attaches nothing to the graph. The registrations can close
+        ///     on a different thread while the method makes the object. Then, the method disposes the
+        ///     object and fails.
         /// </remarks>
         IBindableFactory BindableFactory { get; }
     }
 
     // The in modifier makes the parameter readonly, and the compiler refuses to capture it in a member.
     // Thus, only the field initializer uses the parameter, and the parameter cannot become mutable state.
-    private sealed class Output(in IBindingScheduler bindingScheduler) : IOutput, IBindableFactory
+    private sealed class Output(in IBindingScheduler bindingScheduler) : IOutput, IBindableFactory, IDisposable
     {
         // One list, so that Dispose releases the last entry first, whatever its type.
         private readonly List<IDisposable> registrations = [];
@@ -239,6 +281,10 @@ public class ViewModelBase : IViewModel
         private readonly object gate = new();
 
         private bool isSealed;
+
+        // The first Dispose call makes this composite, and it closes the registrations at the same time.
+        // The composite releases each entry one time, also when two threads call Dispose.
+        private IDisposable? released;
 
         /// <inheritdoc />
         public T AddListener<T>(T listener)
@@ -275,19 +321,32 @@ public class ViewModelBase : IViewModel
         /// <inheritdoc />
         public IBindableFactory BindableFactory => this;
 
-        // The base calls this when the subclass calls Construct. Thus, the composite holds each entry
-        // that the construction registered, and a registration after it fails and does not leak. The
-        // handle that Select makes refuses a second Construct. Thus, this method runs one time only.
-        public IDisposable Seal()
+        // The base calls this when the constructor of the subclass returns. After it, a registration fails
+        // and does not leak.
+        public void Seal()
         {
+            lock (this.gate)
+            {
+                this.isSealed = true;
+            }
+        }
+
+        /// <inheritdoc />
+        public void Dispose()
+        {
+            IDisposable composite;
+
             lock (this.gate)
             {
                 this.isSealed = true;
 
                 // Keep the static call. The Reverse method of List<T> reverses the list in place and
                 // returns nothing. An extension call uses that method and not the method of LINQ.
-                return Disposable.Composite(disposables: Enumerable.Reverse(source: this.registrations));
+                this.released ??= Disposable.Composite(disposables: Enumerable.Reverse(source: this.registrations));
+                composite = this.released;
             }
+
+            composite.Dispose();
         }
 
         /// <inheritdoc />
@@ -359,8 +418,8 @@ public class ViewModelBase : IViewModel
 
         private static InvalidOperationException SealedException() =>
             new(
-                message: "The view model is already constructed. Register each disposable, listener, "
-                    + "and bindable before the subclass calls Construct.");
+                message: "The registrations are closed. Register each disposable, listener, and bindable "
+                    + "before the constructor that Construct calls returns, and before Dispose.");
 
         private void Add(IDisposable registration)
         {
@@ -371,7 +430,7 @@ public class ViewModelBase : IViewModel
             }
         }
 
-        // The first check refuses a late call before SodaFlow makes anything. A Construct can occur
+        // The first check refuses a late call before SodaFlow makes anything. The registrations can close
         // while SodaFlow makes the object. Then, the second check finds the seal, and this method
         // disposes the object and fails. Thus, the object does not stay attached to the graph.
         private T Make<T>(Func<T> make)

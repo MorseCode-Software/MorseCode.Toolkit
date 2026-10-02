@@ -48,7 +48,7 @@ Both are refused at the call, where the mistake is on the stack:
 | Mistake | Result |
 | --- | --- |
 | A null listener or disposable | `ArgumentNullException` at the `Add...` call. |
-| A registration after `Construct` | `InvalidOperationException` at the `Add...` call. |
+| A registration after the constructor returns or throws, or after `Dispose` | `InvalidOperationException` at the `Add...` call. |
 | A second `Construct` | `InvalidOperationException`. |
 
 A null entry that reached `Dispose` would stop the disposal of every entry after it, so it is

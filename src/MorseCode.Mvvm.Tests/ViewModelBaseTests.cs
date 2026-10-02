@@ -200,24 +200,166 @@ public sealed class ViewModelBaseTests
         await Assert.That(caught).IsTypeOf<InvalidOperationException>();
     }
 
-    // The base seals the output when the subclass calls Construct, and before the constructor runs.
+    // The base seals the output when the constructor that Construct calls returns, and not before. Thus,
+    // the constructor of the subclass can register, and Dispose releases what it registered.
     [Test]
-    public async Task RegistrationInTheConstructorFails()
+    public async Task RegistrationInTheConstructorIsReleasedByDispose()
     {
         List<string> log = [];
 
-        Exception caught = Catch(
-            action: () => ViewModelBase.CreateBase(
-                bindingScheduler: BindingScheduler.Immediate,
-                continuation: (output, construct) => construct.Construct(
-                    constructor: viewModelBase =>
-                    {
-                        output.AddDisposable(disposable: new Recording(log: log, name: "in constructor"));
+        ViewModelBase viewModel = ViewModelBase.CreateBase(
+            bindingScheduler: BindingScheduler.Immediate,
+            continuation: (output, construct) => construct.Construct(
+                constructor: viewModelBase =>
+                {
+                    output.AddDisposable(disposable: new Recording(log: log, name: "in constructor"));
 
-                        return viewModelBase;
-                    })));
+                    return viewModelBase;
+                }));
+
+        await Assert.That(log).IsEmpty();
+
+        viewModel.Dispose();
+
+        await Assert.That(log).IsEquivalentTo(expected: ["in constructor"]);
+    }
+
+    [Test]
+    public async Task RegistrationAfterTheConstructorReturnsFails()
+    {
+        List<ViewModelBase.IOutput> kept = [];
+
+        _ = ViewModelBase.CreateBase(
+            bindingScheduler: BindingScheduler.Immediate,
+            continuation: (output, construct) =>
+            {
+                kept.Add(output);
+
+                return construct.Construct(constructor: static viewModelBase => viewModelBase);
+            });
+
+        Exception caught =
+            Catch(action: () => kept[0].AddDisposable(disposable: Disposable.FromAction(onDispose: static () => { })));
 
         await Assert.That(caught).IsTypeOf<InvalidOperationException>();
+    }
+
+    // A subclass that disposes itself on a failure path in its constructor must release what it
+    // registered up to then. The call must not wait for the end of the construction.
+    [Test]
+    public async Task DisposeInTheConstructorReleasesTheRegistrationsMadeBefore()
+    {
+        List<string> log = [];
+
+        ViewModelBase viewModel = ViewModelBase.CreateBase(
+            bindingScheduler: BindingScheduler.Immediate,
+            continuation: (output, construct) =>
+            {
+                output.AddDisposable(disposable: new Recording(log: log, name: "first"));
+                output.AddDisposable(disposable: new Recording(log: log, name: "second"));
+
+                return construct.Construct(
+                    constructor: static viewModelBase =>
+                    {
+                        viewModelBase.Dispose();
+
+                        return viewModelBase;
+                    });
+            });
+
+        await Assert.That(log).IsEquivalentTo(expected: ["second", "first"], ordering: CollectionOrdering.Matching);
+
+        viewModel.Dispose();
+
+        await Assert.That(log).IsEquivalentTo(expected: ["second", "first"], ordering: CollectionOrdering.Matching);
+    }
+
+    [Test]
+    public async Task RegistrationAfterDisposeInTheConstructorFailsAndIsNotKept()
+    {
+        List<string> log = [];
+        Exception? caught = null;
+
+        _ = ViewModelBase.CreateBase(
+            bindingScheduler: BindingScheduler.Immediate,
+            continuation: (output, construct) => construct.Construct(
+                constructor: viewModelBase =>
+                {
+                    viewModelBase.Dispose();
+
+                    caught = Catch(
+                        action: () => output.AddDisposable(disposable: new Recording(log: log, name: "late")));
+
+                    return viewModelBase;
+                }));
+
+        await Assert.That(caught).IsTypeOf<InvalidOperationException>();
+        await Assert.That(log).IsEmpty();
+    }
+
+    // The subclass never receives a base from a failed construction, so nothing else can release what the
+    // construction registered. The exception goes to the caller unchanged.
+    [Test]
+    public async Task FailedConstructorReleasesTheRegistrationsAndRethrowsTheSameException()
+    {
+        List<string> log = [];
+        List<ViewModelBase.IOutput> kept = [];
+        InvalidOperationException failure = new(message: "The constructor failed.");
+
+        Exception caught = Catch(
+            action: () => ViewModelBase.CreateBase<ViewModelBase>(
+                bindingScheduler: BindingScheduler.Immediate,
+                continuation: (output, construct) =>
+                {
+                    kept.Add(output);
+                    output.AddDisposable(disposable: new Recording(log: log, name: "registered"));
+
+                    return construct.Construct<ViewModelBase>(constructor: _ => throw failure);
+                }));
+
+        Exception late =
+            Catch(action: () => kept[0].AddDisposable(disposable: new Recording(log: log, name: "late")));
+
+        await Assert.That(caught).IsSameReferenceAs(expected: failure);
+        await Assert.That(log).IsEquivalentTo(expected: ["registered"]);
+        await Assert.That(late).IsTypeOf<InvalidOperationException>();
+    }
+
+    // The caller must see both errors, and the exception of the constructor is the first.
+    [Test]
+    public async Task FailedConstructorWithAFailingRegistrationThrowsBothExceptions()
+    {
+        Exception failure = new InvalidOperationException(message: "The constructor failed.");
+        Exception releaseFailure = new InvalidOperationException(message: "The release failed.");
+        List<string> log = [];
+        List<ViewModelBase.IOutput> kept = [];
+
+        Exception caught = Catch(
+            action: () => ViewModelBase.CreateBase<ViewModelBase>(
+                bindingScheduler: BindingScheduler.Immediate,
+                continuation: (output, construct) =>
+                {
+                    kept.Add(output);
+
+                    output.AddDisposable(
+                        disposable: Disposable.FromAction(
+                            onDispose: () => throw releaseFailure));
+
+                    return construct.Construct<ViewModelBase>(constructor: _ => throw failure);
+                }));
+
+        await Assert.That(caught).IsTypeOf<AggregateException>();
+
+        await Assert
+            .That(((AggregateException)caught).InnerExceptions)
+            .IsEquivalentTo(expected: [failure, releaseFailure], ordering: CollectionOrdering.Matching);
+
+        // The output closes before the release runs. Thus, it is closed also when the release throws.
+        Exception late =
+            Catch(action: () => kept[0].AddDisposable(disposable: new Recording(log: log, name: "late")));
+
+        await Assert.That(late).IsTypeOf<InvalidOperationException>();
+        await Assert.That(log).IsEmpty();
     }
 
     // A second Construct call cannot make a second owner of the same entries. The handle that Select

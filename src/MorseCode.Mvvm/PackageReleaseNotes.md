@@ -1,3 +1,22 @@
+0.2.2
+
+The registrations of a view model now stay open while the constructor that
+Construct calls runs, and they close when that constructor returns. In 0.2.1
+and before, they closed before the constructor ran, so a registration in the
+constructor of a view model failed. Now the constructor of a view model that
+derives from ViewModelBase can add its own subscriptions to IOutput, and Dispose
+releases them with the others. A registration after the constructor returns
+still fails with an InvalidOperationException.
+
+Dispose on the base now releases the registrations made so far, also when it
+runs inside the constructor or on a different thread, and it closes the
+registrations. If the constructor throws, the base releases the registrations
+made so far, and the exception goes to the caller unchanged. If a registration
+also throws as it is released, the caller gets an AggregateException that holds
+the exception of the constructor first. The message of the
+InvalidOperationException for a late registration now says that the
+registrations are closed. No signature changed.
+
 0.2.1
 
 ViewModelBase is no longer sealed. A view model can derive from it: its
