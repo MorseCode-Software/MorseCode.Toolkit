@@ -33,13 +33,15 @@ public sealed class ConstructorTests
     {
         int calls = 0;
 
-        Constructor<int> selected = Constructor.From(values: 1).Select(
-            selector: v =>
-            {
-                calls++;
+        Constructor<int> selected =
+            Constructor.From(values: 1)
+                .Select(
+                    selector: v =>
+                    {
+                        calls++;
 
-                return v + 1;
-            });
+                        return v + 1;
+                    });
 
         int callsBeforeConstruct = calls;
         int received = selected.Construct(constructor: static v => v);
@@ -57,11 +59,12 @@ public sealed class ConstructorTests
     [Arguments(int.MaxValue)]
     public async Task SelectChainMatchesTheCompositionOfItsSelectors(int values)
     {
-        string bySelect = Constructor
-            .From(values: values)
-            .Select(selector: Double)
-            .Select(selector: Describe)
-            .Construct(constructor: Enclose);
+        string bySelect =
+            Constructor
+                .From(values: values)
+                .Select(selector: Double)
+                .Select(selector: Describe)
+                .Construct(constructor: Enclose);
 
         string byComposition = Enclose(text: Describe(number: Double(number: values)));
 
@@ -111,5 +114,6 @@ public sealed class ConstructorTests
         public string Name { get; } = name;
     }
 
-    private sealed class Derived(in string name) : Base(name);
+    private sealed class Derived(in string name)
+        : Base(name);
 }

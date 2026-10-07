@@ -54,7 +54,8 @@ public sealed class ConstructorSubclassTests
     {
         Recording construct = new(values: 1);
 
-        int[] results = await Concurrency.RunTogether(call: () => _ = construct.Construct(constructor: static values => values));
+        int[] results =
+            await Concurrency.RunTogether(call: () => _ = construct.Construct(constructor: static values => values));
 
         int succeeded = results.Count(predicate: static result => result == Concurrency.Succeeded);
         int refused = results.Count(predicate: static result => result == Concurrency.Refused);
@@ -70,13 +71,14 @@ public sealed class ConstructorSubclassTests
         Recording source = new(values: 20);
         int selectorCalls = 0;
 
-        Constructor<int> selected = source.Select(
-            selector: values =>
-            {
-                Interlocked.Increment(location: ref selectorCalls);
+        Constructor<int> selected =
+            source.Select(
+                selector: values =>
+                {
+                    Interlocked.Increment(location: ref selectorCalls);
 
-                return values * 2;
-            });
+                    return values * 2;
+                });
 
         await Assert.That(selectorCalls).IsEqualTo(expected: 0);
 
@@ -132,18 +134,19 @@ public sealed class ConstructorSubclassTests
         int calls = 0;
 
         // Half of the threads call Select, and the other half call Construct.
-        int[] results = await Concurrency.RunTogether(
-            call: () =>
-            {
-                if (Interlocked.Increment(location: ref calls) % 2 == 0)
+        int[] results =
+            await Concurrency.RunTogether(
+                call: () =>
                 {
-                    _ = source.Select(selector: static values => values);
-                }
-                else
-                {
-                    _ = source.Construct(constructor: static values => values);
-                }
-            });
+                    if (Interlocked.Increment(location: ref calls) % 2 == 0)
+                    {
+                        _ = source.Select(selector: static values => values);
+                    }
+                    else
+                    {
+                        _ = source.Construct(constructor: static values => values);
+                    }
+                });
 
         int succeeded = results.Count(predicate: static result => result == Concurrency.Succeeded);
         int refused = results.Count(predicate: static result => result == Concurrency.Refused);

@@ -41,7 +41,9 @@ public sealed class SingleUseTests
     public async Task AdvanceFailsAtASecondCallAndCallsTheBodyOnce()
     {
         Counting bodyCalls = new();
-        Stage<int, int, int> stage = Stage.From(body: (int input) => (Output: bodyCalls.Pass(value: input), Next: input));
+
+        Stage<int, int, int> stage =
+            Stage.From(body: (int input) => (Output: bodyCalls.Pass(value: input), Next: input));
 
         _ = stage.Advance(input: 1, continuation: static (output, _) => output);
 
@@ -86,8 +88,11 @@ public sealed class SingleUseTests
         InvalidOperationException failure = new(message: "The stage failed.");
         Stage<int, int, int> stage = Stage.From<int, int, int>(body: Fail);
 
-        Exception first = Catching.Catch(action: () => _ = stage.Advance(input: 1, continuation: static (output, _) => output));
-        Exception second = Catching.Catch(action: () => _ = stage.Advance(input: 1, continuation: static (output, _) => output));
+        Exception first =
+            Catching.Catch(action: () => _ = stage.Advance(input: 1, continuation: static (output, _) => output));
+
+        Exception second =
+            Catching.Catch(action: () => _ = stage.Advance(input: 1, continuation: static (output, _) => output));
 
         await Assert.That(first).IsSameReferenceAs(expected: failure);
         await Assert.That(second.Message).Contains(expected: "Advance was already called");
@@ -109,10 +114,15 @@ public sealed class SingleUseTests
         Counting constructorCalls = new();
         Constructor<int> construct = Constructor.From(values: 1);
 
-        int[] results = await Concurrency.RunTogether(call: () => _ = construct.Construct(constructor: constructorCalls.Pass));
+        int[] results =
+            await Concurrency.RunTogether(call: () => _ = construct.Construct(constructor: constructorCalls.Pass));
 
-        await Assert.That(results.Count(predicate: static result => result == Concurrency.Succeeded)).IsEqualTo(expected: 1);
-        await Assert.That(results.Count(predicate: static result => result == Concurrency.Refused)).IsEqualTo(expected: Concurrency.Threads - 1);
+        await Assert.That(results.Count(predicate: static result => result == Concurrency.Succeeded))
+            .IsEqualTo(expected: 1);
+
+        await Assert.That(results.Count(predicate: static result => result == Concurrency.Refused))
+            .IsEqualTo(expected: Concurrency.Threads - 1);
+
         await Assert.That(constructorCalls.Count).IsEqualTo(expected: 1);
     }
 
@@ -120,13 +130,20 @@ public sealed class SingleUseTests
     public async Task ConcurrentAdvanceSucceedsOnce()
     {
         Counting bodyCalls = new();
-        Stage<int, int, int> stage = Stage.From(body: (int input) => (Output: bodyCalls.Pass(value: input), Next: input));
+
+        Stage<int, int, int> stage =
+            Stage.From(body: (int input) => (Output: bodyCalls.Pass(value: input), Next: input));
 
         int[] results =
-            await Concurrency.RunTogether(call: () => _ = stage.Advance(input: 1, continuation: static (output, _) => output));
+            await Concurrency.RunTogether(
+                call: () => _ = stage.Advance(input: 1, continuation: static (output, _) => output));
 
-        await Assert.That(results.Count(predicate: static result => result == Concurrency.Succeeded)).IsEqualTo(expected: 1);
-        await Assert.That(results.Count(predicate: static result => result == Concurrency.Refused)).IsEqualTo(expected: Concurrency.Threads - 1);
+        await Assert.That(results.Count(predicate: static result => result == Concurrency.Succeeded))
+            .IsEqualTo(expected: 1);
+
+        await Assert.That(results.Count(predicate: static result => result == Concurrency.Refused))
+            .IsEqualTo(expected: Concurrency.Threads - 1);
+
         await Assert.That(bodyCalls.Count).IsEqualTo(expected: 1);
     }
 

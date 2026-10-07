@@ -5,18 +5,19 @@ using JetBrains.Annotations;
 namespace MorseCode.Mvvm;
 
 /// <summary>
-///     Makes the usual <see cref="IDisposable" /> objects: one that calls an action, one that disposes a
-///     list, and one that does nothing.
+///     Makes the usual <see cref="IDisposable" /> objects: one that calls an
+///     action, one that disposes a list, and one that does nothing.
 /// </summary>
 [PublicAPI]
 public static partial class Disposable
 {
     /// <summary>
-    ///     Makes a disposable that calls <paramref name="onDispose" /> at the first call to its
-    ///     <see cref="IDisposable.Dispose" /> method.
+    ///     Makes a disposable that calls <paramref name="onDispose" /> at the first
+    ///     call to its <see cref="IDisposable.Dispose" /> method.
     /// </summary>
     /// <remarks>
-    ///     Each subsequent call does nothing, also when two threads call at the same time.
+    ///     Each subsequent call does nothing, also when two threads call at the same
+    ///     time.
     /// </remarks>
     /// <param name="onDispose">The action that releases the resource.</param>
     /// <returns>The disposable.</returns>
@@ -33,7 +34,7 @@ public static partial class Disposable
         private int disposed;
 
         /// <summary>Creates a disposable which runs an action.</summary>
-        /// <param name="onDispose">The action to run on <see cref="Dispose"/>.</param>
+        /// <param name="onDispose">The action to run on <see cref="Dispose" />.</param>
         public ActionDisposable(Action onDispose) => this.onDispose = onDispose;
 
         /// <inheritdoc />

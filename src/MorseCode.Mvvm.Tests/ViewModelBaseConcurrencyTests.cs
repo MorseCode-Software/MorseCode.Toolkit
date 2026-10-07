@@ -38,32 +38,33 @@ public sealed class ViewModelBaseConcurrencyTests
             ConcurrentBag<Entry> refusedEntries = [];
             Race race = new(threads: Threads);
 
-            ViewModelBase viewModel = ViewModelBase.CreateBase(
-                bindingScheduler: BindingScheduler.Immediate,
-                continuation: (output, construct) =>
-                {
-                    race.Start(
-                        register: () =>
-                        {
-                            Entry entry = new();
-
-                            try
+            ViewModelBase viewModel =
+                ViewModelBase.CreateBase(
+                    bindingScheduler: BindingScheduler.Immediate,
+                    continuation: (output, construct) =>
+                    {
+                        race.Start(
+                            register: () =>
                             {
-                                output.AddDisposable(disposable: entry);
-                                acceptedEntries.Add(item: entry);
+                                Entry entry = new();
 
-                                return true;
-                            }
-                            catch (InvalidOperationException)
-                            {
-                                refusedEntries.Add(item: entry);
+                                try
+                                {
+                                    output.AddDisposable(disposable: entry);
+                                    acceptedEntries.Add(item: entry);
 
-                                return false;
-                            }
-                        });
+                                    return true;
+                                }
+                                catch (InvalidOperationException)
+                                {
+                                    refusedEntries.Add(item: entry);
 
-                    return construct.Construct(constructor: static viewModelBase => viewModelBase);
-                });
+                                    return false;
+                                }
+                            });
+
+                        return construct.Construct(constructor: static viewModelBase => viewModelBase);
+                    });
 
             await race.Completion;
             viewModel.Dispose();
@@ -96,28 +97,29 @@ public sealed class ViewModelBaseConcurrencyTests
             ConcurrentBag<IBindableAction> acceptedActions = [];
             Race race = new(threads: Threads);
 
-            ViewModelBase viewModel = ViewModelBase.CreateBase(
-                bindingScheduler: BindingScheduler.Immediate,
-                continuation: (output, construct) =>
-                {
-                    race.Start(
-                        register: () =>
-                        {
-                            try
+            ViewModelBase viewModel =
+                ViewModelBase.CreateBase(
+                    bindingScheduler: BindingScheduler.Immediate,
+                    continuation: (output, construct) =>
+                    {
+                        race.Start(
+                            register: () =>
                             {
-                                acceptedActions.Add(
-                                    item: output.BindableFactory.CreateBindableAction(firingsStreamSink: firings));
+                                try
+                                {
+                                    acceptedActions.Add(
+                                        item: output.BindableFactory.CreateBindableAction(firingsStreamSink: firings));
 
-                                return true;
-                            }
-                            catch (InvalidOperationException)
-                            {
-                                return false;
-                            }
-                        });
+                                    return true;
+                                }
+                                catch (InvalidOperationException)
+                                {
+                                    return false;
+                                }
+                            });
 
-                    return construct.Construct(constructor: static viewModelBase => viewModelBase);
-                });
+                        return construct.Construct(constructor: static viewModelBase => viewModelBase);
+                    });
 
             await race.Completion;
             viewModel.Dispose();
@@ -156,36 +158,41 @@ public sealed class ViewModelBaseConcurrencyTests
 
         try
         {
-            viewModel = Transaction.Run(
-                f: () => ViewModelBase.CreateBase(
-                    bindingScheduler: scheduler,
-                    continuation: (output, construct) =>
-                    {
-                        List<ViewModelBase> constructed = [];
-
-                        Cell<int> sealsWhenSampled = source.Map(
-                            f: value =>
+            viewModel =
+                Transaction.Run(
+                    f: () =>
+                        ViewModelBase.CreateBase(
+                            bindingScheduler: scheduler,
+                            continuation: (output, construct) =>
                             {
-                                if (constructed.Count == 0)
-                                {
-                                    log.Add(item: "construct");
+                                List<ViewModelBase> constructed = [];
 
-                                    constructed.Add(
-                                        item: construct.Construct(constructor: static viewModelBase => viewModelBase));
-                                }
+                                Cell<int> sealsWhenSampled =
+                                    source.Map(
+                                        f: value =>
+                                        {
+                                            if (constructed.Count == 0)
+                                            {
+                                                log.Add(item: "construct");
 
-                                return value;
-                            });
+                                                constructed.Add(
+                                                    item: construct.Construct(
+                                                        constructor: static viewModelBase => viewModelBase));
+                                            }
 
-                        log.Add(item: "factory call starts");
+                                            return value;
+                                        });
 
-                        caught.Add(
-                            item: Catch(action: () => output.BindableFactory.CreateOneWay(cell: sealsWhenSampled)));
+                                log.Add(item: "factory call starts");
 
-                        log.Add(item: "factory call ends");
+                                caught.Add(
+                                    item: Catch(
+                                        action: () => output.BindableFactory.CreateOneWay(cell: sealsWhenSampled)));
 
-                        return constructed[0];
-                    }));
+                                log.Add(item: "factory call ends");
+
+                                return constructed[0];
+                            }));
 
             postsBeforeTheChange = scheduler.Posts;
             source.Send(a: 2);
