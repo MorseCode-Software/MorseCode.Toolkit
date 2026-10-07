@@ -3,8 +3,8 @@ using System;
 namespace MorseCode.StagedConstruction;
 
 /// <summary>
-///     The handle that the default <c>SelectCore</c> method of <see cref="Constructor{TBaseValues}" />
-///     makes.
+///     The handle that the default <c>SelectCore</c> method of
+///     <see cref="Constructor{TBaseValues}" /> makes.
 /// </summary>
 // ReSharper disable once InheritdocConsiderUsage - The summary of Constructor does not say which method makes this handle.
 internal sealed class SelectedConstruct<TSourceValues, TBaseValues>(

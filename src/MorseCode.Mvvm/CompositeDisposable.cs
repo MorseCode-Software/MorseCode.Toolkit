@@ -8,25 +8,27 @@ namespace MorseCode.Mvvm;
 public static partial class Disposable
 {
     /// <summary>
-    ///     Makes one disposable from a fixed list of disposables. A view model keeps one for the
-    ///     subscriptions that its construction made, and disposes it in its own
-    ///     <see cref="IDisposable.Dispose" /> method.
+    ///     Makes one disposable from a fixed list of disposables. A view model keeps
+    ///     one for the subscriptions that its construction made, and disposes it in
+    ///     its own <see cref="IDisposable.Dispose" /> method.
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///         The first call disposes each entry one time, in the order of the list. Each subsequent
-    ///         call does nothing, also when two threads call at the same time.
+    ///         The first call disposes each entry one time, in the order of the list.
+    ///         Each subsequent call does nothing, also when two threads call at the
+    ///         same time.
     ///     </para>
     ///     <para>
-    ///         An exception from one entry does not stop the disposal of the entries after it. When
-    ///         all entries are complete, one exception from the entries goes to the caller unchanged.
-    ///         Two or more exceptions go to the caller in one <see cref="AggregateException" />, in
-    ///         the order of the list.
+    ///         An exception from one entry does not stop the disposal of the entries
+    ///         after it. When all entries are complete, one exception from the entries
+    ///         goes to the caller unchanged.
+    ///         Two or more exceptions go to the caller in one
+    ///         <see cref="AggregateException" />, in the order of the list.
     ///     </para>
     /// </remarks>
     /// <param name="disposables">
-    ///     The entries, in the order of their disposal. The composite keeps a copy, thus a subsequent
-    ///     change to the argument has no effect.
+    ///     The entries, in the order of their disposal. The composite keeps a copy,
+    ///     thus a subsequent change to the argument has no effect.
     /// </param>
     /// <returns>The composite.</returns>
     /// <exception cref="ArgumentException">An entry is null.</exception>
@@ -44,8 +46,8 @@ public static partial class Disposable
         ///     Makes a composite of <paramref name="disposables" />.
         /// </summary>
         /// <param name="disposables">
-        ///     The entries, in the order of their disposal. The composite keeps a copy, thus a
-        ///     subsequent change to the argument has no effect.
+        ///     The entries, in the order of their disposal. The composite keeps a copy,
+        ///     thus a subsequent change to the argument has no effect.
         /// </param>
         /// <exception cref="ArgumentException">An entry is null.</exception>
         public CompositeDisposable(IEnumerable<IDisposable> disposables)
@@ -65,8 +67,9 @@ public static partial class Disposable
 
         /// <inheritdoc />
         /// <remarks>
-        ///     The first call disposes each entry. Each subsequent call does nothing. The remarks of
-        ///     <see cref="Composite" /> give the order and the result of an exception.
+        ///     The first call disposes each entry. Each subsequent call does nothing. The
+        ///     remarks of <see cref="Composite" /> give the order and the result of an
+        ///     exception.
         /// </remarks>
         /// <exception cref="AggregateException">Two or more entries threw an exception.</exception>
         public void Dispose()
