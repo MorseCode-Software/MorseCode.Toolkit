@@ -16,26 +16,29 @@ public sealed class StagedConstructionTests
         List<string> log = [];
         List<AnimalValues> made = [];
 
-        Dog dog = CreateAnimal(
-            name: "Rex",
-            continuation: (output, construct) =>
-            {
-                log.Add(item: "subclass");
+        Dog dog =
+            CreateAnimal(
+                name: "Rex",
+                continuation: (output, construct) =>
+                {
+                    log.Add(item: "subclass");
 
-                return construct.Construct(
-                    constructor: animal =>
-                    {
-                        log.Add(item: "constructor");
+                    return construct.Construct(
+                        constructor: animal =>
+                        {
+                            log.Add(item: "constructor");
 
-                        return new Dog(animal: animal, bark: $"{output}!");
-                    });
-            });
+                            return new Dog(animal: animal, bark: $"{output}!");
+                        });
+                });
 
         await Assert.That(made.Count).IsEqualTo(expected: 1);
         await Assert.That(dog.Animal).IsSameReferenceAs(expected: made[0]);
         await Assert.That(dog.Animal.Name).IsEqualTo(expected: "Rex");
         await Assert.That(dog.Bark).IsEqualTo(expected: "REX!");
-        await Assert.That(log).IsEquivalentTo(expected: ["base", "subclass", "constructor"], ordering: CollectionOrdering.Matching);
+
+        await Assert.That(log)
+            .IsEquivalentTo(expected: ["base", "subclass", "constructor"], ordering: CollectionOrdering.Matching);
 
         return;
 
@@ -58,34 +61,35 @@ public sealed class StagedConstructionTests
     {
         List<string> log = [];
 
-        Robot robot = CreateMachine(
-            seed: 3,
-            continuation: (first, second) =>
-            {
-                log.Add(item: $"subclass 1 got {first}");
+        Robot robot =
+            CreateMachine(
+                seed: 3,
+                continuation: (first, second) =>
+                {
+                    log.Add(item: $"subclass 1 got {first}");
 
-                return second.Advance(
-                    input: first + 1,
-                    continuation: (secondOutput, third) =>
-                    {
-                        log.Add(item: $"subclass 2 got {secondOutput}");
+                    return second.Advance(
+                        input: first + 1,
+                        continuation: (secondOutput, third) =>
+                        {
+                            log.Add(item: $"subclass 2 got {secondOutput}");
 
-                        return third.Advance(
-                            input: $"label {secondOutput}",
-                            continuation: (thirdOutput, construct) =>
-                            {
-                                log.Add(item: $"subclass 3 got {thirdOutput}");
+                            return third.Advance(
+                                input: $"label {secondOutput}",
+                                continuation: (thirdOutput, construct) =>
+                                {
+                                    log.Add(item: $"subclass 3 got {thirdOutput}");
 
-                                return construct.Construct(
-                                    constructor: machine =>
-                                    {
-                                        log.Add(item: "constructor");
+                                    return construct.Construct(
+                                        constructor: machine =>
+                                        {
+                                            log.Add(item: "constructor");
 
-                                        return new Robot(machine: machine, summary: thirdOutput);
-                                    });
-                            });
-                    });
-            });
+                                            return new Robot(machine: machine, summary: thirdOutput);
+                                        });
+                                });
+                        });
+                });
 
         await Assert.That(robot.Machine.Seed).IsEqualTo(expected: 3);
         await Assert.That(robot.Machine.Adjusted).IsEqualTo(expected: 7);
@@ -97,9 +101,12 @@ public sealed class StagedConstructionTests
             .IsEquivalentTo(
                 expected:
                 [
-                    "base 1 got 3", "subclass 1 got 6",
-                    "base 2 got 7", "subclass 2 got 14",
-                    "base 3 got label 14", "subclass 3 got LABEL 14",
+                    "base 1 got 3",
+                    "subclass 1 got 6",
+                    "base 2 got 7",
+                    "subclass 2 got 14",
+                    "base 3 got label 14",
+                    "subclass 3 got LABEL 14",
                     "constructor"
                 ],
                 ordering: CollectionOrdering.Matching);
@@ -108,7 +115,8 @@ public sealed class StagedConstructionTests
 
         TResult CreateMachine<TResult>(
             int seed,
-            StageContinuation<int, Stage<int, int, Stage<string, string, Constructor<MachineValues>>>, TResult> continuation)
+            StageContinuation<int, Stage<int, int, Stage<string, string, Constructor<MachineValues>>>, TResult>
+                continuation)
         {
             log.Add(item: $"base 1 got {seed}");
 
@@ -128,7 +136,8 @@ public sealed class StagedConstructionTests
 
                                     return (
                                         Output: label.ToUpperInvariant(),
-                                        Next: Constructor.From(values: new MachineValues(Seed: seed, Adjusted: adjusted, Label: label)));
+                                        Next: Constructor.From(
+                                            values: new MachineValues(Seed: seed, Adjusted: adjusted, Label: label)));
                                 }));
                     }));
         }
@@ -139,20 +148,21 @@ public sealed class StagedConstructionTests
     {
         List<string> log = [];
 
-        Cat cat = CreateMammal(
-            name: "Tom",
-            continuation: (output, construct) =>
-            {
-                log.Add(item: "subclass");
+        Cat cat =
+            CreateMammal(
+                name: "Tom",
+                continuation: (output, construct) =>
+                {
+                    log.Add(item: "subclass");
 
-                return construct.Construct(
-                    constructor: mammal =>
-                    {
-                        log.Add(item: "constructor");
+                    return construct.Construct(
+                        constructor: mammal =>
+                        {
+                            log.Add(item: "constructor");
 
-                        return new Cat(mammal: mammal, greeting: $"{output} purrs");
-                    });
-            });
+                            return new Cat(mammal: mammal, greeting: $"{output} purrs");
+                        });
+                });
 
         await Assert.That(cat.Mammal.Animal.Name).IsEqualTo(expected: "Tom");
         await Assert.That(cat.Mammal.Furry).IsTrue();
@@ -173,7 +183,9 @@ public sealed class StagedConstructionTests
         {
             log.Add(item: "animal base");
 
-            return continuation(output: name.ToUpperInvariant(), next: Constructor.From(values: new AnimalValues(Name: name)));
+            return continuation(
+                output: name.ToUpperInvariant(),
+                next: Constructor.From(values: new AnimalValues(Name: name)));
         }
 
         TResult CreateMammal<TResult>(
@@ -204,23 +216,28 @@ public sealed class StagedConstructionTests
     {
         List<string> log = [];
 
-        Dog dog = CreateScopedAnimal(
-            name: "Rex",
-            continuation: (output, construct) =>
-            {
-                log.Add(item: "subclass");
+        Dog dog =
+            CreateScopedAnimal(
+                name: "Rex",
+                continuation: (output, construct) =>
+                {
+                    log.Add(item: "subclass");
 
-                return construct.Construct(
-                    constructor: animal =>
-                    {
-                        log.Add(item: "constructor");
+                    return construct.Construct(
+                        constructor: animal =>
+                        {
+                            log.Add(item: "constructor");
 
-                        return new Dog(animal: animal, bark: output);
-                    });
-            });
+                            return new Dog(animal: animal, bark: output);
+                        });
+                });
 
         await Assert.That(dog.Animal.Name).IsEqualTo(expected: "Rex");
-        await Assert.That(log).IsEquivalentTo(expected: ["open", "subclass", "constructor", "close"], ordering: CollectionOrdering.Matching);
+
+        await Assert.That(log)
+            .IsEquivalentTo(
+                expected: ["open", "subclass", "constructor", "close"],
+                ordering: CollectionOrdering.Matching);
 
         return;
 
@@ -256,10 +273,12 @@ public sealed class StagedConstructionTests
     [Test]
     public async Task StagedConstructionGivesTheBaseOnlyValuesThatAreSet()
     {
-        NamedByStages named = CreateNamedBase(
-            name: "Rex",
-            continuation: static (_, construct) =>
-                construct.Construct(constructor: static nameSeenByBase => new NamedByStages(nameSeenByBase: nameSeenByBase)));
+        NamedByStages named =
+            CreateNamedBase(
+                name: "Rex",
+                continuation: static (_, construct) =>
+                    construct.Construct(
+                        constructor: static nameSeenByBase => new NamedByStages(nameSeenByBase: nameSeenByBase)));
 
         await Assert.That(named.NameSeenByBase).IsEqualTo(expected: "Rex");
 

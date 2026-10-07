@@ -45,9 +45,10 @@ public sealed class ViewModelBaseBindableFactoryTests
         StreamSink<int> edits = Stream.CreateSink<int>();
         List<ITwoWayBindableValue<int>> made = [];
 
-        ViewModelBase viewModel = Create(
-            register: output =>
-                made.Add(item: output.BindableFactory.CreateTwoWay(cell: cell, editsStreamSink: edits)));
+        ViewModelBase viewModel =
+            Create(
+                register: output =>
+                    made.Add(item: output.BindableFactory.CreateTwoWay(cell: cell, editsStreamSink: edits)));
 
         made[0].Value = 2;
         viewModel.Dispose();
@@ -82,9 +83,11 @@ public sealed class ViewModelBaseBindableFactoryTests
         IListener listener = edits.ListenStrong(handler: received.Add);
         List<IOneWayToSourceBindableValue<int>> made = [];
 
-        ViewModelBase viewModel = Create(
-            register: output =>
-                made.Add(item: output.BindableFactory.CreateOneWayToSource(editsStreamSink: edits, initialValue: 0)));
+        ViewModelBase viewModel =
+            Create(
+                register: output =>
+                    made.Add(
+                        item: output.BindableFactory.CreateOneWayToSource(editsStreamSink: edits, initialValue: 0)));
 
         made[0].Value = 2;
         viewModel.Dispose();
@@ -116,8 +119,10 @@ public sealed class ViewModelBaseBindableFactoryTests
         StreamSink<string> firings = Stream.CreateSink<string>();
         List<IBindableAction<string>> made = [];
 
-        ViewModelBase viewModel = Create(
-            register: output => made.Add(item: output.BindableFactory.CreateBindableAction(firingsStreamSink: firings)));
+        ViewModelBase viewModel =
+            Create(
+                register: output =>
+                    made.Add(item: output.BindableFactory.CreateBindableAction(firingsStreamSink: firings)));
 
         bool availableBeforeDispose = made[0].CanExecute(parameter: "parameter");
         viewModel.Dispose();
@@ -132,8 +137,10 @@ public sealed class ViewModelBaseBindableFactoryTests
         StreamSink<Unit> firings = Stream.CreateSink<Unit>();
         List<IBindableAction> made = [];
 
-        ViewModelBase viewModel = Create(
-            register: output => made.Add(item: output.BindableFactory.CreateBindableAction(firingsStreamSink: firings)));
+        ViewModelBase viewModel =
+            Create(
+                register: output =>
+                    made.Add(item: output.BindableFactory.CreateBindableAction(firingsStreamSink: firings)));
 
         bool availableBeforeDispose = made[0].CanExecute(parameter: null);
         viewModel.Dispose();
@@ -148,8 +155,10 @@ public sealed class ViewModelBaseBindableFactoryTests
         StreamSink<Maybe<string>> firings = Stream.CreateSink<Maybe<string>>();
         List<IBindableAction<Maybe<string>>> made = [];
 
-        ViewModelBase viewModel = Create(
-            register: output => made.Add(item: output.BindableFactory.CreateBindableAction(firingsStreamSink: firings)));
+        ViewModelBase viewModel =
+            Create(
+                register: output =>
+                    made.Add(item: output.BindableFactory.CreateBindableAction(firingsStreamSink: firings)));
 
         bool availableBeforeDispose = made[0].CanExecute(parameter: null);
         viewModel.Dispose();

@@ -78,7 +78,7 @@ public class ViewModelBase : IViewModel
         {
             throw new InvalidOperationException(
                 message: "A different view model already derives from this base. Two view models "
-                    + "cannot own the same registrations.");
+                         + "cannot own the same registrations.");
         }
     }
 
@@ -199,8 +199,12 @@ public class ViewModelBase : IViewModel
     // ReSharper disable once InheritdocConsiderUsage - The summary of INotifyPropertyChanged.PropertyChanged does not say that this event does not occur.
     public event PropertyChangedEventHandler? PropertyChanged
     {
-        add { }
-        remove { }
+        add
+        {
+        }
+        remove
+        {
+        }
     }
 
     /// <summary>
@@ -360,7 +364,10 @@ public class ViewModelBase : IViewModel
             IEqualityComparer<T>? comparer = null) =>
             this.Make(
                 make: () =>
-                    this.bindableFactory.CreateTwoWay(cell: cell, editsStreamSink: editsStreamSink, comparer: comparer));
+                    this.bindableFactory.CreateTwoWay(
+                        cell: cell,
+                        editsStreamSink: editsStreamSink,
+                        comparer: comparer));
 
         /// <inheritdoc />
         public ITwoWayBindableValue<T> CreateTwoWay<T>(CellSink<T> sink, IEqualityComparer<T>? comparer = null) =>
@@ -419,7 +426,7 @@ public class ViewModelBase : IViewModel
         private static InvalidOperationException SealedException() =>
             new(
                 message: "The registrations are closed. Register each disposable, listener, and bindable "
-                    + "before the constructor that Construct calls returns, and before Dispose.");
+                         + "before the constructor that Construct calls returns, and before Dispose.");
 
         private void Add(IDisposable registration)
         {

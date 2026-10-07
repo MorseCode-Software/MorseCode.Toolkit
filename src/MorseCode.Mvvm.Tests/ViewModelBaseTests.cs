@@ -17,12 +17,14 @@ public sealed class ViewModelBaseTests
     [Test]
     public async Task NullSchedulerFailsAtTheCall()
     {
-        Exception caught = Catch(
-            action: static () => ViewModelBase.CreateBase(
-                // ReSharper disable once NullableWarningSuppressionIsUsed - The null scheduler is the input under test: CreateBase must refuse it at run time.
-                bindingScheduler: null!,
-                continuation: static (_, construct) =>
-                    construct.Construct(constructor: static viewModelBase => viewModelBase)));
+        Exception caught =
+            Catch(
+                action: static () =>
+                    ViewModelBase.CreateBase(
+                        // ReSharper disable once NullableWarningSuppressionIsUsed - The null scheduler is the input under test: CreateBase must refuse it at run time.
+                        bindingScheduler: null!,
+                        continuation: static (_, construct) =>
+                            construct.Construct(constructor: static viewModelBase => viewModelBase)));
 
         await Assert.That(caught).IsTypeOf<ArgumentNullException>();
         await Assert.That(((ArgumentNullException)caught).ParamName).IsEqualTo(expected: "bindingScheduler");
@@ -31,11 +33,13 @@ public sealed class ViewModelBaseTests
     [Test]
     public async Task NullContinuationFailsAtTheCall()
     {
-        Exception caught = Catch(
-            action: static () => ViewModelBase.CreateBase<ViewModelBase>(
-                bindingScheduler: BindingScheduler.Immediate,
-                // ReSharper disable once NullableWarningSuppressionIsUsed - The null continuation is the input under test: CreateBase must refuse it at run time.
-                continuation: null!));
+        Exception caught =
+            Catch(
+                action: static () =>
+                    ViewModelBase.CreateBase<ViewModelBase>(
+                        bindingScheduler: BindingScheduler.Immediate,
+                        // ReSharper disable once NullableWarningSuppressionIsUsed - The null continuation is the input under test: CreateBase must refuse it at run time.
+                        continuation: null!));
 
         await Assert.That(caught).IsTypeOf<ArgumentNullException>();
         await Assert.That(((ArgumentNullException)caught).ParamName).IsEqualTo(expected: "continuation");
@@ -46,10 +50,11 @@ public sealed class ViewModelBaseTests
     {
         Exception? caught = null;
 
-        _ = Create(
-            register: output =>
-                // ReSharper disable once NullableWarningSuppressionIsUsed - The null entry is the input under test: AddDisposable must refuse it at run time.
-                caught = Catch(action: () => output.AddDisposable<IDisposable>(disposable: null!)));
+        _ =
+            Create(
+                register: output =>
+                    // ReSharper disable once NullableWarningSuppressionIsUsed - The null entry is the input under test: AddDisposable must refuse it at run time.
+                    caught = Catch(action: () => output.AddDisposable<IDisposable>(disposable: null!)));
 
         await Assert.That(caught).IsTypeOf<ArgumentNullException>();
     }
@@ -59,10 +64,11 @@ public sealed class ViewModelBaseTests
     {
         Exception? caught = null;
 
-        _ = Create(
-            register: output =>
-                // ReSharper disable once NullableWarningSuppressionIsUsed - The null entry is the input under test: AddListener must refuse it at run time.
-                caught = Catch(action: () => output.AddListener<IWeakListener>(listener: null!)));
+        _ =
+            Create(
+                register: output =>
+                    // ReSharper disable once NullableWarningSuppressionIsUsed - The null entry is the input under test: AddListener must refuse it at run time.
+                    caught = Catch(action: () => output.AddListener<IWeakListener>(listener: null!)));
 
         await Assert.That(caught).IsTypeOf<ArgumentNullException>();
     }
@@ -74,16 +80,17 @@ public sealed class ViewModelBaseTests
     {
         List<string> log = [];
 
-        ViewModelBase viewModel = Create(
-            register: output =>
-            {
-                output.AddDisposable(disposable: new Recording(log: log, name: "A"));
+        ViewModelBase viewModel =
+            Create(
+                register: output =>
+                {
+                    output.AddDisposable(disposable: new Recording(log: log, name: "A"));
 
-                // ReSharper disable once NullableWarningSuppressionIsUsed - The null entry is the input under test: AddDisposable must refuse it at run time.
-                _ = Catch(action: () => output.AddDisposable<IDisposable>(disposable: null!));
+                    // ReSharper disable once NullableWarningSuppressionIsUsed - The null entry is the input under test: AddDisposable must refuse it at run time.
+                    _ = Catch(action: () => output.AddDisposable<IDisposable>(disposable: null!));
 
-                output.AddDisposable(disposable: new Recording(log: log, name: "B"));
-            });
+                    output.AddDisposable(disposable: new Recording(log: log, name: "B"));
+                });
 
         viewModel.Dispose();
 
@@ -95,12 +102,13 @@ public sealed class ViewModelBaseTests
     {
         List<string> log = [];
 
-        ViewModelBase viewModel = Create(
-            register: output =>
-            {
-                output.AddDisposable(disposable: new Recording(log: log, name: "A"));
-                output.AddDisposable(disposable: new Recording(log: log, name: "B"));
-            });
+        ViewModelBase viewModel =
+            Create(
+                register: output =>
+                {
+                    output.AddDisposable(disposable: new Recording(log: log, name: "A"));
+                    output.AddDisposable(disposable: new Recording(log: log, name: "B"));
+                });
 
         viewModel.Dispose();
         viewModel.Dispose();
@@ -116,13 +124,14 @@ public sealed class ViewModelBaseTests
     {
         List<string> log = [];
 
-        ViewModelBase viewModel = Create(
-            register: output =>
-            {
-                output.AddDisposable(disposable: new Recording(log: log, name: "A"));
-                output.AddListener(listener: new RecordingListener(log: log, name: "B"));
-                output.AddDisposable(disposable: new Recording(log: log, name: "C"));
-            });
+        ViewModelBase viewModel =
+            Create(
+                register: output =>
+                {
+                    output.AddDisposable(disposable: new Recording(log: log, name: "A"));
+                    output.AddListener(listener: new RecordingListener(log: log, name: "B"));
+                    output.AddDisposable(disposable: new Recording(log: log, name: "C"));
+                });
 
         viewModel.Dispose();
 
@@ -135,12 +144,13 @@ public sealed class ViewModelBaseTests
         Exception first = new InvalidOperationException(message: "A failed.");
         Exception second = new InvalidOperationException(message: "B failed.");
 
-        ViewModelBase viewModel = Create(
-            register: output =>
-            {
-                output.AddDisposable(disposable: Disposable.FromAction(onDispose: () => throw first));
-                output.AddDisposable(disposable: Disposable.FromAction(onDispose: () => throw second));
-            });
+        ViewModelBase viewModel =
+            Create(
+                register: output =>
+                {
+                    output.AddDisposable(disposable: Disposable.FromAction(onDispose: () => throw first));
+                    output.AddDisposable(disposable: Disposable.FromAction(onDispose: () => throw second));
+                });
 
         Exception caught = Catch(action: viewModel.Dispose);
 
@@ -207,15 +217,17 @@ public sealed class ViewModelBaseTests
     {
         List<string> log = [];
 
-        ViewModelBase viewModel = ViewModelBase.CreateBase(
-            bindingScheduler: BindingScheduler.Immediate,
-            continuation: (output, construct) => construct.Construct(
-                constructor: viewModelBase =>
-                {
-                    output.AddDisposable(disposable: new Recording(log: log, name: "in constructor"));
+        ViewModelBase viewModel =
+            ViewModelBase.CreateBase(
+                bindingScheduler: BindingScheduler.Immediate,
+                continuation: (output, construct) =>
+                    construct.Construct(
+                        constructor: viewModelBase =>
+                        {
+                            output.AddDisposable(disposable: new Recording(log: log, name: "in constructor"));
 
-                    return viewModelBase;
-                }));
+                            return viewModelBase;
+                        }));
 
         await Assert.That(log).IsEmpty();
 
@@ -229,17 +241,25 @@ public sealed class ViewModelBaseTests
     {
         List<ViewModelBase.IOutput> kept = [];
 
-        _ = ViewModelBase.CreateBase(
-            bindingScheduler: BindingScheduler.Immediate,
-            continuation: (output, construct) =>
-            {
-                kept.Add(output);
+        _ =
+            ViewModelBase.CreateBase(
+                bindingScheduler: BindingScheduler.Immediate,
+                continuation: (output, construct) =>
+                {
+                    kept.Add(output);
 
-                return construct.Construct(constructor: static viewModelBase => viewModelBase);
-            });
+                    return construct.Construct(constructor: static viewModelBase => viewModelBase);
+                });
 
         Exception caught =
-            Catch(action: () => kept[0].AddDisposable(disposable: Disposable.FromAction(onDispose: static () => { })));
+            Catch(
+                action: () =>
+                    kept[0]
+                        .AddDisposable(
+                            disposable: Disposable.FromAction(
+                                onDispose: static () =>
+                                {
+                                })));
 
         await Assert.That(caught).IsTypeOf<InvalidOperationException>();
     }
@@ -251,21 +271,22 @@ public sealed class ViewModelBaseTests
     {
         List<string> log = [];
 
-        ViewModelBase viewModel = ViewModelBase.CreateBase(
-            bindingScheduler: BindingScheduler.Immediate,
-            continuation: (output, construct) =>
-            {
-                output.AddDisposable(disposable: new Recording(log: log, name: "first"));
-                output.AddDisposable(disposable: new Recording(log: log, name: "second"));
+        ViewModelBase viewModel =
+            ViewModelBase.CreateBase(
+                bindingScheduler: BindingScheduler.Immediate,
+                continuation: (output, construct) =>
+                {
+                    output.AddDisposable(disposable: new Recording(log: log, name: "first"));
+                    output.AddDisposable(disposable: new Recording(log: log, name: "second"));
 
-                return construct.Construct(
-                    constructor: static viewModelBase =>
-                    {
-                        viewModelBase.Dispose();
+                    return construct.Construct(
+                        constructor: static viewModelBase =>
+                        {
+                            viewModelBase.Dispose();
 
-                        return viewModelBase;
-                    });
-            });
+                            return viewModelBase;
+                        });
+                });
 
         await Assert.That(log).IsEquivalentTo(expected: ["second", "first"], ordering: CollectionOrdering.Matching);
 
@@ -280,18 +301,22 @@ public sealed class ViewModelBaseTests
         List<string> log = [];
         Exception? caught = null;
 
-        _ = ViewModelBase.CreateBase(
-            bindingScheduler: BindingScheduler.Immediate,
-            continuation: (output, construct) => construct.Construct(
-                constructor: viewModelBase =>
-                {
-                    viewModelBase.Dispose();
+        _ =
+            ViewModelBase.CreateBase(
+                bindingScheduler: BindingScheduler.Immediate,
+                continuation: (output, construct) =>
+                    construct.Construct(
+                        constructor: viewModelBase =>
+                        {
+                            viewModelBase.Dispose();
 
-                    caught = Catch(
-                        action: () => output.AddDisposable(disposable: new Recording(log: log, name: "late")));
+                            caught =
+                                Catch(
+                                    action: () =>
+                                        output.AddDisposable(disposable: new Recording(log: log, name: "late")));
 
-                    return viewModelBase;
-                }));
+                            return viewModelBase;
+                        }));
 
         await Assert.That(caught).IsTypeOf<InvalidOperationException>();
         await Assert.That(log).IsEmpty();
@@ -306,16 +331,18 @@ public sealed class ViewModelBaseTests
         List<ViewModelBase.IOutput> kept = [];
         InvalidOperationException failure = new(message: "The constructor failed.");
 
-        Exception caught = Catch(
-            action: () => ViewModelBase.CreateBase<ViewModelBase>(
-                bindingScheduler: BindingScheduler.Immediate,
-                continuation: (output, construct) =>
-                {
-                    kept.Add(output);
-                    output.AddDisposable(disposable: new Recording(log: log, name: "registered"));
+        Exception caught =
+            Catch(
+                action: () =>
+                    ViewModelBase.CreateBase<ViewModelBase>(
+                        bindingScheduler: BindingScheduler.Immediate,
+                        continuation: (output, construct) =>
+                        {
+                            kept.Add(output);
+                            output.AddDisposable(disposable: new Recording(log: log, name: "registered"));
 
-                    return construct.Construct<ViewModelBase>(constructor: _ => throw failure);
-                }));
+                            return construct.Construct<ViewModelBase>(constructor: _ => throw failure);
+                        }));
 
         Exception late =
             Catch(action: () => kept[0].AddDisposable(disposable: new Recording(log: log, name: "late")));
@@ -334,19 +361,20 @@ public sealed class ViewModelBaseTests
         List<string> log = [];
         List<ViewModelBase.IOutput> kept = [];
 
-        Exception caught = Catch(
-            action: () => ViewModelBase.CreateBase<ViewModelBase>(
-                bindingScheduler: BindingScheduler.Immediate,
-                continuation: (output, construct) =>
-                {
-                    kept.Add(output);
+        Exception caught =
+            Catch(
+                action: () =>
+                    ViewModelBase.CreateBase<ViewModelBase>(
+                        bindingScheduler: BindingScheduler.Immediate,
+                        continuation: (output, construct) =>
+                        {
+                            kept.Add(output);
 
-                    output.AddDisposable(
-                        disposable: Disposable.FromAction(
-                            onDispose: () => throw releaseFailure));
+                            output.AddDisposable(
+                                disposable: Disposable.FromAction(onDispose: () => throw releaseFailure));
 
-                    return construct.Construct<ViewModelBase>(constructor: _ => throw failure);
-                }));
+                            return construct.Construct<ViewModelBase>(constructor: _ => throw failure);
+                        }));
 
         await Assert.That(caught).IsTypeOf<AggregateException>();
 
@@ -367,15 +395,17 @@ public sealed class ViewModelBaseTests
     [Test]
     public async Task SecondConstructFails()
     {
-        Exception caught = Catch(
-            action: static () => ViewModelBase.CreateBase(
-                bindingScheduler: BindingScheduler.Immediate,
-                continuation: static (_, construct) =>
-                {
-                    construct.Construct(constructor: static viewModelBase => viewModelBase).Dispose();
+        Exception caught =
+            Catch(
+                action: static () =>
+                    ViewModelBase.CreateBase(
+                        bindingScheduler: BindingScheduler.Immediate,
+                        continuation: static (_, construct) =>
+                        {
+                            construct.Construct(constructor: static viewModelBase => viewModelBase).Dispose();
 
-                    return construct.Construct(constructor: static viewModelBase => viewModelBase);
-                }));
+                            return construct.Construct(constructor: static viewModelBase => viewModelBase);
+                        }));
 
         await Assert.That(caught).IsTypeOf<InvalidOperationException>();
         await Assert.That(caught.Message).Contains(expected: "Construct was already called");
@@ -385,7 +415,11 @@ public sealed class ViewModelBaseTests
     [Test]
     public async Task PropertyChangedKeepsNoHandler()
     {
-        ViewModelBase viewModel = Create(register: static _ => { });
+        ViewModelBase viewModel =
+            Create(
+                register: static _ =>
+                {
+                });
 
         WeakReference subscriber = Subscribe(viewModel: viewModel);
 
@@ -401,7 +435,12 @@ public sealed class ViewModelBaseTests
     [Test]
     public async Task PropertyChangedAcceptsTheRemovalOfAHandler()
     {
-        ViewModelBase viewModel = Create(register: static _ => { });
+        ViewModelBase viewModel =
+            Create(
+                register: static _ =>
+                {
+                });
+
         Subscriber subscriber = new();
 
         viewModel.PropertyChanged += subscriber.OnPropertyChanged;
@@ -415,15 +454,17 @@ public sealed class ViewModelBaseTests
     {
         List<string> log = [];
 
-        Derived viewModel = ViewModelBase.CreateBase(
-            bindingScheduler: BindingScheduler.Immediate,
-            continuation: (output, construct) =>
-            {
-                output.AddDisposable(disposable: new Recording(log: log, name: "A"));
-                output.AddDisposable(disposable: new Recording(log: log, name: "B"));
+        Derived viewModel =
+            ViewModelBase.CreateBase(
+                bindingScheduler: BindingScheduler.Immediate,
+                continuation: (output, construct) =>
+                {
+                    output.AddDisposable(disposable: new Recording(log: log, name: "A"));
+                    output.AddDisposable(disposable: new Recording(log: log, name: "B"));
 
-                return construct.Construct(constructor: static viewModelBase => new Derived(viewModelBase: viewModelBase));
-            });
+                    return construct.Construct(
+                        constructor: static viewModelBase => new Derived(viewModelBase: viewModelBase));
+                });
 
         viewModel.Dispose();
         viewModel.Dispose();
@@ -448,8 +489,8 @@ public sealed class ViewModelBaseTests
     {
         List<string> log = [];
 
-        ViewModelBase viewModelBase = Create(
-            register: output => output.AddDisposable(disposable: new Recording(log: log, name: "A")));
+        ViewModelBase viewModelBase =
+            Create(register: output => output.AddDisposable(disposable: new Recording(log: log, name: "A")));
 
         Derived first = new(viewModelBase: viewModelBase);
         Exception caught = Catch(action: () => _ = new Derived(viewModelBase: viewModelBase));
@@ -495,7 +536,8 @@ public sealed class ViewModelBaseTests
         throw new InvalidOperationException(message: "The action did not throw an exception.");
     }
 
-    private sealed class Derived(ViewModelBase viewModelBase) : ViewModelBase(viewModelBase: viewModelBase);
+    private sealed class Derived(ViewModelBase viewModelBase)
+        : ViewModelBase(viewModelBase: viewModelBase);
 
     private sealed class Recording(ICollection<string> log, string name) : IDisposable
     {

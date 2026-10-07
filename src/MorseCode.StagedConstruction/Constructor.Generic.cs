@@ -127,7 +127,8 @@ public abstract class Constructor<TBaseValues>
     /// <param name="selector">The function that makes the new values from the values of this handle.</param>
     /// <typeparam name="TSelectedValues">The type of the new values.</typeparam>
     /// <returns>The new handle.</returns>
-    protected virtual Constructor<TSelectedValues> SelectCore<TSelectedValues>(Func<TBaseValues, TSelectedValues> selector) =>
+    protected virtual Constructor<TSelectedValues> SelectCore<TSelectedValues>(
+        Func<TBaseValues, TSelectedValues> selector) =>
         new SelectedConstruct<TBaseValues, TSelectedValues>(source: this, selector: selector);
 
     // The handle that the default SelectCore makes calls this. Select claimed this handle, so Construct

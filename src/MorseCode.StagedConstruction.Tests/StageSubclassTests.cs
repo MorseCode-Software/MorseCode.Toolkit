@@ -16,7 +16,9 @@ public sealed class StageSubclassTests
         Recording stage = new();
 
         _ = stage.Advance(input: 1, continuation: static (output, _) => output);
-        Exception caught = Catching.Catch(action: () => _ = stage.Advance(input: 1, continuation: static (output, _) => output));
+
+        Exception caught =
+            Catching.Catch(action: () => _ = stage.Advance(input: 1, continuation: static (output, _) => output));
 
         await Assert.That(caught).IsTypeOf<InvalidOperationException>();
         await Assert.That(caught.Message).Contains(expected: "Advance was already called");
@@ -42,8 +44,11 @@ public sealed class StageSubclassTests
         InvalidOperationException failure = new(message: "The core failed.");
         Recording stage = new(failure: failure);
 
-        Exception first = Catching.Catch(action: () => _ = stage.Advance(input: 1, continuation: static (output, _) => output));
-        Exception second = Catching.Catch(action: () => _ = stage.Advance(input: 1, continuation: static (output, _) => output));
+        Exception first =
+            Catching.Catch(action: () => _ = stage.Advance(input: 1, continuation: static (output, _) => output));
+
+        Exception second =
+            Catching.Catch(action: () => _ = stage.Advance(input: 1, continuation: static (output, _) => output));
 
         await Assert.That(first).IsSameReferenceAs(expected: failure);
         await Assert.That(second.Message).Contains(expected: "Advance was already called");
@@ -55,8 +60,9 @@ public sealed class StageSubclassTests
     {
         Recording stage = new();
 
-        int[] results = await Concurrency.RunTogether(
-            call: () => _ = stage.Advance(input: 1, continuation: static (output, _) => output));
+        int[] results =
+            await Concurrency.RunTogether(
+                call: () => _ = stage.Advance(input: 1, continuation: static (output, _) => output));
 
         int succeeded = results.Count(predicate: static result => result == Concurrency.Succeeded);
         int refused = results.Count(predicate: static result => result == Concurrency.Refused);

@@ -15,27 +15,33 @@ public sealed class StageTests
     {
         List<string> log = [];
 
-        Stage<int, int, int> stage = Stage.From(
-            body: (int input) =>
-            {
-                log.Add(item: $"body got {input}");
+        Stage<int, int, int> stage =
+            Stage.From(
+                body: (int input) =>
+                {
+                    log.Add(item: $"body got {input}");
 
-                return (Output: input, Next: input);
-            });
+                    return (Output: input, Next: input);
+                });
 
         int logCountBeforeAdvance = log.Count;
 
-        _ = stage.Advance(
-            input: 5,
-            continuation: (output, next) =>
-            {
-                log.Add(item: $"continuation got {output} and {next}");
+        _ =
+            stage.Advance(
+                input: 5,
+                continuation: (output, next) =>
+                {
+                    log.Add(item: $"continuation got {output} and {next}");
 
-                return output;
-            });
+                    return output;
+                });
 
         await Assert.That(logCountBeforeAdvance).IsEqualTo(expected: 0);
-        await Assert.That(log).IsEquivalentTo(expected: ["body got 5", "continuation got 5 and 5"], ordering: CollectionOrdering.Matching);
+
+        await Assert.That(log)
+            .IsEquivalentTo(
+                expected: ["body got 5", "continuation got 5 and 5"],
+                ordering: CollectionOrdering.Matching);
     }
 
     [Test]
