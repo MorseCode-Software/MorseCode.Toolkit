@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <!--
+        Avalonia 12 ships for net8.0 and net10.0 only, so this package cannot take the net472,
+        net6.0, and netstandard2.0 targets of the other packages here. It follows Avalonia instead.
+    -->
+    <PropertyGroup>
+        <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+        <LangVersion>14</LangVersion>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+
+    <PropertyGroup>
+        <PackageId>MorseCode.Toolkit.Avalonia.Controls</PackageId>
+        <MinVerTagPrefix>morsecode-toolkit-avalonia-controls-</MinVerTagPrefix>
+        <Product>MorseCode.Toolkit.Avalonia.Controls</Product>
+        <Title>MorseCode.Toolkit.Avalonia.Controls</Title>
+        <Description>Avalonia controls for views that bind to view models written in a functional reactive style on SodaFlow.</Description>
+        <PackageIcon>MorseCode.png</PackageIcon>
+        <AssemblyName>MorseCode.Toolkit.Avalonia.Controls</AssemblyName>
+        <RootNamespace>MorseCode.Toolkit.Avalonia.Controls</RootNamespace>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    </PropertyGroup>
+
+    <!--
+        12.1.3 is the version that the behavior of BatchingComboBox was checked against: the
+        deferral of BeginInit and EndInit in SelectingItemsControl, and what ComboBox writes back
+        when its list changes.
+    -->
+    <ItemGroup>
+        <PackageReference Include="Avalonia" Version="12.1.3"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <Compile Include="BatchingComboBox.cs"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Include="..\..\logo\MorseCode.png" Pack="true" PackagePath="\">
+            <Link>MorseCode.png</Link>
+        </None>
+    </ItemGroup>
+
+</Project>
