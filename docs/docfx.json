@@ -29,7 +29,7 @@
     },
     {
       "//": [
-        "MorseCode.Toolkit.Avalonia.Controls has an entry of its own, because it targets net8.0",
+        "MorseCode.Avalonia.Controls has an entry of its own, because it targets net8.0",
         "and net10.0, as Avalonia 12 does, and has no net6.0 target. It is pinned to net8.0 for the",
         "same cause as above."
       ],
@@ -37,7 +37,7 @@
         {
           "src": "../src",
           "files": [
-            "MorseCode.Toolkit.Avalonia.Controls/MorseCode.Toolkit.Avalonia.Controls.csproj"
+            "MorseCode.Avalonia.Controls/MorseCode.Avalonia.Controls.csproj"
           ]
         }
       ],

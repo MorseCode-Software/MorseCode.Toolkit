@@ -15,8 +15,8 @@
     </PropertyGroup>
 
     <PropertyGroup>
-        <AssemblyName>MorseCode.Toolkit.Avalonia.Controls.Tests</AssemblyName>
-        <RootNamespace>MorseCode.Toolkit.Avalonia.Controls.Tests</RootNamespace>
+        <AssemblyName>MorseCode.Avalonia.Controls.Tests</AssemblyName>
+        <RootNamespace>MorseCode.Avalonia.Controls.Tests</RootNamespace>
         <IsPackable>false</IsPackable>
     </PropertyGroup>
 
@@ -34,7 +34,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\MorseCode.Toolkit.Avalonia.Controls\MorseCode.Toolkit.Avalonia.Controls.csproj"/>
+        <ProjectReference Include="..\MorseCode.Avalonia.Controls\MorseCode.Avalonia.Controls.csproj"/>
     </ItemGroup>
 
 </Project>

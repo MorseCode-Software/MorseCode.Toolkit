@@ -10,7 +10,7 @@ The packages version independently, and all of them are pre-1.0.
 | --- | --- | --- |
 | `MorseCode.Mvvm` | You write view models on SodaFlow. | `SodaFlow.Bindable.ObjectModel`, `MorseCode.StagedConstruction` |
 | `MorseCode.StagedConstruction` | You want to build immutable objects in ordered stages. | Nothing |
-| `MorseCode.Toolkit.Avalonia.Controls` | Your views are Avalonia, and bind to view models on SodaFlow. | `Avalonia` |
+| `MorseCode.Avalonia.Controls` | Your views are Avalonia, and bind to view models on SodaFlow. | `Avalonia` |
 
 ## MorseCode.Mvvm
 
@@ -37,10 +37,10 @@ Construction of immutable objects in ordered stages. It has no dependency on Sod
 was written for objects whose properties are SodaFlow graphs. See
 [Staged construction](staged-construction.md).
 
-## MorseCode.Toolkit.Avalonia.Controls
+## MorseCode.Avalonia.Controls
 
 ```bash
-dotnet add package MorseCode.Toolkit.Avalonia.Controls
+dotnet add package MorseCode.Avalonia.Controls
 ```
 
 Avalonia controls for views that bind to view models on SodaFlow. It holds `BatchingComboBox`, a

@@ -6,7 +6,7 @@ using Avalonia.Data;
 using Avalonia.Threading;
 using JetBrains.Annotations;
 
-namespace MorseCode.Toolkit.Avalonia.Controls;
+namespace MorseCode.Avalonia.Controls;
 
 /// <summary>
 ///     A combo box that applies a new list and a new selected item together. The

@@ -38,12 +38,12 @@ The documentation site is at <https://morsecode-software.github.io/MorseCode.Too
   [![Latest Stable Version](https://img.shields.io/nuget/v/MorseCode.StagedConstruction.svg)](https://www.nuget.org/packages/MorseCode.StagedConstruction/)
   [![Total Downloads](https://img.shields.io/nuget/dt/MorseCode.StagedConstruction.svg)](https://www.nuget.org/packages/MorseCode.StagedConstruction/)
 
-- **MorseCode.Toolkit.Avalonia.Controls**: Avalonia controls for views that bind to view models
+- **MorseCode.Avalonia.Controls**: Avalonia controls for views that bind to view models
   on SodaFlow. `BatchingComboBox` applies a new list and a new selected item together, so a view
   model that changes both in one update keeps the selection it chose, and the combo box writes
   back only what the user picks.<br>
-  [![Latest Stable Version](https://img.shields.io/nuget/v/MorseCode.Toolkit.Avalonia.Controls.svg)](https://www.nuget.org/packages/MorseCode.Toolkit.Avalonia.Controls/)
-  [![Total Downloads](https://img.shields.io/nuget/dt/MorseCode.Toolkit.Avalonia.Controls.svg)](https://www.nuget.org/packages/MorseCode.Toolkit.Avalonia.Controls/)
+  [![Latest Stable Version](https://img.shields.io/nuget/v/MorseCode.Avalonia.Controls.svg)](https://www.nuget.org/packages/MorseCode.Avalonia.Controls/)
+  [![Total Downloads](https://img.shields.io/nuget/dt/MorseCode.Avalonia.Controls.svg)](https://www.nuget.org/packages/MorseCode.Avalonia.Controls/)
 
 ## License
 

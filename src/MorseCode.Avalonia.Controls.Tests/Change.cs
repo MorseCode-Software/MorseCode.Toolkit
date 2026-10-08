@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace MorseCode.Toolkit.Avalonia.Controls.Tests;
+namespace MorseCode.Avalonia.Controls.Tests;
 
 /// <summary>
 ///     One change of a <see cref="SelectionModel" />.

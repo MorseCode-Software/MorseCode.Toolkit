@@ -7,7 +7,7 @@ using TUnit.Assertions.Enums;
 using TUnit.Assertions.Extensions;
 using TUnit.Core;
 
-namespace MorseCode.Toolkit.Avalonia.Controls.Tests;
+namespace MorseCode.Avalonia.Controls.Tests;
 
 /// <summary>
 ///     Checks that a <see cref="BatchingComboBox" /> applies a new list and a new

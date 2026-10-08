@@ -11,14 +11,14 @@
     </PropertyGroup>
 
     <PropertyGroup>
-        <PackageId>MorseCode.Toolkit.Avalonia.Controls</PackageId>
-        <MinVerTagPrefix>morsecode-toolkit-avalonia-controls-</MinVerTagPrefix>
-        <Product>MorseCode.Toolkit.Avalonia.Controls</Product>
-        <Title>MorseCode.Toolkit.Avalonia.Controls</Title>
+        <PackageId>MorseCode.Avalonia.Controls</PackageId>
+        <MinVerTagPrefix>morsecode-avalonia-controls-</MinVerTagPrefix>
+        <Product>MorseCode.Avalonia.Controls</Product>
+        <Title>MorseCode.Avalonia.Controls</Title>
         <Description>Avalonia controls for views that bind to view models written in a functional reactive style on SodaFlow.</Description>
         <PackageIcon>MorseCode.png</PackageIcon>
-        <AssemblyName>MorseCode.Toolkit.Avalonia.Controls</AssemblyName>
-        <RootNamespace>MorseCode.Toolkit.Avalonia.Controls</RootNamespace>
+        <AssemblyName>MorseCode.Avalonia.Controls</AssemblyName>
+        <RootNamespace>MorseCode.Avalonia.Controls</RootNamespace>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
     </PropertyGroup>
 

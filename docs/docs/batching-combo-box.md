@@ -4,7 +4,7 @@ title: A combo box that keeps its selection
 
 # A combo box that keeps its selection
 
-`BatchingComboBox`, in `MorseCode.Toolkit.Avalonia.Controls`, is an Avalonia `ComboBox` that
+`BatchingComboBox`, in `MorseCode.Avalonia.Controls`, is an Avalonia `ComboBox` that
 applies a new list and a new selected item together. Use it wherever a view model can change both
 in one update.
 
@@ -32,7 +32,7 @@ Bind `ItemsSource` as usual, and bind the selection to `BoundSelectedItem` rathe
 `SelectedItem`:
 
 ```xml
-<UserControl xmlns:controls="clr-namespace:MorseCode.Toolkit.Avalonia.Controls;assembly=MorseCode.Toolkit.Avalonia.Controls">
+<UserControl xmlns:controls="clr-namespace:MorseCode.Avalonia.Controls;assembly=MorseCode.Avalonia.Controls">
 
     <controls:BatchingComboBox ItemsSource="{Binding Courses.Value}"
                                BoundSelectedItem="{Binding Course.Value, Mode=TwoWay}" />

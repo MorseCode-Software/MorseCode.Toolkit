@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Threading;
 
-namespace MorseCode.Toolkit.Avalonia.Controls.Tests;
+namespace MorseCode.Avalonia.Controls.Tests;
 
 /// <summary>
 ///     A view model with a list and a selected item. It records each value that

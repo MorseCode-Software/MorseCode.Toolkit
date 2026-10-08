@@ -205,7 +205,7 @@
           "TUnit.Core": "1.66.27"
         }
       },
-      "morsecode.toolkit.avalonia.controls": {
+      "morsecode.avalonia.controls": {
         "type": "Project",
         "dependencies": {
           "Avalonia": "[12.1.3, )"
