@@ -18,3 +18,8 @@
       href: disposal.md
     - name: The Disposable helpers
       href: disposable.md
+
+- name: Avalonia controls
+  items:
+    - name: A combo box that keeps its selection
+      href: batching-combo-box.md
