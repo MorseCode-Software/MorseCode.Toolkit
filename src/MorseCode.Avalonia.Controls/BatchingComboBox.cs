@@ -15,8 +15,7 @@ namespace MorseCode.Avalonia.Controls;
 /// <remarks>
 ///     <para>
 ///         Bind <see cref="ItemsControl.ItemsSource" /> and
-///         <see cref="BoundSelectedItem" />. Do not bind
-///         <see cref="SelectingItemsControl.SelectedItem" />.
+///         <see cref="SelectedItem" /> as on a usual combo box.
 ///     </para>
 ///     <para>
 ///         A usual <see cref="ComboBox" /> applies each change when it arrives. When
@@ -38,9 +37,9 @@ namespace MorseCode.Avalonia.Controls;
 ///         transaction always come in one batch.
 ///     </para>
 ///     <para>
-///         A selection that the user makes goes to
-///         <see cref="BoundSelectedItem" />, and the binding writes it back. A
-///         change that this control makes itself never goes to it.
+///         A selection that the user makes goes back through the binding, as on a
+///         usual combo box. A selected item that the list does not have selects no
+///         item, and the binding writes null back, also as on a usual combo box.
 ///     </para>
 /// </remarks>
 [PublicAPI]
@@ -48,34 +47,51 @@ namespace MorseCode.Avalonia.Controls;
 public class BatchingComboBox : ComboBox
 {
     /// <summary>
-    ///     Defines the <see cref="BoundSelectedItem" /> property.
+    ///     Defines the <see cref="SelectedItem" /> property.
     /// </summary>
-    public static readonly StyledProperty<object?> BoundSelectedItemProperty =
-        AvaloniaProperty.Register<BatchingComboBox, object?>(
-            name: nameof(BoundSelectedItem),
-            defaultValue: null,
-            inherits: false,
-            defaultBindingMode: BindingMode.TwoWay);
+    /// <remarks>
+    ///     <para>
+    ///         This property and the property of the base are the same property for
+    ///         styles and notifications. A binding sets the value through the property
+    ///         that it names. Thus, a binding must name this property to start a
+    ///         batch.
+    ///     </para>
+    ///     <para>
+    ///         XAML on this control names this property. A binding that code makes
+    ///         with <see cref="SelectingItemsControl.SelectedItemProperty" /> goes to
+    ///         the base and starts no batch. A set through a reference of the type
+    ///         <see cref="ComboBox" /> does the same.
+    ///     </para>
+    /// </remarks>
+    public new static readonly DirectProperty<BatchingComboBox, object?> SelectedItemProperty =
+        SelectingItemsControl.SelectedItemProperty.AddOwner<BatchingComboBox>(
+            getter: static box => box.SelectedItem,
+            setter: static (box, value) => box.SelectedItem = value,
+            unsetValue: null,
+            defaultBindingMode: BindingMode.TwoWay,
+            enableDataValidation: true);
 
     // True from the start of a batch until the end that the dispatcher runs.
     private bool isBatching;
 
-    // True while this control writes BoundSelectedItem. That write is not a change to apply.
-    private bool isWritingBoundSelectedItem;
-
     /// <summary>
-    ///     Gets or sets the selected item, for a two-way binding to a view model.
+    ///     Gets or sets the selected item.
     /// </summary>
     /// <remarks>
     ///     A change to this property and a change to
     ///     <see cref="ItemsControl.ItemsSource" /> that arrive in one turn of the
-    ///     dispatcher apply together. A value that the list does not have selects
-    ///     no item, and this property keeps the value.
+    ///     dispatcher apply together.
     /// </remarks>
-    public object? BoundSelectedItem
+    public new object? SelectedItem
     {
-        get => this.GetValue(property: BoundSelectedItemProperty);
-        set => this.SetValue(property: BoundSelectedItemProperty, value: value);
+        get => base.SelectedItem;
+        set
+        {
+            // The batch must start before the base gets the value, because the base looks for the
+            // item in the list that it has now.
+            this.StartBatch();
+            base.SelectedItem = value;
+        }
     }
 
     /// <inheritdoc />
@@ -92,35 +108,9 @@ public class BatchingComboBox : ComboBox
         if (change.Property == ItemsSourceProperty)
         {
             this.StartBatch();
-            base.OnPropertyChanged(change: change);
-
-            return;
         }
 
         base.OnPropertyChanged(change: change);
-
-        if (change.Property == BoundSelectedItemProperty)
-        {
-            if (!this.isWritingBoundSelectedItem)
-            {
-                this.StartBatch();
-                this.SelectedItem = change.GetNewValue<object?>();
-            }
-        }
-        else if (change.Property == SelectedItemProperty && !this.isBatching)
-        {
-            // Outside a batch, only the user changes the selection.
-            this.isWritingBoundSelectedItem = true;
-
-            try
-            {
-                this.SetCurrentValue(property: BoundSelectedItemProperty, value: this.SelectedItem);
-            }
-            finally
-            {
-                this.isWritingBoundSelectedItem = false;
-            }
-        }
     }
 
     // The end of the batch runs after the work that the dispatcher already has, at the same priority.

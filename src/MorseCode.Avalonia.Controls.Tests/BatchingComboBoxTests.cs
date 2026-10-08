@@ -11,7 +11,7 @@ namespace MorseCode.Avalonia.Controls.Tests;
 
 /// <summary>
 ///     Checks that a <see cref="BatchingComboBox" /> applies a new list and a new
-///     selected item together. It writes back only the selections of the user.
+///     selected item together, and writes nothing back while it applies them.
 /// </summary>
 public sealed class BatchingComboBoxTests
 {
@@ -47,6 +47,42 @@ public sealed class BatchingComboBoxTests
                 await Assert.That(model.Selected).IsEqualTo(expected: "B");
             });
 
+    // A binding sets the value through the property that it names. Thus, a binding that names the
+    // property of the base goes to the base, and starts no batch. The docs tell you to name the property
+    // of this control in code. If this test fails, a binding now finds the property of the control, and
+    // the docs must change.
+    [Test]
+    public Task ABindingThatNamesThePropertyOfTheBaseDoesNotBatch() =>
+        TestApplication.Run(
+            test: static async () =>
+            {
+                SelectionModel model = new(items: ["None"], selected: "None");
+                using Shown shown = Shown.BatchingThroughTheBase(model: model);
+
+                model.Post(Change.Selected(value: "B"), Change.Items("None", "A", "B"));
+                shown.Settle();
+
+                await Assert.That(model.Writes)
+                    .IsEquivalentTo(expected: ["null"], ordering: CollectionOrdering.Matching);
+
+                await Assert.That(shown.Box.SelectedItem).IsNull();
+            });
+
+    [Test]
+    public Task ABindingInXamlBatches() =>
+        TestApplication.Run(
+            test: static async () =>
+            {
+                SelectionModel model = new(items: ["None"], selected: "None");
+                using Shown shown = Shown.InXaml(model: model);
+
+                model.Post(Change.Selected(value: "B"), Change.Items("None", "A", "B"));
+                shown.Settle();
+
+                await Assert.That(model.Writes).IsEmpty();
+                await Assert.That(shown.Box.SelectedItem).IsEqualTo(expected: "B");
+            });
+
     [Test]
     public Task ANewListThatHasTheSelectedItemKeepsItAndWritesNothing() =>
         TestApplication.Run(
@@ -79,8 +115,9 @@ public sealed class BatchingComboBoxTests
                 await Assert.That(shown.Box.SelectedItem).IsEqualTo(expected: "B");
             });
 
+    // A usual combo box does the same.
     [Test]
-    public Task ASelectedItemThatTheListDoesNotHaveSelectsNothingAndWritesNothing() =>
+    public Task ASelectedItemThatTheListDoesNotHaveSelectsNothingAndWritesNull() =>
         TestApplication.Run(
             test: static async () =>
             {
@@ -90,9 +127,11 @@ public sealed class BatchingComboBoxTests
                 model.Post(Change.Selected(value: "Z"));
                 shown.Settle();
 
-                await Assert.That(model.Writes).IsEmpty();
+                await Assert.That(model.Writes)
+                    .IsEquivalentTo(expected: ["null"], ordering: CollectionOrdering.Matching);
+
                 await Assert.That(shown.Box.SelectedItem).IsNull();
-                await Assert.That(model.Selected).IsEqualTo(expected: "Z");
+                await Assert.That(model.Selected).IsNull();
             });
 
     [Test]
@@ -149,10 +188,10 @@ public sealed class BatchingComboBoxTests
     {
         private readonly Window window;
 
-        private Shown(ComboBox box, SelectionModel model)
+        private Shown(ComboBox box, SelectionModel model, Control? content = null)
         {
             this.Box = box;
-            this.window = new Window { Content = box, Width = 300, Height = 200 };
+            this.window = new Window { Content = content ?? box, Width = 300, Height = 200 };
             this.window.Show();
             this.Settle();
             model.Writes.Clear();
@@ -166,10 +205,29 @@ public sealed class BatchingComboBoxTests
             box.Bind(property: ItemsControl.ItemsSourceProperty, binding: new ReflectionBinding(path: "Items"));
 
             box.Bind(
-                property: BatchingComboBox.BoundSelectedItemProperty,
+                property: BatchingComboBox.SelectedItemProperty,
                 binding: new ReflectionBinding(path: "Selected") { Mode = BindingMode.TwoWay });
 
             return new Shown(box: box, model: model);
+        }
+
+        public static Shown BatchingThroughTheBase(SelectionModel model)
+        {
+            BatchingComboBox box = new() { DataContext = model };
+            box.Bind(property: ItemsControl.ItemsSourceProperty, binding: new ReflectionBinding(path: "Items"));
+
+            box.Bind(
+                property: SelectingItemsControl.SelectedItemProperty,
+                binding: new ReflectionBinding(path: "Selected") { Mode = BindingMode.TwoWay });
+
+            return new Shown(box: box, model: model);
+        }
+
+        public static Shown InXaml(SelectionModel model)
+        {
+            ComboBoxView view = new() { DataContext = model };
+
+            return new Shown(box: view.Box, model: model, content: view);
         }
 
         public static Shown Usual(SelectionModel model)

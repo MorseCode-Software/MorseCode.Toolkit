@@ -29,6 +29,13 @@
     <ItemGroup>
         <Compile Include="BatchingComboBoxTests.cs"/>
         <Compile Include="Change.cs"/>
+        <AvaloniaXaml Include="ComboBoxView.axaml">
+            <SubType>Designer</SubType>
+        </AvaloniaXaml>
+        <Compile Include="ComboBoxView.axaml.cs">
+            <DependentUpon>ComboBoxView.axaml</DependentUpon>
+            <SubType>Code</SubType>
+        </Compile>
         <Compile Include="SelectionModel.cs"/>
         <Compile Include="TestApplication.cs"/>
     </ItemGroup>
