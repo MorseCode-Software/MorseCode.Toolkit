@@ -29,6 +29,14 @@ selection that the user makes goes back through the binding, as on the combo
 box of Avalonia. A selected item that the list does not have selects no item,
 and the binding writes null back, also as on the combo box of Avalonia.
 
+Both changes must arrive in one turn of the dispatcher. From
+SodaFlow.Bindable.ObjectModel.Core 4.2.0, SynchronizationContextBindingScheduler
+sends everything that one transaction posts as one item of the dispatcher.
+SodaFlow.Bindable.ObjectModel 4.0.3 and later depend on that version. With an
+earlier version, a list and a selected item that one transaction changes can
+arrive in two items. Then a selected item that arrives before its list is lost,
+as on the combo box of Avalonia.
+
 The control declares its own SelectedItem property, and that property starts
 the batch. A binding in XAML uses it. A binding in code must name
 MorseCode.Avalonia.Controls.ComboBox.SelectedItemProperty. A binding that names
@@ -39,10 +47,6 @@ In C#, a file that imports both Avalonia.Controls and
 MorseCode.Avalonia.Controls cannot write a plain ComboBox, because the name has
 two meanings. Write global::Avalonia.Controls.ComboBox for the one of Avalonia,
 or use a using alias.
-
-Both changes must arrive in one turn of the dispatcher. SodaFlow's
-SynchronizationContextBindingScheduler sends everything that one transaction
-posts as one item of the dispatcher, in the release that adds that behavior.
 
 MaybeConverter and MaybeConverter<T, TSelf> bind a control to a property of
 the type Maybe<T>, which view models on SodaFlow use in place of null.
