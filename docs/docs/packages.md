@@ -10,7 +10,7 @@ The packages version independently, and all of them are pre-1.0.
 | --- | --- | --- |
 | `MorseCode.Mvvm` | You write view models on SodaFlow. | `SodaFlow.Bindable.ObjectModel`, `MorseCode.StagedConstruction` |
 | `MorseCode.StagedConstruction` | You want to build immutable objects in ordered stages. | Nothing |
-| `MorseCode.Avalonia.Controls` | Your views are Avalonia, and bind to view models on SodaFlow. | `Avalonia` |
+| `MorseCode.Avalonia.Controls` | Your views are Avalonia, and bind to view models on SodaFlow. | `Avalonia`, `SodaFlow.Functional` |
 
 ## MorseCode.Mvvm
 
@@ -44,8 +44,12 @@ dotnet add package MorseCode.Avalonia.Controls
 ```
 
 Avalonia controls for views that bind to view models on SodaFlow. Each one is a drop-in
-replacement for the Avalonia control of the same name, and should be used in its place. It holds
-`ComboBox`, which applies a new list and a new selected item together. See [ComboBox](combo-box.md).
+replacement for the Avalonia control of the same name, and should be used in its place. It holds:
+
+- `ComboBox`, which applies a new list and a new selected item together. See
+  [ComboBox](combo-box.md).
+- `MaybeConverter`, which binds a control to a view model property of type `Maybe<T>`, turning the
+  control's `null` into `None` and back. See [MaybeConverter](maybe-converter.md).
 
 It targets `net8.0` and `net10.0`, as Avalonia 12 does, rather than the older targets of the other
 packages.

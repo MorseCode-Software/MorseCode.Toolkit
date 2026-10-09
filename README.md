@@ -41,7 +41,8 @@ The documentation site is at <https://morsecode-software.github.io/MorseCode.Too
 - **MorseCode.Avalonia.Controls**: Avalonia controls for views that bind to view models
   on SodaFlow. Each is a drop-in replacement for the Avalonia control of the same name, to use in
   its place. `ComboBox` applies a new list and a new selected item together, so a view model that
-  changes both in one update keeps the selection it chose.<br>
+  changes both in one update keeps the selection it chose. `MaybeConverter` binds a control to a
+  view model's `Maybe<T>`, turning the control's `null` into `None` and back.<br>
   [![Latest Stable Version](https://img.shields.io/nuget/v/MorseCode.Avalonia.Controls.svg)](https://www.nuget.org/packages/MorseCode.Avalonia.Controls/)
   [![Total Downloads](https://img.shields.io/nuget/dt/MorseCode.Avalonia.Controls.svg)](https://www.nuget.org/packages/MorseCode.Avalonia.Controls/)
 

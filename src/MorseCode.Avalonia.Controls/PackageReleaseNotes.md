@@ -1,6 +1,6 @@
 0.1.0
 
-The first release. It contains ComboBox.
+The first release. It contains ComboBox and MaybeConverter.
 
 The controls of this package are drop-in replacements for the Avalonia controls
 of the same names, for views that bind to view models on SodaFlow. Use each one
@@ -43,16 +43,30 @@ Both changes must arrive in one turn of the dispatcher. SodaFlow's
 SynchronizationContextBindingScheduler sends everything that one transaction
 posts as one item of the dispatcher, in the release that adds that behavior.
 
+MaybeConverter binds a control to a property of the type Maybe<T>, which view
+models on SodaFlow use in place of null. Toward the control, Some(value) gives
+the value and None gives null. Toward the view model, null gives None and a
+value gives Some(value), both of the type of the property. One instance serves
+each Maybe<T>:
+
+  SelectedItem="{Binding Course.Value, Mode=TwoWay,
+                 Converter={x:Static mc:MaybeConverter.Instance}}"
+
+A value of a different type gives a binding error, and the binding does not
+write.
+
 This package is pre-1.0. Its API can change in a minor version until 1.0.0.
 
 ---
 
 About this package
 
-Avalonia controls for views that bind to view models written in a functional
-reactive style on SodaFlow. It is part of the MorseCode toolkit, which holds the
-conventions that MorseCode Software builds its own applications with.
+Avalonia controls and converters for views that bind to view models written in
+a functional reactive style on SodaFlow. It is part of the MorseCode toolkit,
+which holds the conventions that MorseCode Software builds its own applications
+with.
 
-Targets net8.0 and net10.0, as Avalonia 12 does. Depends on Avalonia.
+Targets net8.0 and net10.0, as Avalonia 12 does. Depends on Avalonia and
+SodaFlow.Functional.
 
 Source: https://github.com/MorseCode-Software/MorseCode.Toolkit

@@ -36,6 +36,15 @@
             <SubType>Code</SubType>
         </Compile>
         <Compile Include="ComboBoxTests.cs"/>
+        <AvaloniaXaml Include="MaybeComboBoxView.axaml">
+            <SubType>Designer</SubType>
+        </AvaloniaXaml>
+        <Compile Include="MaybeComboBoxView.axaml.cs">
+            <DependentUpon>MaybeComboBoxView.axaml</DependentUpon>
+            <SubType>Code</SubType>
+        </Compile>
+        <Compile Include="MaybeConverterTests.cs"/>
+        <Compile Include="MaybeSelectionModel.cs"/>
         <Compile Include="SelectionModel.cs"/>
         <Compile Include="TestApplication.cs"/>
     </ItemGroup>

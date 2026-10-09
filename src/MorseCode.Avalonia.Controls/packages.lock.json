@@ -25,6 +25,12 @@
         "resolved": "8.0.0",
         "contentHash": "AJy/KVjXgUbgjf6HiI8wAk4DSSq0SCmvXQF8aU6IB+pnIQq+YJvofvMczug2hqO8yEvnQY557ryew66KPpyCsA=="
       },
+      "SodaFlow.Functional": {
+        "type": "Direct",
+        "requested": "[3.0.2, )",
+        "resolved": "3.0.2",
+        "contentHash": "KPwRRnnxRodPjPoFXqQ395cym2Je9WT4A907inTAWUIoJaefZaSDNPjadc+74XOi8kLBvBrxOFt5rxbEsgsa7w=="
+      },
       "Avalonia.BuildServices": {
         "type": "Transitive",
         "resolved": "11.3.2",
@@ -64,6 +70,12 @@
         "requested": "[8.0.0, )",
         "resolved": "8.0.0",
         "contentHash": "AJy/KVjXgUbgjf6HiI8wAk4DSSq0SCmvXQF8aU6IB+pnIQq+YJvofvMczug2hqO8yEvnQY557ryew66KPpyCsA=="
+      },
+      "SodaFlow.Functional": {
+        "type": "Direct",
+        "requested": "[3.0.2, )",
+        "resolved": "3.0.2",
+        "contentHash": "KPwRRnnxRodPjPoFXqQ395cym2Je9WT4A907inTAWUIoJaefZaSDNPjadc+74XOi8kLBvBrxOFt5rxbEsgsa7w=="
       },
       "Avalonia.BuildServices": {
         "type": "Transitive",
