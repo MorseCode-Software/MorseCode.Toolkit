@@ -1,0 +1,59 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <!--
+        Avalonia.Headless runs the control with no screen. Avalonia 12 has no net472 target, thus
+        this test project, unlike the others here, runs on net10.0 only.
+    -->
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <OutputType>Exe</OutputType>
+        <LangVersion>14</LangVersion>
+        <Nullable>enable</Nullable>
+        <!-- The usings are listed per file here, as everywhere else in this repository. -->
+        <TUnitImplicitUsings>disable</TUnitImplicitUsings>
+        <TUnitAssertionsImplicitUsings>disable</TUnitAssertionsImplicitUsings>
+    </PropertyGroup>
+
+    <PropertyGroup>
+        <AssemblyName>MorseCode.Avalonia.Controls.Tests</AssemblyName>
+        <RootNamespace>MorseCode.Avalonia.Controls.Tests</RootNamespace>
+        <IsPackable>false</IsPackable>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Avalonia.Headless" Version="12.1.3"/>
+        <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.3"/>
+        <PackageReference Include="TUnit" Version="1.66.27"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <Compile Include="Change.cs"/>
+        <AvaloniaXaml Include="ComboBoxView.axaml">
+            <SubType>Designer</SubType>
+        </AvaloniaXaml>
+        <Compile Include="ComboBoxView.axaml.cs">
+            <DependentUpon>ComboBoxView.axaml</DependentUpon>
+            <SubType>Code</SubType>
+        </Compile>
+        <Compile Include="ComboBoxTests.cs"/>
+        <AvaloniaXaml Include="MaybeComboBoxView.axaml">
+            <SubType>Designer</SubType>
+        </AvaloniaXaml>
+        <Compile Include="MaybeComboBoxView.axaml.cs">
+            <DependentUpon>MaybeComboBoxView.axaml</DependentUpon>
+            <SubType>Code</SubType>
+        </Compile>
+        <Compile Include="MaybeConverterGenericTests.cs"/>
+        <Compile Include="MaybeConverterTests.cs"/>
+        <Compile Include="MaybeSelectionModel.cs"/>
+        <Compile Include="SelectionModel.cs"/>
+        <Compile Include="ShownMaybe.cs"/>
+        <Compile Include="StringMaybeConverter.cs"/>
+        <Compile Include="TestApplication.cs"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\MorseCode.Avalonia.Controls\MorseCode.Avalonia.Controls.csproj"/>
+    </ItemGroup>
+
+</Project>

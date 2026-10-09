@@ -18,3 +18,10 @@
       href: disposal.md
     - name: The Disposable helpers
       href: disposable.md
+
+- name: Avalonia controls
+  items:
+    - name: ComboBox
+      href: combo-box.md
+    - name: MaybeConverter
+      href: maybe-converter.md

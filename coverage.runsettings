@@ -21,6 +21,7 @@
               <Include>
                 <ModulePath>.*\MorseCode\.Mvvm\.dll$</ModulePath>
                 <ModulePath>.*\MorseCode\.StagedConstruction\.dll$</ModulePath>
+                <ModulePath>.*\MorseCode\.Avalonia\.Controls\.dll$</ModulePath>
               </Include>
             </ModulePaths>
           </CodeCoverage>

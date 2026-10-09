@@ -3,4 +3,6 @@
   <Project Path="MorseCode.Mvvm.Tests/MorseCode.Mvvm.Tests.csproj" />
   <Project Path="MorseCode.StagedConstruction/MorseCode.StagedConstruction.csproj" />
   <Project Path="MorseCode.StagedConstruction.Tests/MorseCode.StagedConstruction.Tests.csproj" />
+  <Project Path="MorseCode.Avalonia.Controls/MorseCode.Avalonia.Controls.csproj" />
+  <Project Path="MorseCode.Avalonia.Controls.Tests/MorseCode.Avalonia.Controls.Tests.csproj" />
 </Solution>

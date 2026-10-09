@@ -4,12 +4,13 @@ title: Which package do I install?
 
 # Which package do I install?
 
-There are two packages. They version independently, and both are pre-1.0.
+The packages version independently, and all of them are pre-1.0.
 
 | Package | Install it when | Depends on |
 | --- | --- | --- |
 | `MorseCode.Mvvm` | You write view models on SodaFlow. | `SodaFlow.Bindable.ObjectModel`, `MorseCode.StagedConstruction` |
 | `MorseCode.StagedConstruction` | You want to build immutable objects in ordered stages. | Nothing |
+| `MorseCode.Avalonia.Controls` | Your views are Avalonia, and bind to view models on SodaFlow. | `Avalonia`, `SodaFlow.Functional` |
 
 ## MorseCode.Mvvm
 
@@ -35,6 +36,24 @@ dotnet add package MorseCode.StagedConstruction
 Construction of immutable objects in ordered stages. It has no dependency on SodaFlow, though it
 was written for objects whose properties are SodaFlow graphs. See
 [Staged construction](staged-construction.md).
+
+## MorseCode.Avalonia.Controls
+
+```bash
+dotnet add package MorseCode.Avalonia.Controls
+```
+
+Avalonia controls for views that bind to view models on SodaFlow. Each one is a drop-in
+replacement for the Avalonia control of the same name, and should be used in its place. It holds:
+
+- `ComboBox`, which applies a new list and a new selected item together. See
+  [ComboBox](combo-box.md).
+- `MaybeConverter` and `MaybeConverter<T, TSelf>`, which bind a control to a view model property of
+  type `Maybe<T>`, one-way and two-way, turning the control's `null` into `None` and back. See
+  [MaybeConverter](maybe-converter.md).
+
+It targets `net8.0` and `net10.0`, as Avalonia 12 does, rather than the older targets of the other
+packages.
 
 ## Version ranges
 

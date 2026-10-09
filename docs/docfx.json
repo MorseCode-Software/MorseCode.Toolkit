@@ -4,7 +4,7 @@
   "metadata": [
     {
       "//": [
-        "Both packages are listed. Each sets GenerateDocumentationFile, so DocFX reads the XML",
+        "These two packages are listed. Each sets GenerateDocumentationFile, so DocFX reads the XML",
         "documentation comments and renders them.",
         "",
         "TargetFramework is pinned because both projects multi-target net472, net6.0 and",
@@ -22,6 +22,28 @@
       "dest": "api",
       "properties": {
         "TargetFramework": "net6.0",
+        "Configuration": "Release"
+      },
+      "memberLayout": "separatePages",
+      "namespaceLayout": "nested"
+    },
+    {
+      "//": [
+        "MorseCode.Avalonia.Controls has an entry of its own, because it targets net8.0",
+        "and net10.0, as Avalonia 12 does, and has no net6.0 target. It is pinned to net8.0 for the",
+        "same cause as above."
+      ],
+      "src": [
+        {
+          "src": "../src",
+          "files": [
+            "MorseCode.Avalonia.Controls/MorseCode.Avalonia.Controls.csproj"
+          ]
+        }
+      ],
+      "dest": "api",
+      "properties": {
+        "TargetFramework": "net8.0",
         "Configuration": "Release"
       },
       "memberLayout": "separatePages",

@@ -1,0 +1,94 @@
+0.1.0
+
+The first release. It contains ComboBox, MaybeConverter, and
+MaybeConverter<T, TSelf>.
+
+The controls of this package are drop-in replacements for the Avalonia controls
+of the same names, for views that bind to view models on SodaFlow. Use each one
+in all places that need that control. In XAML, add the namespace with a prefix,
+such as mc, and write <mc:ComboBox> in place of <ComboBox>.
+
+The ComboBox of Avalonia applies each change to ItemsSource and to SelectedItem
+when it arrives. When its list changes, it clears its selection, and then it
+selects the item that it showed before, if the new list has that item. A
+two-way binding writes each of those values back to the view model. Thus, when
+a view model changes the list and the selected item in one update, the combo
+box can write back a value that the view model never chose. When the selected
+item arrives before the list, the combo box cannot find it and loses it.
+
+The ComboBox of this package applies the two together. Bind ItemsSource and
+SelectedItem as usual:
+
+  <mc:ComboBox ItemsSource="{Binding Courses.Value}"
+               SelectedItem="{Binding Course.Value, Mode=TwoWay}" />
+
+The first change to either property starts a batch with BeginInit, and the
+control ends it with EndInit after the current work of the dispatcher. The
+combo box applies both values at that point and writes nothing back. A
+selection that the user makes goes back through the binding, as on the combo
+box of Avalonia. A selected item that the list does not have selects no item,
+and the binding writes null back, also as on the combo box of Avalonia.
+
+Both changes must arrive in one turn of the dispatcher. From
+SodaFlow.Bindable.ObjectModel.Core 4.2.0, SynchronizationContextBindingScheduler
+sends everything that one transaction posts as one item of the dispatcher.
+SodaFlow.Bindable.ObjectModel 4.0.3 and later depend on that version. With an
+earlier version, a list and a selected item that one transaction changes can
+arrive in two items. Then a selected item that arrives before its list is lost,
+as on the combo box of Avalonia.
+
+The control declares its own SelectedItem property, and that property starts
+the batch. A binding in XAML uses it. A binding in code must name
+MorseCode.Avalonia.Controls.ComboBox.SelectedItemProperty. A binding that names
+the property of the Avalonia ComboBox or of SelectingItemsControl, and a set
+through a reference of the Avalonia type, go to the base and start no batch.
+
+In C#, a file that imports both Avalonia.Controls and
+MorseCode.Avalonia.Controls cannot write a plain ComboBox, because the name has
+two meanings. Write global::Avalonia.Controls.ComboBox for the one of Avalonia,
+or use a using alias.
+
+MaybeConverter and MaybeConverter<T, TSelf> bind a control to a property of
+the type Maybe<T>, which view models on SodaFlow use in place of null.
+
+MaybeConverter is for a one-way binding. Some(value) gives the value, and None
+gives null. One instance serves each Maybe<T>:
+
+  Text="{Binding Note.Value, Converter={x:Static mc:MaybeConverter.Instance}}"
+
+It cannot convert back, because it does not know which Maybe<T> to make. A
+conversion back gives a binding error that names MaybeConverter<T, TSelf>, and
+the binding does not write.
+
+MaybeConverter<T, TSelf> is for a two-way binding. Close it with a sealed
+subclass that has no members, and use the Instance that the base gives:
+
+  public sealed class CourseOptionConverter
+      : MaybeConverter<CourseOption, CourseOptionConverter>;
+
+  SelectedItem="{Binding Course.Value, Mode=TwoWay,
+                 Converter={x:Static app:CourseOptionConverter.Instance}}"
+
+Toward the control, Some(value) gives the value and None gives null. Toward the
+view model, null gives None and a value gives Some(value). It knows T when it
+compiles, thus it uses no reflection, and trimming and compilation ahead of
+time keep each part that it uses.
+
+For each converter, a value of a different type gives a binding error, and the
+binding does not write.
+
+This package is pre-1.0. Its API can change in a minor version until 1.0.0.
+
+---
+
+About this package
+
+Avalonia controls and converters for views that bind to view models written in
+a functional reactive style on SodaFlow. It is part of the MorseCode toolkit,
+which holds the conventions that MorseCode Software builds its own applications
+with.
+
+Targets net8.0 and net10.0, as Avalonia 12 does. Depends on Avalonia and
+SodaFlow.Functional.
+
+Source: https://github.com/MorseCode-Software/MorseCode.Toolkit
