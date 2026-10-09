@@ -38,7 +38,9 @@
 
     <ItemGroup>
         <Compile Include="ComboBox.cs"/>
+        <Compile Include="MaybeConversion.cs"/>
         <Compile Include="MaybeConverter.cs"/>
+        <Compile Include="MaybeConverter.Generic.cs"/>
     </ItemGroup>
 
     <ItemGroup>

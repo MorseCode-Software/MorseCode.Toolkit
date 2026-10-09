@@ -48,8 +48,9 @@ replacement for the Avalonia control of the same name, and should be used in its
 
 - `ComboBox`, which applies a new list and a new selected item together. See
   [ComboBox](combo-box.md).
-- `MaybeConverter`, which binds a control to a view model property of type `Maybe<T>`, turning the
-  control's `null` into `None` and back. See [MaybeConverter](maybe-converter.md).
+- `MaybeConverter` and `MaybeConverter<T, TSelf>`, which bind a control to a view model property of
+  type `Maybe<T>`, one-way and two-way, turning the control's `null` into `None` and back. See
+  [MaybeConverter](maybe-converter.md).
 
 It targets `net8.0` and `net10.0`, as Avalonia 12 does, rather than the older targets of the other
 packages.

@@ -43,9 +43,12 @@
             <DependentUpon>MaybeComboBoxView.axaml</DependentUpon>
             <SubType>Code</SubType>
         </Compile>
+        <Compile Include="MaybeConverterGenericTests.cs"/>
         <Compile Include="MaybeConverterTests.cs"/>
         <Compile Include="MaybeSelectionModel.cs"/>
         <Compile Include="SelectionModel.cs"/>
+        <Compile Include="ShownMaybe.cs"/>
+        <Compile Include="StringMaybeConverter.cs"/>
         <Compile Include="TestApplication.cs"/>
     </ItemGroup>
 

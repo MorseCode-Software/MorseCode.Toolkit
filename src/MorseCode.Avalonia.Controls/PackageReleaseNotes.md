@@ -1,6 +1,7 @@
 0.1.0
 
-The first release. It contains ComboBox and MaybeConverter.
+The first release. It contains ComboBox, MaybeConverter, and
+MaybeConverter<T, TSelf>.
 
 The controls of this package are drop-in replacements for the Avalonia controls
 of the same names, for views that bind to view models on SodaFlow. Use each one
@@ -43,17 +44,34 @@ Both changes must arrive in one turn of the dispatcher. SodaFlow's
 SynchronizationContextBindingScheduler sends everything that one transaction
 posts as one item of the dispatcher, in the release that adds that behavior.
 
-MaybeConverter binds a control to a property of the type Maybe<T>, which view
-models on SodaFlow use in place of null. Toward the control, Some(value) gives
-the value and None gives null. Toward the view model, null gives None and a
-value gives Some(value), both of the type of the property. One instance serves
-each Maybe<T>:
+MaybeConverter and MaybeConverter<T, TSelf> bind a control to a property of
+the type Maybe<T>, which view models on SodaFlow use in place of null.
+
+MaybeConverter is for a one-way binding. Some(value) gives the value, and None
+gives null. One instance serves each Maybe<T>:
+
+  Text="{Binding Note.Value, Converter={x:Static mc:MaybeConverter.Instance}}"
+
+It cannot convert back, because it does not know which Maybe<T> to make. A
+conversion back gives a binding error that names MaybeConverter<T, TSelf>, and
+the binding does not write.
+
+MaybeConverter<T, TSelf> is for a two-way binding. Close it with a sealed
+subclass that has no members, and use the Instance that the base gives:
+
+  public sealed class CourseOptionConverter
+      : MaybeConverter<CourseOption, CourseOptionConverter>;
 
   SelectedItem="{Binding Course.Value, Mode=TwoWay,
-                 Converter={x:Static mc:MaybeConverter.Instance}}"
+                 Converter={x:Static app:CourseOptionConverter.Instance}}"
 
-A value of a different type gives a binding error, and the binding does not
-write.
+Toward the control, Some(value) gives the value and None gives null. Toward the
+view model, null gives None and a value gives Some(value). It knows T when it
+compiles, thus it uses no reflection, and trimming and compilation ahead of
+time keep each part that it uses.
+
+For each converter, a value of a different type gives a binding error, and the
+binding does not write.
 
 This package is pre-1.0. Its API can change in a minor version until 1.0.0.
 

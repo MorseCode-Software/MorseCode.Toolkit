@@ -8,6 +8,6 @@
 
     <mc:ComboBox x:Name="Box"
                  ItemsSource="{Binding Items}"
-                 SelectedItem="{Binding Selected, Mode=TwoWay, Converter={x:Static mc:MaybeConverter.Instance}}" />
+                 SelectedItem="{Binding Selected, Mode=TwoWay, Converter={x:Static tests:StringMaybeConverter.Instance}}" />
 
 </UserControl>
