@@ -9,16 +9,19 @@ using JetBrains.Annotations;
 namespace MorseCode.Avalonia.Controls;
 
 /// <summary>
-///     A combo box that applies a new list and a new selected item together. The
-///     two must arrive in one turn of the dispatcher.
+///     A combo box for views that bind to view models on SodaFlow. Use it in all
+///     places that need a combo box, in place of the combo box of Avalonia.
 /// </summary>
 /// <remarks>
 ///     <para>
 ///         Bind <see cref="ItemsControl.ItemsSource" /> and
-///         <see cref="SelectedItem" /> as on a usual combo box.
+///         <see cref="SelectedItem" /> as on the combo box of Avalonia. This control
+///         applies a new list and a new selected item together, when the two arrive
+///         in one turn of the dispatcher.
 ///     </para>
 ///     <para>
-///         A usual <see cref="ComboBox" /> applies each change when it arrives. When
+///         The <see cref="global::Avalonia.Controls.ComboBox" /> of Avalonia applies
+///         each change when it arrives. When
 ///         its list changes, it clears its selection, and then it selects the item
 ///         that it showed before, if the new list has that item. A two-way binding
 ///         writes each of these values back to the view model. A view model can
@@ -44,7 +47,7 @@ namespace MorseCode.Avalonia.Controls;
 /// </remarks>
 [PublicAPI]
 // ReSharper disable once InheritdocConsiderUsage - The summary of ComboBox does not say how this control applies its changes.
-public class BatchingComboBox : ComboBox
+public class ComboBox : global::Avalonia.Controls.ComboBox
 {
     /// <summary>
     ///     Defines the <see cref="SelectedItem" /> property.
@@ -60,11 +63,11 @@ public class BatchingComboBox : ComboBox
     ///         XAML on this control names this property. A binding that code makes
     ///         with <see cref="SelectingItemsControl.SelectedItemProperty" /> goes to
     ///         the base and starts no batch. A set through a reference of the type
-    ///         <see cref="ComboBox" /> does the same.
+    ///         <see cref="global::Avalonia.Controls.ComboBox" /> does the same.
     ///     </para>
     /// </remarks>
-    public new static readonly DirectProperty<BatchingComboBox, object?> SelectedItemProperty =
-        SelectingItemsControl.SelectedItemProperty.AddOwner<BatchingComboBox>(
+    public new static readonly DirectProperty<ComboBox, object?> SelectedItemProperty =
+        SelectingItemsControl.SelectedItemProperty.AddOwner<ComboBox>(
             getter: static box => box.SelectedItem,
             setter: static (box, value) => box.SelectedItem = value,
             unsetValue: null,
@@ -98,7 +101,7 @@ public class BatchingComboBox : ComboBox
     /// <remarks>
     ///     The themes style a combo box, and this control looks like one.
     /// </remarks>
-    protected override Type StyleKeyOverride => typeof(ComboBox);
+    protected override Type StyleKeyOverride => typeof(global::Avalonia.Controls.ComboBox);
 
     /// <inheritdoc />
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)

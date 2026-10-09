@@ -6,8 +6,8 @@
              x:CompileBindings="True"
              x:DataType="tests:SelectionModel">
 
-    <controls:BatchingComboBox x:Name="Box"
-                               ItemsSource="{Binding Items}"
-                               SelectedItem="{Binding Selected, Mode=TwoWay}" />
+    <controls:ComboBox x:Name="Box"
+                       ItemsSource="{Binding Items}"
+                       SelectedItem="{Binding Selected, Mode=TwoWay}" />
 
 </UserControl>

@@ -43,9 +43,9 @@ was written for objects whose properties are SodaFlow graphs. See
 dotnet add package MorseCode.Avalonia.Controls
 ```
 
-Avalonia controls for views that bind to view models on SodaFlow. It holds `BatchingComboBox`, a
-combo box that applies a new list and a new selected item together. See
-[A combo box that keeps its selection](batching-combo-box.md).
+Avalonia controls for views that bind to view models on SodaFlow. Each one is a drop-in
+replacement for the Avalonia control of the same name, and should be used in its place. It holds
+`ComboBox`, which applies a new list and a new selected item together. See [ComboBox](combo-box.md).
 
 It targets `net8.0` and `net10.0`, as Avalonia 12 does, rather than the older targets of the other
 packages.

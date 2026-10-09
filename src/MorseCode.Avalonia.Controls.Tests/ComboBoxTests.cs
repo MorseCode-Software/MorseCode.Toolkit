@@ -10,10 +10,10 @@ using TUnit.Core;
 namespace MorseCode.Avalonia.Controls.Tests;
 
 /// <summary>
-///     Checks that a <see cref="BatchingComboBox" /> applies a new list and a new
+///     Checks that a <see cref="ComboBox" /> applies a new list and a new
 ///     selected item together, and writes nothing back while it applies them.
 /// </summary>
-public sealed class BatchingComboBoxTests
+public sealed class ComboBoxTests
 {
     [Test]
     public Task AListAndThenItsSelectedItemInOneItemApplyTogether() =>
@@ -21,7 +21,7 @@ public sealed class BatchingComboBoxTests
             test: static async () =>
             {
                 SelectionModel model = new(items: ["None"], selected: "None");
-                using Shown shown = Shown.Batching(model: model);
+                using Shown shown = Shown.InCode(model: model);
 
                 model.Post(Change.Items("None", "A", "B"), Change.Selected(value: "B"));
                 shown.Settle();
@@ -37,7 +37,7 @@ public sealed class BatchingComboBoxTests
             test: static async () =>
             {
                 SelectionModel model = new(items: ["None"], selected: "None");
-                using Shown shown = Shown.Batching(model: model);
+                using Shown shown = Shown.InCode(model: model);
 
                 model.Post(Change.Selected(value: "B"), Change.Items("None", "A", "B"));
                 shown.Settle();
@@ -57,7 +57,7 @@ public sealed class BatchingComboBoxTests
             test: static async () =>
             {
                 SelectionModel model = new(items: ["None"], selected: "None");
-                using Shown shown = Shown.BatchingThroughTheBase(model: model);
+                using Shown shown = Shown.InCodeThroughTheBase(model: model);
 
                 model.Post(Change.Selected(value: "B"), Change.Items("None", "A", "B"));
                 shown.Settle();
@@ -89,7 +89,7 @@ public sealed class BatchingComboBoxTests
             test: static async () =>
             {
                 SelectionModel model = new(items: ["None", "A", "B"], selected: "B");
-                using Shown shown = Shown.Batching(model: model);
+                using Shown shown = Shown.InCode(model: model);
 
                 model.Post(Change.Items("None", "B", "A"));
                 shown.Settle();
@@ -104,7 +104,7 @@ public sealed class BatchingComboBoxTests
             test: static async () =>
             {
                 SelectionModel model = new(items: ["None"], selected: "None");
-                using Shown shown = Shown.Batching(model: model);
+                using Shown shown = Shown.InCode(model: model);
 
                 model.Post(Change.Items("None", "A", "B"));
                 shown.Settle();
@@ -122,7 +122,7 @@ public sealed class BatchingComboBoxTests
             test: static async () =>
             {
                 SelectionModel model = new(items: ["None", "A", "B"], selected: "B");
-                using Shown shown = Shown.Batching(model: model);
+                using Shown shown = Shown.InCode(model: model);
 
                 model.Post(Change.Selected(value: "Z"));
                 shown.Settle();
@@ -140,7 +140,7 @@ public sealed class BatchingComboBoxTests
             test: static async () =>
             {
                 SelectionModel model = new(items: ["None", "A", "B"], selected: "B");
-                using Shown shown = Shown.Batching(model: model);
+                using Shown shown = Shown.InCode(model: model);
 
                 shown.Box.SelectedIndex = 1;
                 shown.Settle();
@@ -159,12 +159,12 @@ public sealed class BatchingComboBoxTests
             test: static async () =>
             {
                 SelectionModel model = new(items: ["None"], selected: "None");
-                using Shown shown = Shown.Batching(model: model);
+                using Shown shown = Shown.InCode(model: model);
 
                 await Assert.That(shown.Box.Template).IsNotNull();
             });
 
-    // This is the behavior that BatchingComboBox prevents. If an update of Avalonia changes it, this
+    // This is the behavior that the ComboBox of this package prevents. If an update of Avalonia changes it, this
     // test fails and tells you to look at the control again.
     [Test]
     public Task AUsualComboBoxLosesASelectedItemThatArrivesBeforeItsList() =>
@@ -188,7 +188,7 @@ public sealed class BatchingComboBoxTests
     {
         private readonly Window window;
 
-        private Shown(ComboBox box, SelectionModel model, Control? content = null)
+        private Shown(global::Avalonia.Controls.ComboBox box, SelectionModel model, Control? content = null)
         {
             this.Box = box;
             this.window = new Window { Content = content ?? box, Width = 300, Height = 200 };
@@ -197,23 +197,23 @@ public sealed class BatchingComboBoxTests
             model.Writes.Clear();
         }
 
-        public ComboBox Box { get; }
+        public global::Avalonia.Controls.ComboBox Box { get; }
 
-        public static Shown Batching(SelectionModel model)
+        public static Shown InCode(SelectionModel model)
         {
-            BatchingComboBox box = new() { DataContext = model };
+            ComboBox box = new() { DataContext = model };
             box.Bind(property: ItemsControl.ItemsSourceProperty, binding: new ReflectionBinding(path: "Items"));
 
             box.Bind(
-                property: BatchingComboBox.SelectedItemProperty,
+                property: ComboBox.SelectedItemProperty,
                 binding: new ReflectionBinding(path: "Selected") { Mode = BindingMode.TwoWay });
 
             return new Shown(box: box, model: model);
         }
 
-        public static Shown BatchingThroughTheBase(SelectionModel model)
+        public static Shown InCodeThroughTheBase(SelectionModel model)
         {
-            BatchingComboBox box = new() { DataContext = model };
+            ComboBox box = new() { DataContext = model };
             box.Bind(property: ItemsControl.ItemsSourceProperty, binding: new ReflectionBinding(path: "Items"));
 
             box.Bind(
@@ -232,7 +232,7 @@ public sealed class BatchingComboBoxTests
 
         public static Shown Usual(SelectionModel model)
         {
-            ComboBox box = new() { DataContext = model };
+            global::Avalonia.Controls.ComboBox box = new() { DataContext = model };
             box.Bind(property: ItemsControl.ItemsSourceProperty, binding: new ReflectionBinding(path: "Items"));
 
             box.Bind(

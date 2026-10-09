@@ -21,5 +21,5 @@
 
 - name: Avalonia controls
   items:
-    - name: A combo box that keeps its selection
-      href: batching-combo-box.md
+    - name: ComboBox
+      href: combo-box.md

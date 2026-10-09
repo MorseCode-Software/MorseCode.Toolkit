@@ -3,7 +3,7 @@ using Avalonia.Controls;
 namespace MorseCode.Avalonia.Controls.Tests;
 
 /// <summary>
-///     A view that binds a <see cref="BatchingComboBox" /> in XAML, as an
+///     A view that binds a <see cref="ComboBox" /> in XAML, as an
 ///     application does.
 /// </summary>
 // ReSharper disable once InheritdocConsiderUsage - The summary of UserControl does not say what this view holds.
