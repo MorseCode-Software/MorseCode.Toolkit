@@ -38,9 +38,19 @@
 
     <ItemGroup>
         <Compile Include="ComboBox.cs"/>
+        <Compile Include="ItemRange.cs"/>
         <Compile Include="MaybeConversion.cs"/>
         <Compile Include="MaybeConverter.cs"/>
         <Compile Include="MaybeConverter.Generic.cs"/>
+        <Compile Include="RowPlaceholder.cs"/>
+        <Compile Include="VirtualizingItemsControl.cs"/>
+        <Compile Include="VirtualWindow.cs"/>
+        <Compile Include="WindowedItems.cs"/>
+    </ItemGroup>
+
+    <!-- WindowedItems is internal, and its tests check the events that it raises. -->
+    <ItemGroup>
+        <InternalsVisibleTo Include="MorseCode.Avalonia.Controls.Tests"/>
     </ItemGroup>
 
     <ItemGroup>
