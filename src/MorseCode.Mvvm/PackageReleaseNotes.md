@@ -1,3 +1,11 @@
+0.2.3
+
+No signature or behavior changed. This release reformats the code and the
+XMLDoc comments of the package to the wrap limits of the repository, 120
+characters for code and 80 for XMLDoc. The text of the XMLDoc comments is the
+same, so the API reference reads the same. You do not need to change or compile
+again any code that uses 0.2.2.
+
 0.2.2
 
 The registrations of a view model now stay open while the constructor that
