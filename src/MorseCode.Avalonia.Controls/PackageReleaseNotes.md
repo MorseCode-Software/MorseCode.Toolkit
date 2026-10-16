@@ -3,7 +3,7 @@
 New: VirtualizingItemsControl, an items control for a long list whose rows are
 heavy view models. Avalonia makes containers only for the positions on screen.
 The control reports those positions in VisibleRange, and the view model answers
-in Window with the rows for them. A position that Window does not cover shows
+in Rows with the rows for them. A position that Rows does not cover shows
 PlaceholderTemplate. In the view model, a Slice of a ReactiveCollection whose
 offset and limit come from VisibleRange, followed by a Map, builds a row only
 when the row is on screen. The control has no reference to SodaFlow's

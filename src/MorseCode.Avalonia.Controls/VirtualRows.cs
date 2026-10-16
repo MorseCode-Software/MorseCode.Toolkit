@@ -8,20 +8,20 @@ namespace MorseCode.Avalonia.Controls;
 ///     position of the first one in the whole list.
 /// </summary>
 /// <remarks>
-///     Make a window from one cell of the view model, so that the offset and the
+///     Make this value from one cell of the view model, so that the offset and the
 ///     items always belong together. For example, lift the cell of the offset of a
 ///     <c>Slice</c> with the items of the <c>Map</c> that follows it.
 /// </remarks>
-/// <param name="Offset">The position of the first item of the window in the whole list.</param>
+/// <param name="Offset">The position of the first item in the whole list.</param>
 /// <param name="Items">
 ///     The items, in sequence. The item at index <c>i</c> shows at position
 ///     <c>Offset + i</c>.
 /// </param>
 [PublicAPI]
-public sealed record VirtualWindow(int Offset, IReadOnlyList<object?> Items)
+public sealed record VirtualRows(int Offset, IReadOnlyList<object?> Items)
 {
     /// <summary>
-    ///     Gets the window with no item.
+    ///     Gets the rows with no item.
     /// </summary>
-    public static VirtualWindow Empty { get; } = new(Offset: 0, Items: []);
+    public static VirtualRows Empty { get; } = new(Offset: 0, Items: []);
 }

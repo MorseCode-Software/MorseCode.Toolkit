@@ -1,7 +1,7 @@
 namespace MorseCode.Avalonia.Controls;
 
 /// <summary>
-///     The item at a position that the window does not cover yet.
+///     The item at a position that the rows do not cover yet.
 /// </summary>
 internal sealed class RowPlaceholder
 {

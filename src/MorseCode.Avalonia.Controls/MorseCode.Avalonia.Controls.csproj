@@ -44,11 +44,11 @@
         <Compile Include="MaybeConverter.Generic.cs"/>
         <Compile Include="RowPlaceholder.cs"/>
         <Compile Include="VirtualizingItemsControl.cs"/>
-        <Compile Include="VirtualWindow.cs"/>
-        <Compile Include="WindowedItems.cs"/>
+        <Compile Include="VirtualRows.cs"/>
+        <Compile Include="VirtualItemList.cs"/>
     </ItemGroup>
 
-    <!-- WindowedItems is internal, and its tests check the events that it raises. -->
+    <!-- VirtualItemList is internal, and its tests check the events that it raises. -->
     <ItemGroup>
         <InternalsVisibleTo Include="MorseCode.Avalonia.Controls.Tests"/>
     </ItemGroup>

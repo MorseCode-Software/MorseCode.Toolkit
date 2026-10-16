@@ -25,14 +25,14 @@ Avalonia's `VirtualizingStackPanel` makes containers only for the positions that
 The control watches those containers and reports their positions, widened by `Buffer` positions on
 each side, in `VisibleRange`.
 
-Your view model turns that range into rows and hands them back in `Window`: the rows, and the
-position of the first one. The control shows each row at its position. A position that `Window`
+Your view model turns that range into rows and hands them back in `Rows`: the rows, and the
+position of the first one. The control shows each row at its position. A position that `Rows`
 does not cover yet shows the `PlaceholderTemplate` instead, until the rows arrive.
 
 ```text
  panel realizes containers ──► VisibleRange ──► view model: Slice, then Map
           ▲                                                      │
-          └──────────────── Window (offset + rows) ◄─────────────┘
+          └──────────────── Rows (offset + rows)   ◄─────────────┘
 ```
 
 ## The view model
@@ -50,9 +50,9 @@ MappedItems<IRowViewModel> rows = collection
         onEvicted: static row => row.Dispose());
 
 // The offset and the rows come from the same transaction, so they always agree.
-Cell<VirtualWindow> window = offset.Lift(
+Cell<VirtualRows> rowsAtOffset = offset.Lift(
     rows.Items,
-    static (first, items) => new VirtualWindow(first, items.Cast<object?>().ToList()));
+    static (first, items) => new VirtualRows(first, items.Cast<object?>().ToList()));
 
 // The view writes this property. It sends both values in one transaction.
 public ItemRange VisibleRange
@@ -71,7 +71,7 @@ then it calls `onEvicted` for the oldest. Scrolling back over rows you have just
 the number of live view models stays bounded however long the list is. Dispose the `MappedItems`
 with the view model, so it releases the rows that are still in use.
 
-Expose `window` and the count of the collection through your usual bindables.
+Expose `rowsAtOffset` and the count of the collection through your usual bindables.
 
 ## The view
 
@@ -79,7 +79,7 @@ Expose `window` and the count of the collection through your usual bindables.
 <UserControl xmlns:mc="clr-namespace:MorseCode.Avalonia.Controls;assembly=MorseCode.Avalonia.Controls">
 
     <mc:VirtualizingItemsControl TotalCount="{Binding Count.Value}"
-                                 Window="{Binding Window.Value}"
+                                 Rows="{Binding RowsAtOffset.Value}"
                                  VisibleRange="{Binding VisibleRange, Mode=OneWayToSource}"
                                  Buffer="10">
         <mc:VirtualizingItemsControl.ItemTemplate>
@@ -101,7 +101,7 @@ Expose `window` and the count of the collection through your usual bindables.
 | Property | What it does |
 | --- | --- |
 | `TotalCount` | The number of positions in the whole list. |
-| `Window` | The rows for some of the positions, and the position of the first. |
+| `Rows` | The rows for some of the positions, and the position of the first. |
 | `VisibleRange` | The positions on screen, with `Buffer` more on each side. The control sets it. Bind it one way to the source. |
 | `Buffer` | How many positions to add on each side of `VisibleRange`. The default is 10. |
 | `PlaceholderTemplate` | What a position shows until its row arrives. |
@@ -119,7 +119,7 @@ arrive.
 ### Do not set `ItemsSource`
 
 The control gives Avalonia its own list, one position per item. Setting `ItemsSource` throws an
-`InvalidOperationException`. Bind `TotalCount` and `Window` instead.
+`InvalidOperationException`. Bind `TotalCount` and `Rows` instead.
 
 ## What to expect
 
@@ -130,7 +130,7 @@ The control gives Avalonia its own list, one position per item. Setting `ItemsSo
   `Map` runs inside the transaction, so a row that is heavy to build holds up that one transaction.
 - **Selection is not part of the control.** It is an `ItemsControl` with no selected item. If you
   need selection, keep it in the view model, by key, and show it from the row.
-- **An insert above the window moves rows.** The control shows each row at its new position, as
+- **An insert above the visible rows moves rows.** The control shows each row at its new position, as
   a replacement of the rows, so Avalonia does not keep the scroll position on the row that was on
   screen.
 

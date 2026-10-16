@@ -13,14 +13,14 @@ namespace MorseCode.Avalonia.Controls.Tests;
 
 /// <summary>
 ///     Checks the list that a <see cref="VirtualizingItemsControl" /> gives to Avalonia, and the events
-///     that it raises when the length or the window changes.
+///     that it raises when the length or the rows change.
 /// </summary>
-public sealed class WindowedItemsTests
+public sealed class VirtualItemListTests
 {
     [Test]
-    public async Task APositionInTheWindowHoldsItsRowAndEveryOtherPositionHoldsAPlaceholder()
+    public async Task APositionThatTheRowsCoverHoldsItsRowAndEveryOtherPositionHoldsAPlaceholder()
     {
-        WindowedItems items = Items(count: 10, window: Window(offset: 3, 3, 4));
+        VirtualItemList items = Items(count: 10, rows: Rows(offset: 3, 3, 4));
 
         await Assert.That(items.Count).IsEqualTo(expected: 10);
         await Assert.That(items[2]).IsSameReferenceAs(expected: RowPlaceholder.Instance);
@@ -30,9 +30,9 @@ public sealed class WindowedItemsTests
     }
 
     [Test]
-    public async Task AWindowThatEndsAfterTheListShowsOnlyThePositionsOfTheList()
+    public async Task RowsThatEndAfterTheListShowOnlyThePositionsOfTheList()
     {
-        WindowedItems items = Items(count: 4, window: Window(offset: 2, 2, 3, 4, 5));
+        VirtualItemList items = Items(count: 4, rows: Rows(offset: 2, 2, 3, 4, 5));
 
         await Assert.That(items.Count).IsEqualTo(expected: 4);
 
@@ -43,7 +43,7 @@ public sealed class WindowedItemsTests
     [Test]
     public async Task APositionOutsideTheListIsRefused()
     {
-        WindowedItems items = Items(count: 3, window: VirtualWindow.Empty);
+        VirtualItemList items = Items(count: 3, rows: VirtualRows.Empty);
 
         await Assert.That(() => items[3]).Throws<ArgumentOutOfRangeException>();
     }
@@ -51,30 +51,30 @@ public sealed class WindowedItemsTests
     [Test]
     public async Task AnUpdateThatChangesNothingRaisesNothing()
     {
-        VirtualWindow window = Window(offset: 1, 1, 2);
-        WindowedItems items = Items(count: 5, window: window);
+        VirtualRows rows = Rows(offset: 1, 1, 2);
+        VirtualItemList items = Items(count: 5, rows: rows);
         List<NotifyCollectionChangedEventArgs> events = Record(items: items);
 
-        items.Update(newCount: 5, newWindow: window);
+        items.Update(newCount: 5, newRows: rows);
 
         await Assert.That(events).IsEmpty();
     }
 
     [Test]
-    public async Task AWindowThatMovesReplacesOnlyThePositionsThatChanged()
+    public async Task RowsThatMoveReplaceOnlyThePositionsThatChanged()
     {
         VirtualRow shared = new(Position: 2);
 
-        WindowedItems items =
+        VirtualItemList items =
             Items(
                 count: 10,
-                window: new VirtualWindow(Offset: 1, Items: [new VirtualRow(Position: 1), shared]));
+                rows: new VirtualRows(Offset: 1, Items: [new VirtualRow(Position: 1), shared]));
 
         List<NotifyCollectionChangedEventArgs> events = Record(items: items);
 
         items.Update(
             newCount: 10,
-            newWindow: new VirtualWindow(Offset: 2, Items: [shared, new VirtualRow(Position: 3)]));
+            newRows: new VirtualRows(Offset: 2, Items: [shared, new VirtualRow(Position: 3)]));
 
         // Position 1 loses its row, and position 3 gets one. Position 2 keeps the same row.
         await Assert.That(events.Select(selector: static args => args.Action).ToList())
@@ -92,10 +92,10 @@ public sealed class WindowedItemsTests
     [Test]
     public async Task AListThatGrowsAddsPlaceholdersAtTheEnd()
     {
-        WindowedItems items = Items(count: 3, window: VirtualWindow.Empty);
+        VirtualItemList items = Items(count: 3, rows: VirtualRows.Empty);
         List<NotifyCollectionChangedEventArgs> events = Record(items: items);
 
-        items.Update(newCount: 5, newWindow: VirtualWindow.Empty);
+        items.Update(newCount: 5, newRows: VirtualRows.Empty);
 
         await Assert.That(events.Count).IsEqualTo(expected: 1);
         await Assert.That(events[0].Action).IsEqualTo(expected: NotifyCollectionChangedAction.Add);
@@ -107,10 +107,10 @@ public sealed class WindowedItemsTests
     [Test]
     public async Task AListThatShrinksRemovesTheEnd()
     {
-        WindowedItems items = Items(count: 5, window: VirtualWindow.Empty);
+        VirtualItemList items = Items(count: 5, rows: VirtualRows.Empty);
         List<NotifyCollectionChangedEventArgs> events = Record(items: items);
 
-        items.Update(newCount: 2, newWindow: VirtualWindow.Empty);
+        items.Update(newCount: 2, newRows: VirtualRows.Empty);
 
         await Assert.That(events.Count).IsEqualTo(expected: 1);
         await Assert.That(events[0].Action).IsEqualTo(expected: NotifyCollectionChangedAction.Remove);
@@ -119,12 +119,12 @@ public sealed class WindowedItemsTests
     }
 
     [Test]
-    public async Task AListThatGrowsAndFillsItsWindowAddsTheTailAndReplacesTheRest()
+    public async Task AListThatGrowsAndFillsItsRowsAddsTheTailAndReplacesTheRest()
     {
-        WindowedItems items = Items(count: 2, window: VirtualWindow.Empty);
+        VirtualItemList items = Items(count: 2, rows: VirtualRows.Empty);
         List<NotifyCollectionChangedEventArgs> events = Record(items: items);
 
-        items.Update(newCount: 4, newWindow: Window(offset: 1, 1, 2, 3));
+        items.Update(newCount: 4, newRows: Rows(offset: 1, 1, 2, 3));
 
         await Assert.That(events.Select(selector: static args => args.Action).ToList())
             .IsEquivalentTo(
@@ -139,12 +139,12 @@ public sealed class WindowedItemsTests
     [Test]
     public async Task AChangeToManyPositionsRaisesOneReset()
     {
-        WindowedItems items = Items(count: 5000, window: VirtualWindow.Empty);
+        VirtualItemList items = Items(count: 5000, rows: VirtualRows.Empty);
         List<NotifyCollectionChangedEventArgs> events = Record(items: items);
 
         items.Update(
             newCount: 5000,
-            newWindow: Window(offset: 0, positions: [.. Enumerable.Range(start: 0, count: 1000)]));
+            newRows: Rows(offset: 0, positions: [.. Enumerable.Range(start: 0, count: 1000)]));
 
         await Assert.That(events.Count).IsEqualTo(expected: 1);
         await Assert.That(events[0].Action).IsEqualTo(expected: NotifyCollectionChangedAction.Reset);
@@ -153,7 +153,7 @@ public sealed class WindowedItemsTests
     [Test]
     public async Task IndexOfFindsARowAndNeverAPlaceholder()
     {
-        WindowedItems items = Items(count: 10, window: Window(offset: 4, 4, 5));
+        VirtualItemList items = Items(count: 10, rows: Rows(offset: 4, 4, 5));
         object? row = items[5];
 
         await Assert.That(items.IndexOf(value: row)).IsEqualTo(expected: 5);
@@ -165,7 +165,7 @@ public sealed class WindowedItemsTests
     [Test]
     public async Task TheListRefusesEveryEdit()
     {
-        IList items = Items(count: 3, window: VirtualWindow.Empty);
+        IList items = Items(count: 3, rows: VirtualRows.Empty);
 
         await Assert.That(() => items.Add(value: new object())).Throws<NotSupportedException>();
         await Assert.That(items.Clear).Throws<NotSupportedException>();
@@ -175,19 +175,19 @@ public sealed class WindowedItemsTests
         await Assert.That(() => items[0] = new object()).Throws<NotSupportedException>();
     }
 
-    private static VirtualWindow Window(int offset, params int[] positions) =>
+    private static VirtualRows Rows(int offset, params int[] positions) =>
         new(
             Offset: offset,
             Items: [.. positions.Select(selector: static position => new VirtualRow(Position: position))]);
 
-    private static int? PositionAt(WindowedItems items, int index) => (items[index] as VirtualRow)?.Position;
+    private static int? PositionAt(VirtualItemList items, int index) => (items[index] as VirtualRow)?.Position;
 
     private static object? FirstNewItem(NotifyCollectionChangedEventArgs args) => args.NewItems?[0];
 
-    private static WindowedItems Items(int count, VirtualWindow window)
+    private static VirtualItemList Items(int count, VirtualRows rows)
     {
-        WindowedItems items = new();
-        items.Update(newCount: count, newWindow: window);
+        VirtualItemList items = new();
+        items.Update(newCount: count, newRows: rows);
 
         return items;
     }

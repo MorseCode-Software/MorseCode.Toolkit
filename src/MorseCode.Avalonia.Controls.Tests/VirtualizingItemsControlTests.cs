@@ -209,5 +209,7 @@ public sealed class VirtualizingItemsControlTests
             });
 
     private static List<string> Texts(ShownVirtual shown) =>
-        [.. shown.Shown().Select(selector: static pair => pair.Text)];
+    [
+        .. shown.Shown().Select(selector: static pair => pair.Text)
+    ];
 }

@@ -49,8 +49,8 @@ internal sealed class ShownVirtual : IDisposable
             binding: new ReflectionBinding(path: "TotalCount"));
 
         this.List.Bind(
-            property: VirtualizingItemsControl.WindowProperty,
-            binding: new ReflectionBinding(path: "Window"));
+            property: VirtualizingItemsControl.RowsProperty,
+            binding: new ReflectionBinding(path: "Rows"));
 
         this.List.Bind(
             property: VirtualizingItemsControl.VisibleRangeProperty,
@@ -90,15 +90,15 @@ internal sealed class ShownVirtual : IDisposable
     /// </summary>
     /// <returns>The texts, in the order of the positions.</returns>
     public IReadOnlyList<(int Position, string Text)> Shown() =>
-        [
-            .. this.List.GetRealizedContainers()
-                .Select(
-                    selector: container =>
-                    (
-                        Position: this.List.IndexFromContainer(container: container),
-                        Text: (((ContentPresenter)container).Child as TextBlock)?.Text ?? "none"))
-                .OrderBy(keySelector: static pair => pair.Position)
-        ];
+    [
+        .. this.List.GetRealizedContainers()
+            .Select(
+                selector: container =>
+                (
+                    Position: this.List.IndexFromContainer(container: container),
+                    Text: (((ContentPresenter)container).Child as TextBlock)?.Text ?? "none"))
+            .OrderBy(keySelector: static pair => pair.Position)
+    ];
 
     /// <inheritdoc />
     public void Dispose() => this.window.Close();

@@ -23,15 +23,15 @@ namespace MorseCode.Avalonia.Controls;
 ///         <see cref="ItemsControl.ScrollIntoView(int)" /> work as on any items control. Avalonia
 ///         makes containers for the positions that show, and the control reports
 ///         them in <see cref="VisibleRange" />, with <see cref="Buffer" /> more
-///         positions on each side. A position that <see cref="Window" /> does not
+///         positions on each side. A position that <see cref="Rows" /> does not
 ///         cover shows <see cref="PlaceholderTemplate" />.
 ///     </para>
 ///     <para>
 ///         In the view model, send <see cref="VisibleRange" /> to the offset and the
 ///         limit of <c>Slice</c>, and build the rows with <c>Map</c> after it. The
-///         <c>Map</c> builds a row for a key only when the key is inside the window.
-///         Make a <see cref="VirtualWindow" /> from the offset of the slice and the
-///         items of the map, and bind it to <see cref="Window" />.
+///         <c>Map</c> builds a row for a key only when the key is inside the slice.
+///         Make a <see cref="VirtualRows" /> from the offset of the slice and the
+///         items of the map, and bind it to <see cref="Rows" />.
 ///     </para>
 ///     <para>
 ///         Do not set <see cref="ItemsControl.ItemsSource" />. The control sets it. A
@@ -51,12 +51,12 @@ public class VirtualizingItemsControl : ItemsControl
         AvaloniaProperty.Register<VirtualizingItemsControl, int>(name: nameof(TotalCount), defaultValue: 0);
 
     /// <summary>
-    ///     Defines the <see cref="Window" /> property.
+    ///     Defines the <see cref="Rows" /> property.
     /// </summary>
-    public static readonly StyledProperty<VirtualWindow> WindowProperty =
-        AvaloniaProperty.Register<VirtualizingItemsControl, VirtualWindow>(
-            name: nameof(Window),
-            defaultValue: VirtualWindow.Empty);
+    public static readonly StyledProperty<VirtualRows> RowsProperty =
+        AvaloniaProperty.Register<VirtualizingItemsControl, VirtualRows>(
+            name: nameof(Rows),
+            defaultValue: VirtualRows.Empty);
 
     /// <summary>
     ///     Defines the <see cref="PlaceholderTemplate" /> property.
@@ -82,7 +82,7 @@ public class VirtualizingItemsControl : ItemsControl
     private static readonly FuncTemplate<Panel?> DefaultPanel =
         new(func: static () => new VirtualizingStackPanel());
 
-    private readonly WindowedItems items = new();
+    private readonly VirtualItemList items = new();
 
     // True from a request to report until the dispatcher runs the report.
     private bool isReportPending;
@@ -117,14 +117,14 @@ public class VirtualizingItemsControl : ItemsControl
     /// <summary>
     ///     Gets or sets the rows for some of the positions.
     /// </summary>
-    public VirtualWindow Window
+    public VirtualRows Rows
     {
-        get => this.GetValue(property: WindowProperty);
-        set => this.SetValue(property: WindowProperty, value: value);
+        get => this.GetValue(property: RowsProperty);
+        set => this.SetValue(property: RowsProperty, value: value);
     }
 
     /// <summary>
-    ///     Gets or sets the template for a position that <see cref="Window" /> does
+    ///     Gets or sets the template for a position that <see cref="Rows" /> does
     ///     not cover.
     /// </summary>
     /// <remarks>
@@ -171,12 +171,12 @@ public class VirtualizingItemsControl : ItemsControl
         if (change.Property == ItemsSourceProperty && !ReferenceEquals(objA: change.NewValue, objB: this.items))
         {
             throw new InvalidOperationException(
-                message: "VirtualizingItemsControl sets ItemsSource itself. Bind TotalCount and Window instead.");
+                message: "VirtualizingItemsControl sets ItemsSource itself. Bind TotalCount and Rows instead.");
         }
 
-        if (change.Property == TotalCountProperty || change.Property == WindowProperty)
+        if (change.Property == TotalCountProperty || change.Property == RowsProperty)
         {
-            this.items.Update(newCount: Math.Max(val1: 0, val2: this.TotalCount), newWindow: this.Window);
+            this.items.Update(newCount: Math.Max(val1: 0, val2: this.TotalCount), newRows: this.Rows);
         }
         else if (change.Property == BufferProperty)
         {

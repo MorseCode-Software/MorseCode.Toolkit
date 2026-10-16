@@ -64,23 +64,23 @@ internal sealed class RecipeModel : INotifyPropertyChanged, IDisposable
                                 retainedBeyondTheView: retainedBeyondTheView,
                                 onEvicted: row => this.Evicted.Add(item: row.Position));
 
-                    Cell<VirtualWindow> window =
+                    Cell<VirtualRows> answer =
                         this.offset.Lift(
                             c2: rows.Items,
                             f: static (first, items) =>
-                                new VirtualWindow(
+                                new VirtualRows(
                                     Offset: first,
                                     Items: [.. items.Cast<object?>()]));
 
                     IListener subscription =
-                        window.Listen(
+                        answer.Listen(
                             handler: value =>
                             {
-                                this.Window = value;
+                                this.Rows = value;
 
                                 this.PropertyChanged?.Invoke(
                                     sender: this,
-                                    e: new PropertyChangedEventArgs(propertyName: nameof(this.Window)));
+                                    e: new PropertyChangedEventArgs(propertyName: nameof(this.Rows)));
                             });
 
                     return (rows, subscription);
@@ -102,7 +102,7 @@ internal sealed class RecipeModel : INotifyPropertyChanged, IDisposable
     /// <summary>
     ///     Gets the rows for the last range that the view wrote.
     /// </summary>
-    public VirtualWindow Window { get; private set; } = VirtualWindow.Empty;
+    public VirtualRows Rows { get; private set; } = VirtualRows.Empty;
 
     /// <summary>
     ///     Gets or sets the range that shows. Only the view calls the setter.

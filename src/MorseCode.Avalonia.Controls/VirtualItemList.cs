@@ -7,22 +7,22 @@ namespace MorseCode.Avalonia.Controls;
 
 /// <summary>
 ///     The list that a <see cref="VirtualizingItemsControl" /> gives to Avalonia. It
-///     has one position for each item of the whole list. A position that the window
-///     covers holds a row from the window. Each other position holds a
+///     has one position for each item of the whole list. A position that the rows
+///     cover holds one of the rows. Each other position holds a
 ///     <see cref="RowPlaceholder" />.
 /// </summary>
 /// <remarks>
-///     This list builds nothing and keeps nothing but the window. Thus, a list of a
-///     million positions costs no more than the window.
+///     This list builds nothing and keeps nothing but the rows. Thus, a list of a
+///     million positions costs no more than the rows.
 /// </remarks>
 // ReSharper disable once InheritdocConsiderUsage - The summary of IList does not say what this list holds.
-internal sealed class WindowedItems : IList, IReadOnlyList<object?>, INotifyCollectionChanged
+internal sealed class VirtualItemList : IList, IReadOnlyList<object?>, INotifyCollectionChanged
 {
     // More changed positions than this are cheaper for the panel as a reset than as one event for each
-    // position. A reset also clears the containers, thus the limit is well above any usual window.
+    // position. A reset also clears the containers, thus the limit is well above any usual number of rows.
     private const int ResetThreshold = 512;
 
-    private VirtualWindow window = VirtualWindow.Empty;
+    private VirtualRows rows = VirtualRows.Empty;
 
     /// <inheritdoc />
     public event NotifyCollectionChangedEventHandler? CollectionChanged;
@@ -52,32 +52,32 @@ internal sealed class WindowedItems : IList, IReadOnlyList<object?>, INotifyColl
                 throw new ArgumentOutOfRangeException(paramName: nameof(index));
             }
 
-            return ItemAt(window: this.window, index: index);
+            return ItemAt(rows: this.rows, index: index);
         }
         set => throw new NotSupportedException();
     }
 
     /// <summary>
-    ///     Changes the length of the list and the window, and tells the listeners
+    ///     Changes the length of the list and the rows, and tells the listeners
     ///     which positions changed.
     /// </summary>
     /// <param name="newCount">The number of positions in the whole list.</param>
-    /// <param name="newWindow">The window.</param>
-    public void Update(int newCount, VirtualWindow newWindow)
+    /// <param name="newRows">The rows.</param>
+    public void Update(int newCount, VirtualRows newRows)
     {
         int oldCount = this.Count;
-        VirtualWindow oldWindow = this.window;
+        VirtualRows oldRows = this.rows;
 
         this.Count = newCount;
-        this.window = newWindow;
+        this.rows = newRows;
 
         // A listener that reads the list while it handles an event sees the final state. Each event is
         // still correct for its own positions, because it names a position and the item that is there.
         List<int> changed =
             ChangedPositions(
-                oldWindow: oldWindow,
+                oldRows: oldRows,
                 oldCount: oldCount,
-                newWindow: newWindow,
+                newRows: newRows,
                 newCount: newCount);
 
         if (changed.Count > ResetThreshold)
@@ -93,7 +93,7 @@ internal sealed class WindowedItems : IList, IReadOnlyList<object?>, INotifyColl
 
             for (int index = oldCount; index < newCount; index++)
             {
-                added.Add(item: ItemAt(window: newWindow, index: index));
+                added.Add(item: ItemAt(rows: newRows, index: index));
             }
 
             this.Raise(
@@ -108,7 +108,7 @@ internal sealed class WindowedItems : IList, IReadOnlyList<object?>, INotifyColl
 
             for (int index = newCount; index < oldCount; index++)
             {
-                removed.Add(item: ItemAt(window: oldWindow, index: index));
+                removed.Add(item: ItemAt(rows: oldRows, index: index));
             }
 
             this.Raise(
@@ -123,8 +123,8 @@ internal sealed class WindowedItems : IList, IReadOnlyList<object?>, INotifyColl
             this.Raise(
                 args: new NotifyCollectionChangedEventArgs(
                     action: NotifyCollectionChangedAction.Replace,
-                    newItem: ItemAt(window: newWindow, index: index),
-                    oldItem: ItemAt(window: oldWindow, index: index),
+                    newItem: ItemAt(rows: newRows, index: index),
+                    oldItem: ItemAt(rows: oldRows, index: index),
                     index: index));
         }
     }
@@ -149,11 +149,11 @@ internal sealed class WindowedItems : IList, IReadOnlyList<object?>, INotifyColl
             return -1;
         }
 
-        for (int i = 0; i < this.window.Items.Count; i++)
+        for (int i = 0; i < this.rows.Items.Count; i++)
         {
-            int index = this.window.Offset + i;
+            int index = this.rows.Offset + i;
 
-            if (index < this.Count && Equals(objA: this.window.Items[index: i], objB: value))
+            if (index < this.Count && Equals(objA: this.rows.Items[index: i], objB: value))
             {
                 return index;
             }
@@ -187,37 +187,37 @@ internal sealed class WindowedItems : IList, IReadOnlyList<object?>, INotifyColl
     void IList.RemoveAt(int index) => throw new NotSupportedException();
 
     // The caller makes sure that the index is inside the list.
-    private static object? ItemAt(VirtualWindow window, int index)
+    private static object? ItemAt(VirtualRows rows, int index)
     {
-        int inWindow = index - window.Offset;
+        int inRows = index - rows.Offset;
 
-        return inWindow >= 0 && inWindow < window.Items.Count ? window.Items[index: inWindow] : RowPlaceholder.Instance;
+        return inRows >= 0 && inRows < rows.Items.Count ? rows.Items[index: inRows] : RowPlaceholder.Instance;
     }
 
     // The positions that were in the list before and after, and that hold a different item now. Only
-    // the two windows can differ, because every other position is a placeholder in both.
+    // the two sets of rows can differ, because every other position is a placeholder in both.
     private static List<int> ChangedPositions(
-        VirtualWindow oldWindow,
+        VirtualRows oldRows,
         int oldCount,
-        VirtualWindow newWindow,
+        VirtualRows newRows,
         int newCount)
     {
         int shared = Math.Min(val1: oldCount, val2: newCount);
-        int from = Math.Max(val1: 0, val2: Math.Min(val1: oldWindow.Offset, val2: newWindow.Offset));
+        int from = Math.Max(val1: 0, val2: Math.Min(val1: oldRows.Offset, val2: newRows.Offset));
 
         int to =
             Math.Min(
                 val1: shared,
                 val2: Math.Max(
-                    val1: oldWindow.Offset + oldWindow.Items.Count,
-                    val2: newWindow.Offset + newWindow.Items.Count));
+                    val1: oldRows.Offset + oldRows.Items.Count,
+                    val2: newRows.Offset + newRows.Items.Count));
 
         List<int> changed = [];
 
         for (int index = from; index < to; index++)
         {
-            object? before = ItemAt(window: oldWindow, index: index);
-            object? after = ItemAt(window: newWindow, index: index);
+            object? before = ItemAt(rows: oldRows, index: index);
+            object? after = ItemAt(rows: newRows, index: index);
 
             if (!ReferenceEquals(objA: before, objB: after))
             {
@@ -232,7 +232,7 @@ internal sealed class WindowedItems : IList, IReadOnlyList<object?>, INotifyColl
     {
         for (int index = 0; index < this.Count; index++)
         {
-            yield return ItemAt(window: this.window, index: index);
+            yield return ItemAt(rows: this.rows, index: index);
         }
     }
 

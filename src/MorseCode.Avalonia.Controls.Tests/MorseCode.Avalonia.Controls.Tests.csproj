@@ -58,7 +58,7 @@
         <Compile Include="VirtualizingItemsControlTests.cs"/>
         <Compile Include="VirtualModel.cs"/>
         <Compile Include="VirtualRow.cs"/>
-        <Compile Include="WindowedItemsTests.cs"/>
+        <Compile Include="VirtualItemListTests.cs"/>
     </ItemGroup>
 
     <ItemGroup>

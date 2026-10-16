@@ -30,7 +30,7 @@ internal sealed class VirtualModel(in int total) : INotifyPropertyChanged
     /// <summary>
     ///     Gets the rows for the last range that the view wrote.
     /// </summary>
-    public VirtualWindow Window { get; private set; } = VirtualWindow.Empty;
+    public VirtualRows Rows { get; private set; } = VirtualRows.Empty;
 
     /// <summary>
     ///     Gets or sets the range that shows. Only the view calls the setter.
@@ -114,8 +114,8 @@ internal sealed class VirtualModel(in int total) : INotifyPropertyChanged
             items.Add(item: row);
         }
 
-        this.Window = new VirtualWindow(Offset: first, Items: items);
-        this.Raise(propertyName: nameof(this.Window));
+        this.Rows = new VirtualRows(Offset: first, Items: items);
+        this.Raise(propertyName: nameof(this.Rows));
     }
 
     private void Raise(string propertyName) =>
