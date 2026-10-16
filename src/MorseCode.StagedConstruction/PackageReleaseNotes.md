@@ -1,3 +1,12 @@
+0.2.1
+
+No signature or behavior changed. This release reformats the code and the
+XMLDoc comments of the package to the wrap limits of the repository, 120
+characters for code and 80 for XMLDoc, and it makes the private members of two
+internal types read-only fields. The text of the XMLDoc comments is the same, so
+the API reference reads the same. You do not need to change or compile again
+any code that uses 0.2.0.
+
 0.2.0
 
 This package now targets net472, net6.0, and netstandard2.0, and not net10.0
