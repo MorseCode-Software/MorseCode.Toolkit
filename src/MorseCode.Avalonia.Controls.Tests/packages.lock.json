@@ -34,6 +34,29 @@
         "resolved": "8.0.0",
         "contentHash": "AJy/KVjXgUbgjf6HiI8wAk4DSSq0SCmvXQF8aU6IB+pnIQq+YJvofvMczug2hqO8yEvnQY557ryew66KPpyCsA=="
       },
+      "SodaFlow": {
+        "type": "Direct",
+        "requested": "[5.0.1, )",
+        "resolved": "5.0.1",
+        "contentHash": "CeQyU53++j6pKk3K/hN4mhpyRSX7vDBtPKl5vPrKK+NwIFsvHkNpcVjxmPNqggHTV6XfAa+s/emmaRTEd9yrzA==",
+        "dependencies": {
+          "SodaFlow.Core": "[5.0.0, 6.0.0)",
+          "SodaFlow.Functional": "[3.0.2, 4.0.0)",
+          "System.ValueTuple": "4.6.2"
+        }
+      },
+      "SodaFlow.Collections": {
+        "type": "Direct",
+        "requested": "[2.0.0, )",
+        "resolved": "2.0.0",
+        "contentHash": "ruQQXiSv524/XsPjA4SWA0yZWlEPmOiOLsE1cJu6Yb3IF/2PRDj+TqFEntk52vqNZT7Ixd55zj94ONgd2UFH0A==",
+        "dependencies": {
+          "SodaFlow": "[5.0.0, 6.0.0)",
+          "SodaFlow.Collections.Core": "[2.0.0, 3.0.0)",
+          "SodaFlow.Functional": "[3.0.1, 4.0.0)",
+          "System.ValueTuple": "4.6.2"
+        }
+      },
       "TUnit": {
         "type": "Direct",
         "requested": "[1.66.27, )",
@@ -184,10 +207,32 @@
           "Microsoft.Testing.Platform": "[2.4.0, 3.0.0)"
         }
       },
+      "SodaFlow.Collections.Core": {
+        "type": "Transitive",
+        "resolved": "2.0.0",
+        "contentHash": "JM4UR2x8Bhmla0eacvkk80agQiKyibTPstNDhtfWxwXWhumxgmqj1afUhI5xc6zP/51pLS1mX9MEPCYqYkOJyg==",
+        "dependencies": {
+          "SodaFlow.Core": "[5.0.0, 6.0.0)",
+          "System.ValueTuple": "4.6.2"
+        }
+      },
+      "SodaFlow.Core": {
+        "type": "Transitive",
+        "resolved": "5.0.0",
+        "contentHash": "LSJtWDGie+NbVqOzY/s9PxiNO3d5hAFgiFqne2I6dYOHH/9zcKd0oVZtlobkQBU1lh7eFB5Qz1pzJHiG7ERlug==",
+        "dependencies": {
+          "System.ValueTuple": "4.6.2"
+        }
+      },
       "SodaFlow.Functional": {
         "type": "Transitive",
         "resolved": "3.0.2",
         "contentHash": "KPwRRnnxRodPjPoFXqQ395cym2Je9WT4A907inTAWUIoJaefZaSDNPjadc+74XOi8kLBvBrxOFt5rxbEsgsa7w=="
+      },
+      "System.ValueTuple": {
+        "type": "Transitive",
+        "resolved": "4.6.2",
+        "contentHash": "yQgmjfFximrNm9LIV3mL6T5MzjeC+epeE5rl4hXxAlYmxby7RM1dPSkIKXk9HNkl6G54h2JHOmLD46+Pey+IRg=="
       },
       "TUnit.Assertions": {
         "type": "Transitive",
