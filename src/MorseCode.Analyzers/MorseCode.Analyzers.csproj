@@ -1,0 +1,68 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <!--
+        The compiler loads an analyzer into its own process, which runs on .NET Framework in Visual
+        Studio and on .NET elsewhere. netstandard2.0 is the one target that both load, thus this
+        project does not target net472 and net6.0 as the libraries do.
+    -->
+    <PropertyGroup>
+        <TargetFramework>netstandard2.0</TargetFramework>
+        <LangVersion>14</LangVersion>
+        <Nullable>enable</Nullable>
+        <!-- The rules for an analyzer, such as no access to files, the network, or the clock. -->
+        <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    </PropertyGroup>
+
+    <PropertyGroup>
+        <PackageId>MorseCode.Analyzers</PackageId>
+        <MinVerTagPrefix>morsecode-analyzers-</MinVerTagPrefix>
+        <Product>MorseCode.Analyzers</Product>
+        <Title>MorseCode.Analyzers</Title>
+        <Description>Roslyn analyzers for the conventions that MorseCode Software writes C# with, such as named arguments in the order of the parameters.</Description>
+        <PackageIcon>MorseCode.png</PackageIcon>
+        <AssemblyName>MorseCode.Analyzers</AssemblyName>
+        <RootNamespace>MorseCode.Analyzers</RootNamespace>
+    </PropertyGroup>
+
+    <!--
+        The package holds the analyzer only, in analyzers/dotnet/cs, where the compiler finds it. It
+        gives a project no assembly to reference, and no dependency: the compiler supplies Roslyn.
+        DevelopmentDependency makes NuGet add the package with PrivateAssets="all", thus it does not
+        flow to the packages of a project that uses it. A symbol package has nothing to hold.
+    -->
+    <PropertyGroup>
+        <IncludeBuildOutput>false</IncludeBuildOutput>
+        <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+        <DevelopmentDependency>true</DevelopmentDependency>
+        <IncludeSymbols>false</IncludeSymbols>
+        <IncludeSource>false</IncludeSource>
+    </PropertyGroup>
+
+    <!--
+        The analyzer runs inside the compiler, which gives these assemblies. An analyzer must not ask
+        for a later version than the compiler that loads it, or that compiler does not run it. Roslyn
+        4.4 is in the .NET 7 SDK and Visual Studio 2022 17.4, and in each later one, and it has all
+        that the analyzer uses. PrivateAssets keeps Roslyn out of the package.
+    -->
+    <ItemGroup>
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.4.0" PrivateAssets="all"/>
+    </ItemGroup>
+
+    <!-- The release tracking of the rules, which the Roslyn analyzer rules ask for (RS2008). -->
+    <ItemGroup>
+        <AdditionalFiles Include="AnalyzerReleases.Shipped.md"/>
+        <AdditionalFiles Include="AnalyzerReleases.Unshipped.md"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <Compile Include="NamedArgumentOrderAnalyzer.cs"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Include="$(OutputPath)$(AssemblyName).dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false"/>
+        <None Include="..\..\logo\MorseCode.png" Pack="true" PackagePath="\">
+            <Link>MorseCode.png</Link>
+        </None>
+    </ItemGroup>
+
+</Project>
