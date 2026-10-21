@@ -60,6 +60,12 @@ jobs:
           dotnet restore src/MorseCode.StagedConstruction/MorseCode.StagedConstruction.csproj
           dotnet restore src/MorseCode.Mvvm/MorseCode.Mvvm.csproj
 
+      # Directory.Build.props gives every library MorseCode.Analyzers as an analyzer. DocFX loads the
+      # libraries without a build, thus it needs the analyzer already built. Without it, DocFX
+      # reports FailedToResolveAnalyzer, which --warningsAsErrors fails.
+      - name: Build analyzer
+        run: dotnet build src/MorseCode.Analyzers/MorseCode.Analyzers.csproj --configuration Release -warnaserror
+
       - name: Build site
         run: dotnet docfx docs/docfx.json --warningsAsErrors
 

@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <!--
+        net10.0 only, not also net472 as the other tests. The tests compile samples of code against
+        the assemblies of the runtime that runs them, and a sample of an interpolated string needs
+        the handler types of .NET 6 and later. The analyzer has one netstandard2.0 build, with no
+        code that changes with the framework.
+    -->
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <OutputType>Exe</OutputType>
+        <LangVersion>14</LangVersion>
+        <Nullable>enable</Nullable>
+        <!-- The usings are listed per file here, as everywhere else in this repository. -->
+        <TUnitImplicitUsings>disable</TUnitImplicitUsings>
+        <TUnitAssertionsImplicitUsings>disable</TUnitAssertionsImplicitUsings>
+    </PropertyGroup>
+
+    <PropertyGroup>
+        <AssemblyName>MorseCode.Analyzers.Tests</AssemblyName>
+        <RootNamespace>MorseCode.Analyzers.Tests</RootNamespace>
+        <IsPackable>false</IsPackable>
+    </PropertyGroup>
+
+    <!--
+        The compiler that compiles the samples. It is later than the Roslyn of the analyzer, as the
+        compiler of a user is, and it knows the primary constructors that a sample has.
+    -->
+    <ItemGroup>
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.14.0"/>
+        <PackageReference Include="TUnit" Version="1.66.27"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <Compile Include="NamedArgumentOrderAnalyzerTests.cs"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\MorseCode.Analyzers\MorseCode.Analyzers.csproj"/>
+    </ItemGroup>
+
+</Project>

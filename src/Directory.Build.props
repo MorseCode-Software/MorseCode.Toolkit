@@ -96,6 +96,19 @@
     </PropertyGroup>
 
     <!--
+        The analyzers of MorseCode.Analyzers, in every project but their own and their tests, so the
+        toolkit keeps the conventions that the package reports. A finding is a warning of the build,
+        and -warnaserror fails it. ReferenceOutputAssembly keeps the analyzer out of the references
+        of a project. PrivateAssets keeps it out of the dependencies of a package that pack makes.
+    -->
+    <ItemGroup Condition="'$(MSBuildProjectName)' != 'MorseCode.Analyzers' And '$(MSBuildProjectName)' != 'MorseCode.Analyzers.Tests'">
+        <ProjectReference Include="$(MSBuildThisFileDirectory)MorseCode.Analyzers\MorseCode.Analyzers.csproj"
+                          OutputItemType="Analyzer"
+                          ReferenceOutputAssembly="false"
+                          PrivateAssets="all"/>
+    </ItemGroup>
+
+    <!--
         Read at build time by the compiler and by ReSharper, and of no use to a consumer at run
         time, so PrivateAssets keeps it out of the packages.
     -->

@@ -11,6 +11,7 @@ The packages version independently, and all of them are pre-1.0.
 | `MorseCode.Mvvm` | You write view models on SodaFlow. | `SodaFlow.Bindable.ObjectModel`, `MorseCode.StagedConstruction` |
 | `MorseCode.StagedConstruction` | You want to build immutable objects in ordered stages. | Nothing |
 | `MorseCode.Avalonia.Controls` | Your views are Avalonia, and bind to view models on SodaFlow. | `Avalonia`, `SodaFlow.Functional` |
+| `MorseCode.Analyzers` | You want the build to report code that breaks the conventions MorseCode writes C# with. | Nothing |
 
 ## MorseCode.Mvvm
 
@@ -56,6 +57,21 @@ Avalonia controls for views that bind to view models on SodaFlow. It holds:
 
 It targets `net8.0` and `net10.0`, as Avalonia 12 does, rather than the older targets of the other
 packages.
+
+## MorseCode.Analyzers
+
+```bash
+dotnet add package MorseCode.Analyzers
+```
+
+Roslyn analyzers that run in the compiler, so the build reports what they find. It holds one rule:
+
+- MC0001, which reports a call whose arguments aren't in the order of the method's parameters,
+  when at least one argument has a name. See [Named argument order](named-argument-order.md).
+
+It's a development dependency: NuGet adds it with `PrivateAssets="all"`, and it doesn't flow to
+the packages of a project that uses it. It needs the .NET 7 SDK or later, or Visual Studio 2022
+17.4 or later.
 
 ## Version ranges
 
