@@ -81,11 +81,11 @@ add it once in `Directory.Build.props`:
 
 ```xml
 <ItemGroup>
-    <PackageReference Include="MorseCode.Analyzers" Version="0.2.0" PrivateAssets="all"/>
+    <PackageReference Include="MorseCode.Analyzers" Version="0.1.1" PrivateAssets="all"/>
 </ItemGroup>
 ```
 
-MC0002 arrives in version 0.2.0. It needs Roslyn 4.4 or later: the .NET 7 SDK or later, or Visual
+MC0002 arrives in version 0.1.1. It needs Roslyn 4.4 or later: the .NET 7 SDK or later, or Visual
 Studio 2022 17.4 or later.
 
 ## Changing its severity

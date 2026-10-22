@@ -1,4 +1,4 @@
-0.2.0
+0.1.1
 
 New rule: MC0002 reports an explicit cast, such as (int)value or (Square)shape.
 An explicit cast tells the compiler to trust the writer. The compiler does not
@@ -15,7 +15,8 @@ really needed carries a suppression with a reason, by #pragma warning disable or
 by SuppressMessage. The documentation is at
 https://morsecode-software.github.io/MorseCode.Toolkit/docs/explicit-cast.html
 
-MC0001 did not change. A project that builds with -warnaserror and updates from
+MC0001 did not change. This is a patch version because no API changed and the
+package adds a rule. A project that builds with -warnaserror and updates from
 0.1.0 fails on each explicit cast that it has. Set
 dotnet_diagnostic.MC0002.severity in .editorconfig to change that.
 
