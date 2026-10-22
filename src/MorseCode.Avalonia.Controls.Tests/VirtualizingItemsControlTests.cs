@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Avalonia;
+using SodaFlow.Functional;
 using TUnit.Assertions;
 using TUnit.Assertions.Enums;
 using TUnit.Assertions.Extensions;
@@ -206,6 +207,146 @@ public sealed class VirtualizingItemsControlTests
                 VirtualizingItemsControl list = new();
 
                 await Assert.That(() => list.ItemsSource = Source).Throws<InvalidOperationException>();
+            });
+
+    // The view model made the request before the control was bound. The control keeps nothing of its
+    // own. The binding gives it the request when it binds, and it scrolls at the Loaded event.
+    [Test]
+    public Task ARequestMadeBeforeTheControlIsBoundScrollsAndIsCleared() =>
+        TestApplication.Run(
+            test: static async () =>
+            {
+                VirtualModel model = new(total: 1000);
+                model.Request(position: 700);
+                using ShownVirtual shown = new(model: model, buffer: 0);
+
+                await Assert.That(Texts(shown: shown).Any(predicate: static text => text == "Row 700")).IsTrue();
+                await Assert.That(model.ScrollRequest).IsEqualTo(expected: Maybe<int>.None);
+
+                await Assert.That(model.ScrollWrites)
+                    .IsEquivalentTo(expected: [Maybe<int>.None], ordering: CollectionOrdering.Matching);
+            });
+
+    [Test]
+    public Task ARequestMadeAfterTheControlIsShownScrollsAndIsCleared() =>
+        TestApplication.Run(
+            test: static async () =>
+            {
+                VirtualModel model = new(total: 1000);
+                using ShownVirtual shown = new(model: model, buffer: 0);
+
+                model.Request(position: 700);
+                shown.Settle();
+
+                await Assert.That(Texts(shown: shown).Any(predicate: static text => text == "Row 700")).IsTrue();
+                await Assert.That(model.ScrollRequest).IsEqualTo(expected: Maybe<int>.None);
+
+                await Assert.That(model.ScrollWrites)
+                    .IsEquivalentTo(expected: [Maybe<int>.None], ordering: CollectionOrdering.Matching);
+
+                await Assert.That(model.Built.Any(predicate: static position => position is > 9 and < 690)).IsFalse();
+            });
+
+    // A request for a position that the list does not have yet is not lost. It waits for the count.
+    [Test]
+    public Task ARequestBeyondTheCountWaitsForTheCount() =>
+        TestApplication.Run(
+            test: static async () =>
+            {
+                VirtualModel model = new(total: 100);
+                using ShownVirtual shown = new(model: model, buffer: 0);
+
+                model.Request(position: 500);
+                shown.Settle();
+
+                await Assert.That(Texts(shown: shown)[0]).IsEqualTo(expected: "Row 0");
+                await Assert.That(model.ScrollRequest).IsEqualTo(expected: Maybe<int>.Some(value: 500));
+                await Assert.That(model.ScrollWrites).IsEmpty();
+
+                model.Resize(total: 1000);
+                shown.Settle();
+
+                await Assert.That(Texts(shown: shown).Any(predicate: static text => text == "Row 500")).IsTrue();
+                await Assert.That(model.ScrollRequest).IsEqualTo(expected: Maybe<int>.None);
+            });
+
+    // The request and the count change in one turn of the dispatcher, before the posted scroll runs. The
+    // second change finds the scroll already posted, and the scroll reads both values when it runs.
+    [Test]
+    public Task ARequestAndACountThatChangeInOneTurnScrollOnce() =>
+        TestApplication.Run(
+            test: static async () =>
+            {
+                VirtualModel model = new(total: 100);
+                using ShownVirtual shown = new(model: model, buffer: 0);
+
+                model.Request(position: 500);
+                model.Resize(total: 1000);
+                shown.Settle();
+
+                await Assert.That(Texts(shown: shown).Any(predicate: static text => text == "Row 500")).IsTrue();
+                await Assert.That(model.ScrollRequest).IsEqualTo(expected: Maybe<int>.None);
+
+                await Assert.That(model.ScrollWrites)
+                    .IsEquivalentTo(expected: [Maybe<int>.None], ordering: CollectionOrdering.Matching);
+            });
+
+    // A negative position can never apply, thus the control clears it and does not scroll.
+    [Test]
+    public Task ANegativeRequestIsClearedWithoutScrolling() =>
+        TestApplication.Run(
+            test: static async () =>
+            {
+                VirtualModel model = new(total: 1000);
+                using ShownVirtual shown = new(model: model, buffer: 0);
+
+                model.Request(position: -1);
+                shown.Settle();
+
+                await Assert.That(Texts(shown: shown)[0]).IsEqualTo(expected: "Row 0");
+                await Assert.That(model.ScrollRequest).IsEqualTo(expected: Maybe<int>.None);
+            });
+
+    // The view model keeps the last request. Two requests before the dispatcher runs give one scroll,
+    // to the second position.
+    [Test]
+    public Task ALaterRequestReplacesOneThatWaits() =>
+        TestApplication.Run(
+            test: static async () =>
+            {
+                VirtualModel model = new(total: 1000);
+                using ShownVirtual shown = new(model: model, buffer: 0);
+
+                model.Request(position: 300);
+                model.Request(position: 700);
+                shown.Settle();
+
+                await Assert.That(Texts(shown: shown).Any(predicate: static text => text == "Row 700")).IsTrue();
+                await Assert.That(model.Built.Any(predicate: static position => position is > 9 and < 690)).IsFalse();
+                await Assert.That(model.ScrollRequest).IsEqualTo(expected: Maybe<int>.None);
+            });
+
+    // The reset makes the same request possible again.
+    [Test]
+    public Task TheSameRequestScrollsAgainAfterTheControlClearedIt() =>
+        TestApplication.Run(
+            test: static async () =>
+            {
+                VirtualModel model = new(total: 1000);
+                using ShownVirtual shown = new(model: model, buffer: 0);
+
+                model.Request(position: 700);
+                shown.Settle();
+                shown.Scroller.Offset = new Vector(x: 0, y: 0);
+                shown.Settle();
+
+                await Assert.That(Texts(shown: shown)[0]).IsEqualTo(expected: "Row 0");
+
+                model.Request(position: 700);
+                shown.Settle();
+
+                await Assert.That(Texts(shown: shown).Any(predicate: static text => text == "Row 700")).IsTrue();
+                await Assert.That(model.ScrollWrites.Count).IsEqualTo(expected: 2);
             });
 
     private static List<string> Texts(ShownVirtual shown) =>

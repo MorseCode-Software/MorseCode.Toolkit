@@ -6,8 +6,10 @@ using Avalonia.Controls;
 using Avalonia.Controls.Presenters;
 using Avalonia.Controls.Templates;
 using Avalonia.Data;
+using Avalonia.Interactivity;
 using Avalonia.Threading;
 using JetBrains.Annotations;
+using SodaFlow.Functional;
 
 namespace MorseCode.Avalonia.Controls;
 
@@ -32,6 +34,11 @@ namespace MorseCode.Avalonia.Controls;
 ///         <c>Map</c> builds a row for a key only when the key is inside the slice.
 ///         Make a <see cref="VirtualRows" /> from the offset of the slice and the
 ///         items of the map, and bind it to <see cref="Rows" />.
+///     </para>
+///     <para>
+///         To scroll, the view model sets <see cref="ScrollRequest" /> to the position that it wants
+///         to show. The control scrolls there when it can, and then sets the property back to
+///         none. Thus, a request made before the control is bound or laid out is not lost.
 ///     </para>
 ///     <para>
 ///         Do not set <see cref="ItemsControl.ItemsSource" />. The control sets it. A
@@ -71,6 +78,15 @@ public class VirtualizingItemsControl : ItemsControl
         AvaloniaProperty.Register<VirtualizingItemsControl, int>(name: nameof(Buffer), defaultValue: 10);
 
     /// <summary>
+    ///     Defines the <see cref="ScrollRequest" /> property.
+    /// </summary>
+    public static readonly StyledProperty<Maybe<int>> ScrollRequestProperty =
+        AvaloniaProperty.Register<VirtualizingItemsControl, Maybe<int>>(
+            name: nameof(ScrollRequest),
+            defaultValue: Maybe<int>.None,
+            defaultBindingMode: BindingMode.TwoWay);
+
+    /// <summary>
     ///     Defines the <see cref="VisibleRange" /> property.
     /// </summary>
     public static readonly DirectProperty<VirtualizingItemsControl, ItemRange> VisibleRangeProperty =
@@ -86,6 +102,9 @@ public class VirtualizingItemsControl : ItemsControl
 
     // True from a request to report until the dispatcher runs the report.
     private bool isReportPending;
+
+    // True from a request to scroll until the dispatcher runs it.
+    private bool isScrollPending;
 
     private ItemRange visibleRange = ItemRange.Empty;
 
@@ -152,6 +171,35 @@ public class VirtualizingItemsControl : ItemsControl
     }
 
     /// <summary>
+    ///     Gets or sets the position that the view model wants to show. The control scrolls to it
+    ///     and then sets the property to none.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         Bind this property two-way. The view model sets a position. The control scrolls
+    ///         there, and writes none back to say that it did. The view model keeps the last request
+    ///         until then, thus a request made before the control is bound is still there when the
+    ///         control binds.
+    ///     </para>
+    ///     <para>
+    ///         The control waits for its Loaded event and for at least that many positions. A request
+    ///         for a position beyond <see cref="TotalCount" /> stays until the count grows or the
+    ///         view model sets another request. A negative position can never apply, so the control
+    ///         sets it back to none at once. A new request replaces one that waits.
+    ///     </para>
+    ///     <para>
+    ///         The position is a number and not an item, because the control has no row for a
+    ///         position that <see cref="Rows" /> does not cover. The scroll brings the position into
+    ///         view, as <see cref="ItemsControl.ScrollIntoView(int)" /> does.
+    ///     </para>
+    /// </remarks>
+    public Maybe<int> ScrollRequest
+    {
+        get => this.GetValue(property: ScrollRequestProperty);
+        set => this.SetValue(property: ScrollRequestProperty, value: value);
+    }
+
+    /// <summary>
     ///     Gets the positions that show, with <see cref="Buffer" /> more on each side.
     /// </summary>
     /// <remarks>
@@ -182,6 +230,21 @@ public class VirtualizingItemsControl : ItemsControl
         {
             this.RequestReport();
         }
+
+        // A request can wait for the count, and the count can arrive after the request.
+        if (change.Property == ScrollRequestProperty || change.Property == TotalCountProperty)
+        {
+            this.RequestScroll();
+        }
+    }
+
+    /// <inheritdoc />
+    protected override void OnLoaded(RoutedEventArgs e)
+    {
+        base.OnLoaded(e: e);
+
+        // A request that came before the Loaded event can scroll now.
+        this.RequestScroll();
     }
 
     /// <inheritdoc />
@@ -204,6 +267,38 @@ public class VirtualizingItemsControl : ItemsControl
 
                 break;
         }
+    }
+
+    private void RequestScroll()
+    {
+        if (this.isScrollPending)
+        {
+            return;
+        }
+
+        this.isScrollPending = true;
+        this.Dispatcher.Post(action: this.ApplyScroll, priority: DispatcherPriority.Normal);
+    }
+
+    // The request is a value of the view model, thus it stays until the control can use it. Setting it
+    // back to none is how the control says that it scrolled.
+    private void ApplyScroll()
+    {
+        this.isScrollPending = false;
+
+        this.ScrollRequest.MatchSome(
+            onSome: position =>
+            {
+                if (position < 0)
+                {
+                    this.ScrollRequest = Maybe<int>.None;
+                }
+                else if (this.IsLoaded && this.ItemsPanelRoot is not null && position < this.items.Count)
+                {
+                    this.ScrollIntoView(index: position);
+                    this.ScrollRequest = Maybe<int>.None;
+                }
+            });
     }
 
     private void RequestReport()
