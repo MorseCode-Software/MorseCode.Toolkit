@@ -1,0 +1,133 @@
+# Builds, tests, and inspects the sample solutions under samples/.
+#
+# This follows SodaFlow's .github/workflows/samples.yml. It is independent of build.yml, which builds,
+# tests, packs, inspects, and releases the libraries under src/, and of docs.yml. Nothing is shared.
+#
+# THIS WORKFLOW RUNS ONLY WHEN A SAMPLE CAN HAVE CHANGED. A pull request or a push that touches none
+# of the paths below starts no run. Each sample references the published packages of this repository,
+# and not the projects under src/, so a change under src/ cannot affect a sample. The paths are the
+# things that can: the samples themselves, this file, the inspection in build.cake and its rule set,
+# and the files that pin the SDK, the tools, and the formatting.
+#
+# DO NOT MAKE A CHECK OF THIS WORKFLOW REQUIRED on main. A required check that a path filter skipped
+# reports nothing, and GitHub reads that as "still waiting", so a pull request that touches only src/
+# could never merge. SodaFlow removed its path filter for that reason, when it made its sample checks
+# required. If these checks must be required here, remove the paths and skip the steps inside the job
+# instead: a job that a workflow skips reports as success, and a workflow that a filter skips does not.
+#
+# Because each sample pins a version of every package, a new release that breaks a sample shows only
+# when someone changes the pin. That is the point of a sample that tests what a user installs.
+name: Samples
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'samples/**'
+      - '.github/workflows/samples.yml'
+      - 'build.cake'
+      - 'src/MorseCode.Toolkit.sln.DotSettings'
+      - '.editorconfig'
+      - '.config/dotnet-tools.json'
+      - 'global.json'
+  pull_request:
+    paths:
+      - 'samples/**'
+      - '.github/workflows/samples.yml'
+      - 'build.cake'
+      - 'src/MorseCode.Toolkit.sln.DotSettings'
+      - '.editorconfig'
+      - '.config/dotnet-tools.json'
+      - 'global.json'
+  workflow_dispatch:
+
+# Uploading the inspection results to code scanning needs security-events. Naming one permission drops
+# every other to none, so the read that checkout needs is spelled out.
+permissions:
+  contents: read
+  security-events: write
+
+# A newer push to a pull request cancels the run it supersedes.
+concurrency:
+  group: samples-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CONFIGURATION: Release
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_NOLOGO: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+
+defaults:
+  run:
+    shell: pwsh
+
+jobs:
+  build:
+    # Windows, as the other workflows here. Nothing in a sample needs it, but the inspection is the same
+    # one that the libraries get, and one platform means one set of results to compare.
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    strategy:
+      # A failing sample must not hide the state of the others.
+      fail-fast: false
+      matrix:
+        sample: [ Workbench ]
+
+    # The job name is the status check name: Workbench, for the one sample today.
+    name: ${{ matrix.sample }}
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+          # The lock files of the samples and the tool manifest decide what the packages folder holds.
+          cache: true
+          cache-dependency-path: |
+            samples/**/packages.lock.json
+            .config/dotnet-tools.json
+
+      - name: Restore tools
+        run: dotnet tool restore
+
+      # Warnings are errors, because a sample is teaching code. Nothing under src/ is built: the
+      # sample restores the libraries of this repository from nuget.org, at the version that it pins.
+      # The restore is in locked mode on CI, thus a missing or stale packages.lock.json fails here.
+      - name: Build
+        run: dotnet build samples/${{ matrix.sample }}/MorseCode.Toolkit.Samples.${{ matrix.sample }}.slnx --configuration ${{ env.CONFIGURATION }} -warnaserror
+
+      - name: Test
+        run: dotnet test --solution samples/${{ matrix.sample }}/MorseCode.Toolkit.Samples.${{ matrix.sample }}.slnx --configuration ${{ env.CONFIGURATION }} --no-build
+
+      # The step is in build.cake, so it runs locally in the same way:
+      #
+      #     dotnet cake --target=Inspect-Sample --sample=Workbench
+      #
+      # It reads src/MorseCode.Toolkit.sln.DotSettings, the one rule set that every solution is held
+      # to, and fails on any finding of any severity, as the inspection of src does.
+      - name: Inspect
+        run: dotnet cake --target=Inspect-Sample --sample=${{ matrix.sample }} --configuration ${{ env.CONFIGURATION }}
+
+      # The SARIF that the step above wrote, handed to code scanning so the findings show on the lines
+      # that they are about. always(), because the step above fails while there are findings, and those
+      # are the runs to annotate. continue-on-error, because this is presentation: an upload problem
+      # must not look like a code problem. The category keeps the samples apart, because an upload
+      # without one replaces the last upload for the commit.
+      - name: Upload inspection results
+        if: always()
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: inspection/inspectcode-${{ matrix.sample }}.sarif
+          category: samples-${{ matrix.sample }}
+
+      - name: Collect inspection
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: inspection-${{ matrix.sample }}
+          path: inspection
+          if-no-files-found: ignore
