@@ -76,7 +76,7 @@ public sealed class ActionDisposableTests
         Exception caught = Catch(action: () => _ = Disposable.FromAction(onDispose: null!));
 
         await Assert.That(caught).IsTypeOf<ArgumentNullException>();
-        await Assert.That(((ArgumentNullException)caught).ParamName).IsEqualTo(expected: "onDispose");
+        await Assert.That((caught as ArgumentNullException)?.ParamName).IsEqualTo(expected: "onDispose");
     }
 
     private static Exception Catch(Action action)

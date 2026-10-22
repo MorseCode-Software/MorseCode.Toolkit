@@ -64,10 +64,13 @@ packages.
 dotnet add package MorseCode.Analyzers
 ```
 
-Roslyn analyzers that run in the compiler, so the build reports what they find. It holds one rule:
+Roslyn analyzers that run in the compiler, so the build reports what they find. It holds these
+rules:
 
 - MC0001, which reports a call whose arguments aren't in the order of the method's parameters,
   when at least one argument has a name. See [Named argument order](named-argument-order.md).
+- MC0002, which reports an explicit cast, such as `(int)value`, so the few that are needed stand
+  out. See [Explicit cast](explicit-cast.md).
 
 It's a development dependency: NuGet adds it with `PrivateAssets="all"`, and it doesn't flow to
 the packages of a project that uses it. It needs the .NET 7 SDK or later, or Visual Studio 2022
