@@ -1,3 +1,24 @@
+0.2.0
+
+New rule: MC0002 reports an explicit cast, such as (int)value or (Square)shape.
+An explicit cast tells the compiler to trust the writer. The compiler does not
+check it, so a wrong reference cast fails at run time and a wrong numeric cast
+loses data without a sign. The rule reports each cast expression, whatever the
+conversion is: a reference or unboxing cast, a numeric or enum conversion, a
+nullable to its value, a conversion that the type declares, and a cast that an
+implicit conversion makes unnecessary. The message names the target type and
+gives a way out that suits the conversion. The rule does not report as, is, a
+pattern, a parenthesized expression, or generated code.
+
+MC0002 is a warning, so a build with -warnaserror fails on it. A cast that is
+really needed carries a suppression with a reason, by #pragma warning disable or
+by SuppressMessage. The documentation is at
+https://morsecode-software.github.io/MorseCode.Toolkit/docs/explicit-cast.html
+
+MC0001 did not change. A project that builds with -warnaserror and updates from
+0.1.0 fails on each explicit cast that it has. Set
+dotnet_diagnostic.MC0002.severity in .editorconfig to change that.
+
 0.1.0
 
 The first release. It contains one rule, MC0001, which reports a call whose
