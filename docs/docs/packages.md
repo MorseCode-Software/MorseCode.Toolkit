@@ -44,14 +44,16 @@ was written for objects whose properties are SodaFlow graphs. See
 dotnet add package MorseCode.Avalonia.Controls
 ```
 
-Avalonia controls for views that bind to view models on SodaFlow. Each one is a drop-in
-replacement for the Avalonia control of the same name, and should be used in its place. It holds:
+Avalonia controls for views that bind to view models on SodaFlow. It holds:
 
-- `ComboBox`, which applies a new list and a new selected item together. See
-  [ComboBox](combo-box.md).
+- `ComboBox`, a drop-in replacement for Avalonia's, which applies a new list and a new selected
+  item together. Use it in its place. See [ComboBox](combo-box.md).
 - `MaybeConverter` and `MaybeConverter<T, TSelf>`, which bind a control to a view model property of
   type `Maybe<T>`, one-way and two-way, turning the control's `null` into `None` and back. See
   [MaybeConverter](maybe-converter.md).
+- `VirtualizingItemsControl`, which shows a long list over a SodaFlow `ReactiveCollection` and
+  builds the heavy view model of a row only when the row is on screen. See
+  [VirtualizingItemsControl](virtualizing-items-control.md).
 
 It targets `net8.0` and `net10.0`, as Avalonia 12 does, rather than the older targets of the other
 packages.

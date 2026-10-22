@@ -25,6 +25,8 @@
       href: combo-box.md
     - name: MaybeConverter
       href: maybe-converter.md
+    - name: VirtualizingItemsControl
+      href: virtualizing-items-control.md
 
 - name: Analyzers
   items:
