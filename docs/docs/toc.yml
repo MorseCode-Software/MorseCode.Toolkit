@@ -30,3 +30,5 @@
   items:
     - name: Named argument order (MC0001)
       href: named-argument-order.md
+    - name: Explicit cast (MC0002)
+      href: explicit-cast.md
