@@ -96,7 +96,7 @@ internal sealed class ShownVirtual : IDisposable
                 selector: container =>
                 (
                     Position: this.List.IndexFromContainer(container: container),
-                    Text: (((ContentPresenter)container).Child as TextBlock)?.Text ?? "none"))
+                    Text: ((container as ContentPresenter)?.Child as TextBlock)?.Text ?? "none"))
             .OrderBy(keySelector: static pair => pair.Position)
     ];
 
