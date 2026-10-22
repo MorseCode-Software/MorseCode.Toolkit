@@ -1,3 +1,20 @@
+0.2.1
+
+New: VirtualizingItemsControl.ScrollRequest, a Maybe<int> that lets a view model
+scroll the list. The view model sets the position that it wants to show. The
+control scrolls there as soon as it is loaded and has that many positions, and
+then sets the property back to none. The property binds two-way by default. It is
+a value and not an event, so a request that the view model makes before the view
+is bound, or before the list has laid out, is not lost. A request beyond
+TotalCount waits for the count. A negative position is cleared at once. A new
+request replaces one that waits.
+
+No existing type changed, and the package has no new dependency. The
+documentation page for VirtualizingItemsControl shows the view model, with a
+bindable action and a two-way bindable value, and says what the property does
+not do: a second request that arrives in the instant between a scroll and the
+write of none can be cleared with the first.
+
 0.2.0
 
 New: VirtualizingItemsControl, an items control for a long list whose rows are

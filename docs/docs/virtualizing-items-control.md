@@ -81,6 +81,7 @@ Expose `rowsAtOffset` and the count of the collection through your usual bindabl
     <mc:VirtualizingItemsControl TotalCount="{Binding Count.Value}"
                                  Rows="{Binding RowsAtOffset.Value}"
                                  VisibleRange="{Binding VisibleRange, Mode=OneWayToSource}"
+                                 ScrollRequest="{Binding ScrollRequest.Value}"
                                  Buffer="10">
         <mc:VirtualizingItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:IRowViewModel">
@@ -103,9 +104,51 @@ Expose `rowsAtOffset` and the count of the collection through your usual bindabl
 | `TotalCount` | The number of positions in the whole list. |
 | `Rows` | The rows for some of the positions, and the position of the first. |
 | `VisibleRange` | The positions on screen, with `Buffer` more on each side. The control sets it. Bind it one way to the source. |
+| `ScrollRequest` | The position that the view model wants to show, as a `Maybe<int>`. The control scrolls there and sets it back to none. Binds two-way. |
 | `Buffer` | How many positions to add on each side of `VisibleRange`. The default is 10. |
 | `PlaceholderTemplate` | What a position shows until its row arrives. |
 | `ItemTemplate` | What a row shows, as on any items control. |
+
+### Scroll from the view model
+
+A view model asks for a scroll through `ScrollRequest`, and the view doesn't call `ScrollIntoView`
+itself. The request is a value and not an event, so it isn't lost when the view model asks before
+the view is bound, or before the list has laid out. The control keeps the request until it can use
+it, scrolls, and then writes `Maybe.None` back.
+
+In the view model, an action takes the position, and a two-way bindable value holds the request:
+
+```csharp
+StreamSink<int> scrollTo = Stream.CreateSink<int>();
+StreamSink<Maybe<int>> edits = Stream.CreateSink<Maybe<int>>();
+
+// The action sets the request. The edits are what the view writes, which is none after a scroll.
+Cell<Maybe<int>> request =
+    scrollTo.Map(static position => Maybe<int>.Some(position))
+        .OrElse(edits)
+        .Hold(Maybe<int>.None);
+
+IBindableAction<int> scrollToAction = output.BindableFactory.CreateBindableAction(scrollTo);
+ITwoWayBindableValue<Maybe<int>> scrollRequest =
+    output.BindableFactory.CreateTwoWay(request, edits);
+```
+
+Code runs the action with `ScrollTo.Execute(position)`, and a view binds a `Command` to it as it
+does to any `ICommand`. To scroll to an item, find its position first, for example with
+`collection.IndexOf(key)`.
+
+The request is a position and not an item, because the control has a row only for the positions
+that are on screen. The scroll brings the position into view, as `ScrollIntoView` does.
+
+- A request for a position beyond `TotalCount` waits until the count grows. A negative position can
+  never apply, so the control clears it at once.
+- A new request replaces one that is waiting. The last request wins.
+- A second request that the view model makes in the instant between the control's scroll and the
+  arrival of its `None` is cleared with the first, because the `None` doesn't say which request the
+  control scrolled to. Two requests in one turn of the dispatcher are fine, and so are two requests
+  that are a moment apart.
+- The tests run this view model against a real SodaFlow graph with a bindable action and a two-way
+  bindable value, including a request made before the view binds.
 
 ### Give the placeholder the height of a row
 
