@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using SodaFlow;
+using SodaFlow.Bindable.ObjectModel;
 using SodaFlow.Collections;
+using SodaFlow.Functional;
 
 namespace MorseCode.Avalonia.Controls.Tests;
 
@@ -88,6 +90,27 @@ internal sealed class RecipeModel : INotifyPropertyChanged, IDisposable
 
         this.mapped = map;
         this.listener = listen;
+
+        // The view model asks for a scroll with the action. The request is a value, thus a request that
+        // comes before the view binds is still there when it binds. The view writes none after it
+        // scrolls, and that edit clears the request.
+        BindableFactory factory = new(bindingScheduler: BindingScheduler.Immediate);
+
+        (this.ScrollTo, this.ScrollRequest) =
+            Transaction.Run(
+                f: () =>
+                {
+                    StreamSink<int> scrollTo = Stream.CreateSink<int>();
+                    StreamSink<Maybe<int>> edits = Stream.CreateSink<Maybe<int>>();
+
+                    Cell<Maybe<int>> request =
+                        scrollTo.Map(f: static position => Maybe<int>.Some(value: position))
+                            .OrElse(s2: edits)
+                            .Hold(initialValue: Maybe<int>.None);
+
+                    return (factory.CreateBindableAction(firingsStreamSink: scrollTo),
+                        factory.CreateTwoWay(cell: request, editsStreamSink: edits));
+                });
     }
 
     /// <inheritdoc />
@@ -124,6 +147,17 @@ internal sealed class RecipeModel : INotifyPropertyChanged, IDisposable
                 });
         }
     } = ItemRange.Empty;
+
+    /// <summary>
+    ///     Gets the action that asks the view to scroll to a position.
+    /// </summary>
+    public IBindableAction<int> ScrollTo { get; }
+
+    /// <summary>
+    ///     Gets the position that the view model wants to show, or none.
+    /// </summary>
+    // ReSharper disable once UnusedAutoPropertyAccessor.Global - A binding in the view reads this property by its name.
+    public ITwoWayBindableValue<Maybe<int>> ScrollRequest { get; }
 
     /// <summary>
     ///     Gets the key of each row that the map built, in sequence.
