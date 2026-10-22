@@ -1,6 +1,6 @@
 using SodaFlow;
 
-namespace MorseCode.Toolkit.Sample;
+namespace MorseCode.Toolkit.Samples.Workbench;
 
 /// <summary>
 ///     Counts the view models of the rows. The count shows that the list builds a view model only

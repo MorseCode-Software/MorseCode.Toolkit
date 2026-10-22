@@ -2,7 +2,7 @@ using SodaFlow;
 using SodaFlow.Bindable.ObjectModel;
 using SodaFlow.Functional;
 
-namespace MorseCode.Toolkit.Sample;
+namespace MorseCode.Toolkit.Samples.Workbench;
 
 /// <summary>
 ///     The view model of one row. Building it stands for a cost: it holds two bindable values, and

@@ -1,7 +1,7 @@
 using Avalonia.Controls;
 using SodaFlow.Bindable.ObjectModel;
 
-namespace MorseCode.Toolkit.Sample;
+namespace MorseCode.Toolkit.Samples.Workbench;
 
 /// <summary>
 ///     The one place that builds the objects of the application and gives each one what it needs.

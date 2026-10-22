@@ -2,7 +2,7 @@ using MorseCode.Avalonia.Controls;
 using MorseCode.Mvvm;
 using SodaFlow.Bindable.ObjectModel;
 
-namespace MorseCode.Toolkit.Sample;
+namespace MorseCode.Toolkit.Samples.Workbench;
 
 /// <summary>
 ///     What the main window shows: a long list, and the counts of the row view models.

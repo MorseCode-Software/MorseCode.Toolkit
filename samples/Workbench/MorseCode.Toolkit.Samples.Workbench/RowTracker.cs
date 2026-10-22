@@ -1,6 +1,6 @@
 using SodaFlow;
 
-namespace MorseCode.Toolkit.Sample;
+namespace MorseCode.Toolkit.Samples.Workbench;
 
 /// <summary>
 ///     The tracker of the row view models. Each count is a fold over the changes that rows send.

@@ -1,7 +1,7 @@
 using MorseCode.Mvvm;
 using SodaFlow.Bindable.ObjectModel;
 
-namespace MorseCode.Toolkit.Sample;
+namespace MorseCode.Toolkit.Samples.Workbench;
 
 /// <summary>
 ///     What a row shows. The list builds one for each row on the screen, and no more.

@@ -4,11 +4,11 @@ using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Headless;
 using Avalonia.Themes.Fluent;
-using MorseCode.Toolkit.Sample.Tests;
+using MorseCode.Toolkit.Samples.Workbench.Tests;
 
 [assembly: AvaloniaTestApplication(appBuilderEntryPointType: typeof(TestApplication))]
 
-namespace MorseCode.Toolkit.Sample.Tests;
+namespace MorseCode.Toolkit.Samples.Workbench.Tests;
 
 /// <summary>
 ///     The application that the tests run in, with no screen. It has the Fluent theme, as the sample has.

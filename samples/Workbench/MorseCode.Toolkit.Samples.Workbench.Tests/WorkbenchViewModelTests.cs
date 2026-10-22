@@ -7,7 +7,7 @@ using TUnit.Assertions;
 using TUnit.Assertions.Extensions;
 using TUnit.Core;
 
-namespace MorseCode.Toolkit.Sample.Tests;
+namespace MorseCode.Toolkit.Samples.Workbench.Tests;
 
 /// <summary>
 ///     Checks the view model. It builds a row view model only for the rows in the range that the

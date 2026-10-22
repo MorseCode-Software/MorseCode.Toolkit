@@ -3,7 +3,7 @@ using MorseCode.StagedConstruction;
 using SodaFlow;
 using SodaFlow.Bindable.ObjectModel;
 
-namespace MorseCode.Toolkit.Sample;
+namespace MorseCode.Toolkit.Samples.Workbench;
 
 /// <summary>
 ///     The base of a view model that the <see cref="IRowTracker" /> counts. It has two stages. The

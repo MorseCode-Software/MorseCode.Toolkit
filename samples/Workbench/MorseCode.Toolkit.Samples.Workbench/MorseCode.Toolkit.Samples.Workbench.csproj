@@ -6,8 +6,8 @@
         <LangVersion>14</LangVersion>
         <Nullable>enable</Nullable>
         <ImplicitUsings>disable</ImplicitUsings>
-        <AssemblyName>MorseCode.Toolkit.Sample</AssemblyName>
-        <RootNamespace>MorseCode.Toolkit.Sample</RootNamespace>
+        <AssemblyName>MorseCode.Toolkit.Samples.Workbench</AssemblyName>
+        <RootNamespace>MorseCode.Toolkit.Samples.Workbench</RootNamespace>
         <IsPackable>false</IsPackable>
         <!-- The views bind to interfaces, and the compiler checks each binding against its type. -->
         <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
@@ -15,7 +15,7 @@
 
     <!-- The tests start the view models of this project. -->
     <ItemGroup>
-        <InternalsVisibleTo Include="MorseCode.Toolkit.Sample.Tests"/>
+        <InternalsVisibleTo Include="MorseCode.Toolkit.Samples.Workbench.Tests"/>
     </ItemGroup>
 
     <ItemGroup>
@@ -27,17 +27,17 @@
     </ItemGroup>
 
     <!--
-        PROJECT REFERENCES, FOR NOW. A sample must reference published packages at a pinned version,
-        so that it tests what a user installs. MorseCode.Avalonia.Controls 0.2.0 holds
-        VirtualizingItemsControl and is not published yet. After it is published, replace these three
-        references with PackageReference items for MorseCode.Mvvm, MorseCode.StagedConstruction (a
-        dependency of MorseCode.Mvvm), and MorseCode.Avalonia.Controls, at the released versions, and
-        commit the lock file that the restore writes.
+        The packages of this repository, at the versions that are published, and not the projects
+        under src/. The sample tests what a user installs. A change under src/ cannot break it, and
+        a new release that breaks it shows only when someone changes these versions. MorseCode.Mvvm
+        asks for MorseCode.StagedConstruction too, but the sample uses staged construction itself, so
+        it names that package. Changing a version means restoring and committing the lock file that
+        the restore writes.
     -->
     <ItemGroup>
-        <ProjectReference Include="..\..\src\MorseCode.Avalonia.Controls\MorseCode.Avalonia.Controls.csproj"/>
-        <ProjectReference Include="..\..\src\MorseCode.Mvvm\MorseCode.Mvvm.csproj"/>
-        <ProjectReference Include="..\..\src\MorseCode.StagedConstruction\MorseCode.StagedConstruction.csproj"/>
+        <PackageReference Include="MorseCode.Avalonia.Controls" Version="0.2.0"/>
+        <PackageReference Include="MorseCode.Mvvm" Version="0.2.3"/>
+        <PackageReference Include="MorseCode.StagedConstruction" Version="0.2.1"/>
     </ItemGroup>
 
     <ItemGroup>

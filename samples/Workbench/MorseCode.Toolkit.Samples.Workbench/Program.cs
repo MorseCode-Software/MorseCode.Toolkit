@@ -2,7 +2,7 @@ using System;
 using Avalonia;
 using SodaFlow.Bindable.ObjectModel;
 
-namespace MorseCode.Toolkit.Sample;
+namespace MorseCode.Toolkit.Samples.Workbench;
 
 /// <summary>
 ///     The entry point of the application.

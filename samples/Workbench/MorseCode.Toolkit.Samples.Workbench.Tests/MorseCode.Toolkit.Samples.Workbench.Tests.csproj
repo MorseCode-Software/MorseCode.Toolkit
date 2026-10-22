@@ -9,8 +9,8 @@
         <!-- The usings are listed per file here, as everywhere else in this repository. -->
         <TUnitImplicitUsings>disable</TUnitImplicitUsings>
         <TUnitAssertionsImplicitUsings>disable</TUnitAssertionsImplicitUsings>
-        <AssemblyName>MorseCode.Toolkit.Sample.Tests</AssemblyName>
-        <RootNamespace>MorseCode.Toolkit.Sample.Tests</RootNamespace>
+        <AssemblyName>MorseCode.Toolkit.Samples.Workbench.Tests</AssemblyName>
+        <RootNamespace>MorseCode.Toolkit.Samples.Workbench.Tests</RootNamespace>
         <IsPackable>false</IsPackable>
     </PropertyGroup>
 
@@ -27,7 +27,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\MorseCode.Toolkit.Sample\MorseCode.Toolkit.Sample.csproj"/>
+        <ProjectReference Include="..\MorseCode.Toolkit.Samples.Workbench\MorseCode.Toolkit.Samples.Workbench.csproj"/>
     </ItemGroup>
 
 </Project>

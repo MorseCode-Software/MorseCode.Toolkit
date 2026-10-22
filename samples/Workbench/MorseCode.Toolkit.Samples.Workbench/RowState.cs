@@ -1,4 +1,4 @@
-namespace MorseCode.Toolkit.Sample;
+namespace MorseCode.Toolkit.Samples.Workbench;
 
 /// <summary>
 ///     The part of a row that can change. The collection keeps it apart from the identity of the row.

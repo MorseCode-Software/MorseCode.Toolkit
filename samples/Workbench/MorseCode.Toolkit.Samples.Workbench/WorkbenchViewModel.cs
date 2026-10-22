@@ -5,7 +5,7 @@ using SodaFlow;
 using SodaFlow.Bindable.ObjectModel;
 using SodaFlow.Collections;
 
-namespace MorseCode.Toolkit.Sample;
+namespace MorseCode.Toolkit.Samples.Workbench;
 
 /// <summary>
 ///     The view model of the main window. It turns the range that the list reports into the rows
