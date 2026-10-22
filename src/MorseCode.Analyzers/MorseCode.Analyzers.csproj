@@ -55,6 +55,7 @@
     </ItemGroup>
 
     <ItemGroup>
+        <Compile Include="ExplicitCastAnalyzer.cs"/>
         <Compile Include="NamedArgumentOrderAnalyzer.cs"/>
     </ItemGroup>
 

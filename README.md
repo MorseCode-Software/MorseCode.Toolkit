@@ -50,7 +50,7 @@ The documentation site is at <https://morsecode-software.github.io/MorseCode.Too
 - **MorseCode.Analyzers**: Roslyn analyzers for the conventions MorseCode Software writes C# with.
   They run in the compiler, so the build reports what they find. MC0001 reports a call whose
   arguments aren't in the order of the method's parameters, when at least one argument has a
-  name. The package is a development dependency, so it doesn't flow to the packages of a project
+  name. MC0002 reports an explicit cast, such as `(int)value`. The package is a development dependency, so it doesn't flow to the packages of a project
   that uses it.<br>
   [![Latest Stable Version](https://img.shields.io/nuget/v/MorseCode.Analyzers.svg)](https://www.nuget.org/packages/MorseCode.Analyzers/)
   [![Total Downloads](https://img.shields.io/nuget/dt/MorseCode.Analyzers.svg)](https://www.nuget.org/packages/MorseCode.Analyzers/)

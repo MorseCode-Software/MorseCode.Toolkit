@@ -32,6 +32,8 @@
     </ItemGroup>
 
     <ItemGroup>
+        <Compile Include="AnalyzerHarness.cs"/>
+        <Compile Include="ExplicitCastAnalyzerTests.cs"/>
         <Compile Include="NamedArgumentOrderAnalyzerTests.cs"/>
     </ItemGroup>
 

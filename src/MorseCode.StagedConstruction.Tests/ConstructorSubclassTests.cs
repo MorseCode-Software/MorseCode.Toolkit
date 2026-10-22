@@ -177,7 +177,7 @@ public sealed class ConstructorSubclassTests
         Exception caught = Catching.Catch(action: () => _ = source.Select<int>(selector: null!));
 
         await Assert.That(caught).IsTypeOf<ArgumentNullException>();
-        await Assert.That(((ArgumentNullException)caught).ParamName).IsEqualTo(expected: "selector");
+        await Assert.That((caught as ArgumentNullException)?.ParamName).IsEqualTo(expected: "selector");
         await Assert.That(source.Construct(constructor: static values => values)).IsEqualTo(expected: 1);
     }
 
@@ -229,7 +229,7 @@ public sealed class ConstructorSubclassTests
         Exception caught = Catching.Catch(action: () => _ = construct.Construct<int>(constructor: null!));
 
         await Assert.That(caught).IsTypeOf<ArgumentNullException>();
-        await Assert.That(((ArgumentNullException)caught).ParamName).IsEqualTo(expected: "constructor");
+        await Assert.That((caught as ArgumentNullException)?.ParamName).IsEqualTo(expected: "constructor");
         await Assert.That(construct.CoreCalls).IsEqualTo(expected: 0);
         await Assert.That(construct.Construct(constructor: static values => values)).IsEqualTo(expected: 1);
     }

@@ -27,7 +27,7 @@ public sealed class ViewModelBaseTests
                             construct.Construct(constructor: static viewModelBase => viewModelBase)));
 
         await Assert.That(caught).IsTypeOf<ArgumentNullException>();
-        await Assert.That(((ArgumentNullException)caught).ParamName).IsEqualTo(expected: "bindingScheduler");
+        await Assert.That((caught as ArgumentNullException)?.ParamName).IsEqualTo(expected: "bindingScheduler");
     }
 
     [Test]
@@ -42,7 +42,7 @@ public sealed class ViewModelBaseTests
                         continuation: null!));
 
         await Assert.That(caught).IsTypeOf<ArgumentNullException>();
-        await Assert.That(((ArgumentNullException)caught).ParamName).IsEqualTo(expected: "continuation");
+        await Assert.That((caught as ArgumentNullException)?.ParamName).IsEqualTo(expected: "continuation");
     }
 
     [Test]
@@ -157,7 +157,7 @@ public sealed class ViewModelBaseTests
         await Assert.That(caught).IsTypeOf<AggregateException>();
 
         await Assert
-            .That(((AggregateException)caught).InnerExceptions)
+            .That((caught as AggregateException)?.InnerExceptions)
             .IsEquivalentTo(expected: [second, first], ordering: CollectionOrdering.Matching);
     }
 
@@ -379,7 +379,7 @@ public sealed class ViewModelBaseTests
         await Assert.That(caught).IsTypeOf<AggregateException>();
 
         await Assert
-            .That(((AggregateException)caught).InnerExceptions)
+            .That((caught as AggregateException)?.InnerExceptions)
             .IsEquivalentTo(expected: [failure, releaseFailure], ordering: CollectionOrdering.Matching);
 
         // The output closes before the release runs. Thus, it is closed also when the release throws.
@@ -479,7 +479,7 @@ public sealed class ViewModelBaseTests
         Exception caught = Catch(action: static () => _ = new Derived(viewModelBase: null!));
 
         await Assert.That(caught).IsTypeOf<ArgumentNullException>();
-        await Assert.That(((ArgumentNullException)caught).ParamName).IsEqualTo(expected: "viewModelBase");
+        await Assert.That((caught as ArgumentNullException)?.ParamName).IsEqualTo(expected: "viewModelBase");
     }
 
     // Two view models that own the same registrations could each dispose them while the other still
