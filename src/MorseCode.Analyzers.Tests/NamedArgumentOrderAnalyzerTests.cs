@@ -1,12 +1,7 @@
-using System;
 using System.Collections.Generic;
-using System.Collections.Immutable;
-using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.Diagnostics;
 using TUnit.Assertions;
 using TUnit.Assertions.Enums;
 using TUnit.Assertions.Extensions;
@@ -188,7 +183,7 @@ internal sealed class NamedArgumentOrderAnalyzerTests
 
     // Compiles the declarations and the body, and gives what the analyzer reports. The sample must compile,
     // because the analyzer does not examine a call that does not bind.
-    private static async Task<IReadOnlyList<Diagnostic>> Analyze(string body, string baseArguments)
+    private static Task<IReadOnlyList<Diagnostic>> Analyze(string body, string baseArguments)
     {
         const string end =
             """
@@ -203,57 +198,6 @@ internal sealed class NamedArgumentOrderAnalyzerTests
             + "\n"
             + end;
 
-        CSharpCompilation library = Compile(assemblyName: "Library", text: Library, references: PlatformReferences());
-
-        using MemoryStream image = new();
-        _ = library.Emit(peStream: image);
-
-        CSharpCompilation compilation =
-            Compile(
-                assemblyName: "Sample",
-                text: source,
-                references:
-                [
-                    .. PlatformReferences(), MetadataReference.CreateFromImage(peImage: [.. image.ToArray()])
-                ]);
-
-        ImmutableArray<Diagnostic> errors =
-        [
-            .. compilation.GetDiagnostics()
-                .Concat(second: library.GetDiagnostics())
-                .Where(predicate: static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
-        ];
-
-        if (errors.Length > 0)
-        {
-            throw new InvalidOperationException(message: $"The sample does not compile: {errors[0]}");
-        }
-
-        ImmutableArray<Diagnostic> found =
-            await compilation.WithAnalyzers(analyzers: [new NamedArgumentOrderAnalyzer()])
-                .GetAnalyzerDiagnosticsAsync()
-                .ConfigureAwait(continueOnCapturedContext: false);
-
-        return [.. found.OrderBy(keySelector: static diagnostic => diagnostic.Location.SourceSpan.Start)];
-
-        static CSharpCompilation Compile(string assemblyName, string text, IEnumerable<MetadataReference> references) =>
-            CSharpCompilation.Create(
-                assemblyName: assemblyName,
-                syntaxTrees:
-                [
-                    CSharpSyntaxTree.ParseText(
-                        text: text,
-                        options: new CSharpParseOptions(languageVersion: LanguageVersion.Preview))
-                ],
-                references: references,
-                options: new CSharpCompilationOptions(
-                    outputKind: OutputKind.DynamicallyLinkedLibrary,
-                    nullableContextOptions: NullableContextOptions.Enable));
-
-        // The assemblies of the runtime that runs the tests, which the samples compile against.
-        static IEnumerable<MetadataReference> PlatformReferences() =>
-            ((string?)AppContext.GetData(name: "TRUSTED_PLATFORM_ASSEMBLIES") ?? string.Empty)
-            .Split(separator: Path.PathSeparator, options: StringSplitOptions.RemoveEmptyEntries)
-            .Select(selector: static path => MetadataReference.CreateFromFile(path: path));
+        return AnalyzerHarness.Analyze(analyzer: new NamedArgumentOrderAnalyzer(), source: source, library: Library);
     }
 }
