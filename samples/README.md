@@ -25,7 +25,6 @@ The [sample application page](../docs/docs/sample-app.md) explains what to read 
   nearest `Directory.Build.props` and stops, so a sample does not read the one under `src/`.
 - Each project restores through a committed `packages.lock.json`. Changing a pinned version means
   restoring and committing the lock file.
-- The [samples workflow](../.github/workflows/samples.yml) builds, tests, and inspects a sample. It
-  starts only when something that can affect a sample changes: the samples, the inspection, or the
-  files that pin the SDK and the tools. Run the inspection yourself with
-  `dotnet cake --target=Inspect-Sample --sample=Workbench`.
+- The [samples workflow](../.github/workflows/samples.yml) builds, tests, and inspects a sample on every
+  pull request and every push to `main`. It has no path filter, so a check of it can be required.
+  Run the inspection yourself with `dotnet cake --target=Inspect-Sample --sample=Workbench`.

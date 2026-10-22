@@ -3,42 +3,24 @@
 # This follows SodaFlow's .github/workflows/samples.yml. It is independent of build.yml, which builds,
 # tests, packs, inspects, and releases the libraries under src/, and of docs.yml. Nothing is shared.
 #
-# THIS WORKFLOW RUNS ONLY WHEN A SAMPLE CAN HAVE CHANGED. A pull request or a push that touches none
-# of the paths below starts no run. Each sample references the published packages of this repository,
-# and not the projects under src/, so a change under src/ cannot affect a sample. The paths are the
-# things that can: the samples themselves, this file, the inspection in build.cake and its rule set,
-# and the files that pin the SDK, the tools, and the formatting.
+# THERE IS NO PATHS FILTER, and that is deliberate. A required status check that a workflow skips
+# because of a path filter reports nothing, and GitHub reads that as "still waiting", not as "passed". A
+# pull request that touches only src/ would then never merge, once these checks are required. SodaFlow
+# had a filter first and removed it for that reason. A job that a running workflow skips reports as
+# success, but a workflow that a filter skips does not. So the workflow runs on every pull request and
+# every push to main.
 #
-# DO NOT MAKE A CHECK OF THIS WORKFLOW REQUIRED on main. A required check that a path filter skipped
-# reports nothing, and GitHub reads that as "still waiting", so a pull request that touches only src/
-# could never merge. SodaFlow removed its path filter for that reason, when it made its sample checks
-# required. If these checks must be required here, remove the paths and skip the steps inside the job
-# instead: a job that a workflow skips reports as success, and a workflow that a filter skips does not.
-#
-# Because each sample pins a version of every package, a new release that breaks a sample shows only
-# when someone changes the pin. That is the point of a sample that tests what a user installs.
+# What the filter would have said is still true. Each sample references the published packages of this
+# repository, and not the projects under src/, so a change under src/ cannot affect a sample, and the
+# run of a sample for such a change passes for reasons that have nothing to do with the change. Because
+# each sample pins a version of every package, a new release that breaks a sample shows only when
+# someone changes the pin. That is the point of a sample that tests what a user installs.
 name: Samples
 
 on:
   push:
     branches: [ main ]
-    paths:
-      - 'samples/**'
-      - '.github/workflows/samples.yml'
-      - 'build.cake'
-      - 'src/MorseCode.Toolkit.sln.DotSettings'
-      - '.editorconfig'
-      - '.config/dotnet-tools.json'
-      - 'global.json'
   pull_request:
-    paths:
-      - 'samples/**'
-      - '.github/workflows/samples.yml'
-      - 'build.cake'
-      - 'src/MorseCode.Toolkit.sln.DotSettings'
-      - '.editorconfig'
-      - '.config/dotnet-tools.json'
-      - 'global.json'
   workflow_dispatch:
 
 # Uploading the inspection results to code scanning needs security-events. Naming one permission drops
