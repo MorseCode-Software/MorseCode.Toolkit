@@ -7,4 +7,8 @@
   <Project Path="MorseCode.StagedConstruction.Tests/MorseCode.StagedConstruction.Tests.csproj" />
   <Project Path="MorseCode.Avalonia.Controls/MorseCode.Avalonia.Controls.csproj" />
   <Project Path="MorseCode.Avalonia.Controls.Tests/MorseCode.Avalonia.Controls.Tests.csproj" />
+  <Folder Name="/samples/">
+    <Project Path="../samples/MorseCode.Toolkit.Sample/MorseCode.Toolkit.Sample.csproj" />
+    <Project Path="../samples/MorseCode.Toolkit.Sample.Tests/MorseCode.Toolkit.Sample.Tests.csproj" />
+  </Folder>
 </Solution>

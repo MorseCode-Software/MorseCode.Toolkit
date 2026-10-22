@@ -1,0 +1,70 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>WinExe</OutputType>
+        <TargetFramework>net10.0</TargetFramework>
+        <LangVersion>14</LangVersion>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>disable</ImplicitUsings>
+        <AssemblyName>MorseCode.Toolkit.Sample</AssemblyName>
+        <RootNamespace>MorseCode.Toolkit.Sample</RootNamespace>
+        <IsPackable>false</IsPackable>
+        <!-- The views bind to interfaces, and the compiler checks each binding against its type. -->
+        <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    </PropertyGroup>
+
+    <!-- The tests start the view models of this project. -->
+    <ItemGroup>
+        <InternalsVisibleTo Include="MorseCode.Toolkit.Sample.Tests"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Avalonia" Version="12.1.3"/>
+        <PackageReference Include="Avalonia.Desktop" Version="12.1.3"/>
+        <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.3"/>
+        <PackageReference Include="SodaFlow" Version="5.0.1"/>
+        <PackageReference Include="SodaFlow.Collections" Version="2.0.0"/>
+    </ItemGroup>
+
+    <!--
+        PROJECT REFERENCES, FOR NOW. A sample must reference published packages at a pinned version,
+        so that it tests what a user installs. MorseCode.Avalonia.Controls 0.2.0 holds
+        VirtualizingItemsControl and is not published yet. After it is published, replace these three
+        references with PackageReference items for MorseCode.Mvvm, MorseCode.StagedConstruction (a
+        dependency of MorseCode.Mvvm), and MorseCode.Avalonia.Controls, at the released versions, and
+        commit the lock file that the restore writes.
+    -->
+    <ItemGroup>
+        <ProjectReference Include="..\..\src\MorseCode.Avalonia.Controls\MorseCode.Avalonia.Controls.csproj"/>
+        <ProjectReference Include="..\..\src\MorseCode.Mvvm\MorseCode.Mvvm.csproj"/>
+        <ProjectReference Include="..\..\src\MorseCode.StagedConstruction\MorseCode.StagedConstruction.csproj"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <AvaloniaXaml Include="App.axaml">
+            <SubType>Designer</SubType>
+        </AvaloniaXaml>
+        <Compile Include="App.axaml.cs">
+            <DependentUpon>App.axaml</DependentUpon>
+            <SubType>Code</SubType>
+        </Compile>
+        <Compile Include="CompositionRoot.cs"/>
+        <Compile Include="IRowTracker.cs"/>
+        <Compile Include="IRowViewModel.cs"/>
+        <Compile Include="IWorkbenchViewModel.cs"/>
+        <AvaloniaXaml Include="MainWindow.axaml">
+            <SubType>Designer</SubType>
+        </AvaloniaXaml>
+        <Compile Include="MainWindow.axaml.cs">
+            <DependentUpon>MainWindow.axaml</DependentUpon>
+            <SubType>Code</SubType>
+        </Compile>
+        <Compile Include="Program.cs"/>
+        <Compile Include="RowState.cs"/>
+        <Compile Include="RowTracker.cs"/>
+        <Compile Include="RowViewModel.cs"/>
+        <Compile Include="TrackedViewModelBase.cs"/>
+        <Compile Include="WorkbenchViewModel.cs"/>
+    </ItemGroup>
+
+</Project>

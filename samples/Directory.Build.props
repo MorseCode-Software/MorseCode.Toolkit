@@ -1,0 +1,32 @@
+<Project>
+
+    <!--
+        This tree is not under src/, so MSBuild does not read src/Directory.Build.props here. This
+        file repeats the two rules that every project must keep, and nothing else. The samples are not
+        packages, so they carry no MinVer and no package metadata.
+    -->
+
+    <!-- No default items. Every project lists each Compile, AvaloniaXaml, and None item by name. -->
+    <PropertyGroup>
+        <EnableDefaultItems>false</EnableDefaultItems>
+    </PropertyGroup>
+
+    <!-- Every project restores through a committed packages.lock.json. Locked mode is on CI only. -->
+    <PropertyGroup>
+        <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+        <RestoreLockedMode Condition="'$(CI)' != ''">true</RestoreLockedMode>
+    </PropertyGroup>
+
+    <!--
+        The analyzers of MorseCode.Analyzers, as in src/Directory.Build.props. The reference is to the
+        project for now. After the first release of the sample against published packages, it becomes
+        a PackageReference at a pinned version.
+    -->
+    <ItemGroup>
+        <ProjectReference Include="$(MSBuildThisFileDirectory)..\src\MorseCode.Analyzers\MorseCode.Analyzers.csproj"
+                          OutputItemType="Analyzer"
+                          ReferenceOutputAssembly="false"
+                          PrivateAssets="all"/>
+    </ItemGroup>
+
+</Project>
