@@ -8,3 +8,11 @@
 Rule ID | Category | Severity | Notes
 --------|----------|----------|-------
 MC0001  | Style    | Warning  | NamedArgumentOrderAnalyzer
+
+## Release 0.1.1
+
+### New Rules
+
+Rule ID | Category | Severity | Notes
+--------|----------|----------|-------
+MC0002  | Style    | Warning  | ExplicitCastAnalyzer

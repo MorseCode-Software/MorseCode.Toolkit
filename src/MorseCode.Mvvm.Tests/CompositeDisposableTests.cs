@@ -121,7 +121,7 @@ public sealed class CompositeDisposableTests
         await Assert.That(caught).IsTypeOf<AggregateException>();
 
         await Assert
-            .That(((AggregateException)caught).InnerExceptions)
+            .That((caught as AggregateException)?.InnerExceptions)
             .IsEquivalentTo(expected: [first, second], ordering: CollectionOrdering.Matching);
 
         await Assert.That(log).IsEquivalentTo(expected: ["B"], ordering: CollectionOrdering.Matching);
