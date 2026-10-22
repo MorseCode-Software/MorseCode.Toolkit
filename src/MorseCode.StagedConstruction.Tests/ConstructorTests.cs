@@ -88,7 +88,7 @@ public sealed class ConstructorTests
         Exception caught = Catching.Catch(action: () => _ = construct.Select<int>(selector: null!));
 
         await Assert.That(caught).IsTypeOf<ArgumentNullException>();
-        await Assert.That(((ArgumentNullException)caught).ParamName).IsEqualTo(expected: "selector");
+        await Assert.That((caught as ArgumentNullException)?.ParamName).IsEqualTo(expected: "selector");
     }
 
     // The handle does not convert between value types. A helper that is generic in the value type takes

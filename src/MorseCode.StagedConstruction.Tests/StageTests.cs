@@ -77,6 +77,6 @@ public sealed class StageTests
         Exception caught = Catching.Catch(action: () => _ = Stage.From<int, int, int>(body: null!));
 
         await Assert.That(caught).IsTypeOf<ArgumentNullException>();
-        await Assert.That(((ArgumentNullException)caught).ParamName).IsEqualTo(expected: "body");
+        await Assert.That((caught as ArgumentNullException)?.ParamName).IsEqualTo(expected: "body");
     }
 }
