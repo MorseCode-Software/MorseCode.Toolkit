@@ -1,0 +1,104 @@
+---
+title: Sample application
+---
+
+# Sample application
+
+`samples/MorseCode.Toolkit.Sample` is a small Avalonia app that uses three parts of this toolkit
+together. It shows a list of 500,000 items. Each row has a view model that is costly to build, and
+the app builds one only for a row that you can see.
+
+The window has two counters above the list:
+
+- **Built** is how many row view models the app has made since it started.
+- **Alive** is how many exist now.
+
+Scroll the list and watch both. Click **Scroll far down the list** to jump over hundreds of
+thousands of rows. Built grows by the rows of one screen, not by the distance of the jump. Alive
+stays small. The list keeps the last 64 rows that left the screen, and it disposes an older row
+when a newer one leaves.
+
+Run it from the root of the repository:
+
+```bash
+dotnet run --project samples/MorseCode.Toolkit.Sample
+```
+
+> [!NOTE]
+> The sample references the projects under `src/` for now, because the release of
+> `MorseCode.Avalonia.Controls` that holds `VirtualizingItemsControl` is not published yet. After
+> that release, the references change to the published packages, as the other samples of this
+> kind do.
+
+## What to read, and in what order
+
+| File | What it shows |
+| --- | --- |
+| `Program.cs` and `CompositionRoot.cs` | Pure dependency injection. There is no container. One place builds the view model and gives it what it needs, and the scheduler is captured on the UI thread. |
+| `WorkbenchViewModel.cs` | The view model of the window: `ViewModelBase`, and the recipe of `VirtualizingItemsControl`. |
+| `TrackedViewModelBase.cs` | A base with two stages. |
+| `RowViewModel.cs` | A row, built on that base. |
+| `RowTracker.cs` | The two counters, as folds over what the rows report. |
+| `MainWindow.axaml` | The view. It binds the control to the view model. |
+
+## ViewModelBase and the lifecycle
+
+`WorkbenchViewModel.Create` calls `ViewModelBase.CreateBase`, which gives it an `IOutput`. Every
+subscription and bindable value the view model makes goes through that output:
+
+- `output.AddDisposable` registers the `MappedItems` that builds the rows.
+- `output.BindableFactory` makes the bindable values for the rows, the range, and the two counters.
+
+Nothing is released by hand. When the window closes, `Dispose` on the view model releases all of it.
+It releases the last registration first. The `MappedItems` is registered before the bindable
+values that read it, so the bindable values stop first and the rows stop last. The same rule runs
+in each row: `TrackedViewModelBase` registers the "this row is gone" notice first, so it runs
+after every bindable value of the row has stopped.
+
+The registrations close when the constructor returns. The tests check that closing the window
+disposes every row.
+
+## Staged construction
+
+A row must register a bindable value for its title, but only the row knows which cell holds the
+title, and only the base can register the value. One exchange cannot do both, so
+`TrackedViewModelBase` has two stages:
+
+1. `CreateBase` calls `ViewModelBase.CreateBase`, registers the counting, and gives the row an
+   `IOutput` and a `Stage<Cell<string>, IOneWayBindableValue<string>, Constructor<Values>>`.
+2. The row calls `Advance` on the stage with the cell of its title. The stage makes the bindable
+   value, registers it, and gives it back with a `Constructor` for the last step.
+3. The row makes its other bindable values, and calls `Construct`, which runs the private
+   constructor of the row.
+
+Every value is a local variable until `Construct` runs, so nothing can read a row that is only
+partly built. `construct.Select` adds the values of the second stage to the `ViewModelBase` of the
+first. [Staged construction](staged-construction.md) and
+[Bases with several stages](multi-stage.md) explain the pattern.
+
+## VirtualizingItemsControl
+
+The view model follows the recipe on the [VirtualizingItemsControl](virtualizing-items-control.md)
+page:
+
+- The window binds the `VisibleRange` of the control, one way to the source, to a bindable value.
+  That value writes a `CellSink<ItemRange>`.
+- Two cells, the offset and the limit, are derived from it. Both change in the same transaction.
+- `collection.Slice(offsetCell, limitCell)` keeps only the keys in the range, and `Map` builds a
+  `RowViewModel` for each one. `Map` keeps a row that left the range, up to a bound, and then
+  calls `onEvicted` to dispose it.
+- The `Rows` that the control reads is a `VirtualRows` that lifts the offset with
+  `MappedItems.Items`, so the offset and the rows always come from the same transaction.
+
+The placeholder is as high as a row. If it were not, Avalonia would ask for more rows than fit on
+the screen.
+
+## The tests
+
+`samples/MorseCode.Toolkit.Sample.Tests` checks the behavior, not the layout:
+
+- With no UI, a range builds exactly the rows in it, starting at the offset.
+- A row that leaves the range is disposed only after more rows than the bound have left.
+- Disposing the view model disposes every row.
+- With the real window and a headless Avalonia, the window builds a handful of rows, and a jump of
+  hundreds of thousands of positions builds only the rows it lands on.

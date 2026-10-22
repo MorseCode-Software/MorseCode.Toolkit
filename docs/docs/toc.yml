@@ -28,6 +28,11 @@
     - name: VirtualizingItemsControl
       href: virtualizing-items-control.md
 
+- name: Sample application
+  items:
+    - name: Sample application
+      href: sample-app.md
+
 - name: Analyzers
   items:
     - name: Named argument order (MC0001)
