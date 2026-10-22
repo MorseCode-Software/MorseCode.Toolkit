@@ -4,7 +4,7 @@ title: Sample application
 
 # Sample application
 
-`samples/MorseCode.Toolkit.Sample` is a small Avalonia app that uses three parts of this toolkit
+`samples/Workbench` is a small Avalonia app that uses three parts of this toolkit
 together. It shows a list of 500,000 items. Each row has a view model that is costly to build, and
 the app builds one only for a row that you can see.
 
@@ -21,14 +21,15 @@ when a newer one leaves.
 Run it from the root of the repository:
 
 ```bash
-dotnet run --project samples/MorseCode.Toolkit.Sample
+dotnet run --project samples/Workbench/MorseCode.Toolkit.Samples.Workbench
 ```
 
 > [!NOTE]
-> The sample references the projects under `src/` for now, because the release of
-> `MorseCode.Avalonia.Controls` that holds `VirtualizingItemsControl` is not published yet. After
-> that release, the references change to the published packages, as the other samples of this
-> kind do.
+> The sample uses the published packages of this repository (`MorseCode.Mvvm`,
+> `MorseCode.StagedConstruction`, `MorseCode.Avalonia.Controls`, and `MorseCode.Analyzers`) at a
+> pinned version, and not the projects under `src/`. It has its own solution,
+> `samples/Workbench/MorseCode.Toolkit.Samples.Workbench.slnx`, and its own workflow. A change under
+> `src/` does not affect it until someone changes the version that it pins.
 
 ## What to read, and in what order
 
@@ -95,7 +96,7 @@ the screen.
 
 ## The tests
 
-`samples/MorseCode.Toolkit.Sample.Tests` checks the behavior, not the layout:
+`samples/Workbench/MorseCode.Toolkit.Samples.Workbench.Tests` checks the behavior, not the layout:
 
 - With no UI, a range builds exactly the rows in it, starting at the offset.
 - A row that leaves the range is disposed only after more rows than the bound have left.
