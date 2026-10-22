@@ -270,6 +270,27 @@ public sealed class VirtualizingItemsControlTests
                 await Assert.That(model.ScrollRequest).IsEqualTo(expected: Maybe<int>.None);
             });
 
+    // The request and the count change in one turn of the dispatcher, before the posted scroll runs. The
+    // second change finds the scroll already posted, and the scroll reads both values when it runs.
+    [Test]
+    public Task ARequestAndACountThatChangeInOneTurnScrollOnce() =>
+        TestApplication.Run(
+            test: static async () =>
+            {
+                VirtualModel model = new(total: 100);
+                using ShownVirtual shown = new(model: model, buffer: 0);
+
+                model.Request(position: 500);
+                model.Resize(total: 1000);
+                shown.Settle();
+
+                await Assert.That(Texts(shown: shown).Any(predicate: static text => text == "Row 500")).IsTrue();
+                await Assert.That(model.ScrollRequest).IsEqualTo(expected: Maybe<int>.None);
+
+                await Assert.That(model.ScrollWrites)
+                    .IsEquivalentTo(expected: [Maybe<int>.None], ordering: CollectionOrdering.Matching);
+            });
+
     // A negative position can never apply, thus the control clears it and does not scroll.
     [Test]
     public Task ANegativeRequestIsClearedWithoutScrolling() =>
