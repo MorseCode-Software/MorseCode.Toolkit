@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using MorseCode.Avalonia.Controls;
 using SodaFlow;
 using SodaFlow.Bindable.ObjectModel;
+using SodaFlow.Functional;
 using TUnit.Assertions;
 using TUnit.Assertions.Extensions;
 using TUnit.Core;
@@ -24,6 +25,25 @@ public sealed class WorkbenchViewModelTests
 
         await Assert.That(Count(cell: tracker.Built)).IsEqualTo(expected: 0);
         await Assert.That(viewModel.Rows.Value.Items.Count).IsEqualTo(expected: 0);
+    }
+
+    [Test]
+    public async Task TheJumpActionRequestsAScrollFarDownAndTheViewClearsIt()
+    {
+        IRowTracker tracker = RowTracker.Create();
+
+        using IWorkbenchViewModel viewModel = Create(tracker: tracker, retainedBeyondTheView: 8);
+
+        await Assert.That(viewModel.ScrollRequest.Value).IsEqualTo(expected: Maybe<int>.None);
+
+        viewModel.Jump.Execute(parameter: null);
+
+        await Assert.That(viewModel.ScrollRequest.Value).IsEqualTo(expected: Maybe<int>.Some(value: 450_000));
+
+        // The list writes none after it scrolls.
+        viewModel.ScrollRequest.Value = Maybe<int>.None;
+
+        await Assert.That(viewModel.ScrollRequest.Value).IsEqualTo(expected: Maybe<int>.None);
     }
 
     [Test]

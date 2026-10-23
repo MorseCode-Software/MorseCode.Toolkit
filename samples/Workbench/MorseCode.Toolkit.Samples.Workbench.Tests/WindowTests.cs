@@ -1,6 +1,10 @@
 using System.Threading.Tasks;
+using Avalonia;
+using Avalonia.Headless;
+using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Threading;
+using SodaFlow.Functional;
 using TUnit.Assertions;
 using TUnit.Assertions.Extensions;
 using TUnit.Core;
@@ -32,8 +36,23 @@ public sealed class WindowTests
                 await Assert.That(builtAtStart).IsGreaterThan(minimum: 0);
                 await Assert.That(builtAtStart).IsLessThan(maximum: 100);
 
-                window.RowList.ScrollIntoView(index: viewModel.JumpTarget);
+                // A click on the button runs the action of the view model. The view model asks for the
+                // scroll, the list scrolls, and the list clears the request.
+                // A press and a release of the left button over the middle of the button, as a user does.
+                Point middle =
+                    window.JumpButton.TranslatePoint(
+                        point: new Point(x: window.JumpButton.Bounds.Width / 2, y: window.JumpButton.Bounds.Height / 2),
+                        relativeTo: window)
+                    ?? default;
+
+                window.MouseDown(point: middle, button: MouseButton.Left);
+                window.MouseUp(point: middle, button: MouseButton.Left);
                 Settle(window: window);
+
+                await Assert.That(viewModel.ScrollRequest.Value).IsEqualTo(expected: Maybe<int>.None);
+
+                // The list is at the end of the jump, 450,000 positions from the start.
+                await Assert.That(window.RowList.VisibleRange.First).IsGreaterThan(minimum: 449_000);
 
                 int built = WorkbenchViewModelTests.Count(cell: tracker.Built);
                 int alive = WorkbenchViewModelTests.Count(cell: tracker.Alive);

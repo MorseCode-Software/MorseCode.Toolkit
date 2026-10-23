@@ -1,6 +1,7 @@
 using MorseCode.Avalonia.Controls;
 using MorseCode.Mvvm;
 using SodaFlow.Bindable.ObjectModel;
+using SodaFlow.Functional;
 
 namespace MorseCode.Toolkit.Samples.Workbench;
 
@@ -16,9 +17,15 @@ internal interface IWorkbenchViewModel : IViewModel
     int TotalCount { get; }
 
     /// <summary>
-    ///     Gets a position far down the list, for the button that scrolls there.
+    ///     Gets the action that asks the list to scroll far down. The button of the window runs it.
     /// </summary>
-    int JumpTarget { get; }
+    IBindableAction Jump { get; }
+
+    /// <summary>
+    ///     Gets the position that the view model wants to show, or none. The list scrolls there and
+    ///     writes none back.
+    /// </summary>
+    ITwoWayBindableValue<Maybe<int>> ScrollRequest { get; }
 
     /// <summary>
     ///     Gets the rows for the range that the view reported last.

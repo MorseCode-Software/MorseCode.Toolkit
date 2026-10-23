@@ -24,13 +24,14 @@
                 <Run Text="Row view models alive:"/>
                 <Run Text="{Binding AliveRows.Value, StringFormat={}{0:N0}}" FontWeight="Bold"/>
             </TextBlock>
-            <Button Name="JumpButton" Click="OnJumpClick" Content="Scroll far down the list"/>
+            <Button Name="JumpButton" Command="{Binding Jump}" Content="Scroll far down the list"/>
         </StackPanel>
 
         <mc:VirtualizingItemsControl Name="RowList"
                                      TotalCount="{Binding TotalCount}"
                                      Rows="{Binding Rows.Value}"
                                      VisibleRange="{Binding VisibleRange.Value, Mode=OneWayToSource}"
+                                     ScrollRequest="{Binding ScrollRequest.Value}"
                                      Buffer="5">
             <mc:VirtualizingItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="local:IRowViewModel">

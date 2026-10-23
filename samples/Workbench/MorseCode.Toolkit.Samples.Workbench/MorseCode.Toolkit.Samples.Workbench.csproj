@@ -35,7 +35,7 @@
         the restore writes.
     -->
     <ItemGroup>
-        <PackageReference Include="MorseCode.Avalonia.Controls" Version="0.2.0"/>
+        <PackageReference Include="MorseCode.Avalonia.Controls" Version="0.2.1"/>
         <PackageReference Include="MorseCode.Mvvm" Version="0.2.3"/>
         <PackageReference Include="MorseCode.StagedConstruction" Version="0.2.1"/>
     </ItemGroup>

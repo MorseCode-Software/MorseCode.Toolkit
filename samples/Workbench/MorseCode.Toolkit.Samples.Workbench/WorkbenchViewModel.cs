@@ -4,6 +4,7 @@ using MorseCode.Mvvm;
 using SodaFlow;
 using SodaFlow.Bindable.ObjectModel;
 using SodaFlow.Collections;
+using SodaFlow.Functional;
 
 namespace MorseCode.Toolkit.Samples.Workbench;
 
@@ -19,6 +20,8 @@ internal sealed class WorkbenchViewModel : ViewModelBase, IWorkbenchViewModel
         int totalCount,
         IOneWayBindableValue<VirtualRows> rows,
         IOneWayToSourceBindableValue<ItemRange> visibleRange,
+        IBindableAction jump,
+        ITwoWayBindableValue<Maybe<int>> scrollRequest,
         IOneWayBindableValue<int> builtRows,
         IOneWayBindableValue<int> aliveRows)
         : base(viewModelBase: viewModelBase)
@@ -26,6 +29,8 @@ internal sealed class WorkbenchViewModel : ViewModelBase, IWorkbenchViewModel
         this.TotalCount = totalCount;
         this.Rows = rows;
         this.VisibleRange = visibleRange;
+        this.Jump = jump;
+        this.ScrollRequest = scrollRequest;
         this.BuiltRows = builtRows;
         this.AliveRows = aliveRows;
     }
@@ -34,13 +39,16 @@ internal sealed class WorkbenchViewModel : ViewModelBase, IWorkbenchViewModel
     public int TotalCount { get; }
 
     /// <inheritdoc />
-    public int JumpTarget => this.TotalCount * 9 / 10;
-
-    /// <inheritdoc />
     public IOneWayBindableValue<VirtualRows> Rows { get; }
 
     /// <inheritdoc />
     public IOneWayToSourceBindableValue<ItemRange> VisibleRange { get; }
+
+    /// <inheritdoc />
+    public IBindableAction Jump { get; }
+
+    /// <inheritdoc />
+    public ITwoWayBindableValue<Maybe<int>> ScrollRequest { get; }
 
     /// <inheritdoc />
     public IOneWayBindableValue<int> BuiltRows { get; }
@@ -118,6 +126,26 @@ internal sealed class WorkbenchViewModel : ViewModelBase, IWorkbenchViewModel
                         IOneWayToSourceBindableValue<ItemRange> visibleRange =
                             output.BindableFactory.CreateOneWayToSource(sink: range);
 
+                        // The jump asks for a position far down the list. The request is a value, thus it
+                        // is not lost when it comes before the window binds. The list writes none after
+                        // it scrolls, and that edit clears the request.
+                        int jumpTarget = totalCount * 9 / 10;
+                        StreamSink<Unit> jumpFirings = Stream.CreateSink<Unit>();
+                        StreamSink<Maybe<int>> scrollEdits = Stream.CreateSink<Maybe<int>>();
+
+                        Cell<Maybe<int>> scrollRequestCell =
+                            jumpFirings.Map(f: _ => Maybe<int>.Some(value: jumpTarget))
+                                .OrElse(s2: scrollEdits)
+                                .Hold(initialValue: Maybe<int>.None);
+
+                        IBindableAction jump =
+                            output.BindableFactory.CreateBindableAction(firingsStreamSink: jumpFirings);
+
+                        ITwoWayBindableValue<Maybe<int>> scrollRequest =
+                            output.BindableFactory.CreateTwoWay(
+                                cell: scrollRequestCell,
+                                editsStreamSink: scrollEdits);
+
                         IOneWayBindableValue<int> builtRows =
                             output.BindableFactory.CreateOneWay(cell: tracker.Built);
 
@@ -131,6 +159,8 @@ internal sealed class WorkbenchViewModel : ViewModelBase, IWorkbenchViewModel
                                     totalCount: totalCount,
                                     rows: rows,
                                     visibleRange: visibleRange,
+                                    jump: jump,
+                                    scrollRequest: scrollRequest,
                                     builtRows: builtRows,
                                     aliveRows: aliveRows));
                     }));
