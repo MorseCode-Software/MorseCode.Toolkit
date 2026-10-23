@@ -168,7 +168,7 @@ jobs:
         uses: actions/cache@v6
         with:
           path: .inspectcode-cache
-          key: inspectcode-${{ runner.os }}-${{ hashFiles('src/**/*.cs', 'src/**/*.csproj', 'src/MorseCode.Toolkit.slnx', 'src/MorseCode.Toolkit.sln.DotSettings', '.editorconfig', 'src/**/.editorconfig') }}
+          key: inspectcode-${{ runner.os }}-${{ hashFiles('src/**/*.cs', 'src/**/*.csproj', 'src/MorseCode.Toolkit.slnx', 'src/MorseCode.Toolkit.sln.DotSettings', '.editorconfig', 'src/**/.editorconfig', 'samples/**/.editorconfig') }}
           restore-keys: |
             inspectcode-${{ runner.os }}-
 

@@ -1,4 +1,7 @@
-// Build script for the solution under src.
+// Build script for the solution under src, and for the inspection of the samples under samples.
+//
+// The samples are not built here. Each has its own solution, and the samples workflow builds it. This
+// file only inspects a sample (Inspect-Sample) and checks that the settings beside it match.
 //
 // This follows SodaFlow's build.cake target for target, and that file keeps the history and the
 // measurements behind each step. What is repeated here is what a reader needs in order to act.
@@ -26,6 +29,9 @@ using System.Xml.Linq;
 var target = Argument("target", "Default");
 var configuration = Argument("configuration", "Release");
 
+// Which sample Inspect-Sample looks at. Empty for every other target.
+var sampleName = Argument("sample", string.Empty);
+
 var solution = File("./src/MorseCode.Toolkit.slnx");
 var artifactsDirectory = Directory("./artifacts");
 var coverageDirectory = Directory("./coverage");
@@ -36,6 +42,14 @@ var inspectionCacheDirectory = Directory("./.inspectcode-cache");
 // A byte-identical copy of SodaFlow's src/SodaFlow.sln.DotSettings. The two repositories are held
 // to one rule set, so a rule change there is copied here.
 var inspectionSettings = File("./src/MorseCode.Toolkit.sln.DotSettings");
+// The editor-only copies beside the sample solutions, which must match it byte for byte. Rider pairs
+// a .DotSettings file with the solution beside it, so each solution needs a copy of its own. CI reads
+// only the canonical file. Thus, the copies exist for the editor alone, and a difference between
+// them is a difference between what CI enforces and what Rider shows.
+var mirroredInspectionSettings = new[]
+{
+    File("./samples/Workbench/MorseCode.Toolkit.Samples.Workbench.sln.DotSettings"),
+};
 // Overridable so a release can be rehearsed against a local folder feed. nuget.org does not allow a
 // version to be deleted or reused.
 var nugetSource = Argument("nuget-source", "https://api.nuget.org/v3/index.json");
@@ -75,6 +89,7 @@ Task("Restore")
 
 Task("Build")
     .Description("Builds the solution.")
+    .IsDependentOn("Verify-Inspection-Settings")
     .IsDependentOn("Restore")
     .Does(() =>
 {
@@ -195,6 +210,48 @@ void RunInspection(FilePath solutionPath, FilePath reportPath, string descriptio
     }
 }
 
+// A dependency of Build rather than a step of its own in the workflow. As a dependency it runs
+// everywhere without being listed anywhere: a local `dotnet cake` and CI both reach it through Build.
+// It needs nothing compiled, so it costs milliseconds.
+Task("Verify-Inspection-Settings")
+    .Description("Checks that the inspection settings beside each sample match the canonical ones.")
+    .Does(() =>
+{
+    var expected = System.IO.File.ReadAllBytes(MakeAbsolute(inspectionSettings.Path).FullPath);
+    var problems = new List<string>();
+
+    foreach (var mirrored in mirroredInspectionSettings)
+    {
+        var path = MakeAbsolute(mirrored.Path).FullPath;
+
+        if (!System.IO.File.Exists(path))
+        {
+            problems.Add($"{mirrored.Path} is missing.");
+        }
+        else if (!System.IO.File.ReadAllBytes(path).SequenceEqual(expected))
+        {
+            problems.Add($"{mirrored.Path} differs from {inspectionSettings.Path}.");
+        }
+    }
+
+    foreach (var problem in problems)
+    {
+        Error("  {0}", problem);
+    }
+
+    if (problems.Count > 0)
+    {
+        throw new Exception(
+            $"{problems.Count} inspection settings file(s) out of step with {inspectionSettings.Path}, "
+            + "listed above. Copy that file over them. They are meant to be byte-identical.");
+    }
+
+    Information(
+        "All {0} mirrored inspection settings match {1}.",
+        mirroredInspectionSettings.Length,
+        inspectionSettings.Path);
+});
+
 // A subdirectory of inspectionCacheDirectory named by a hash of every file that decides what an
 // inspection reports. inspectcode revalidates a cache against source edits but not against the
 // settings, so a settings change has to start cold. Caches left by other settings are removed.
@@ -205,6 +262,7 @@ DirectoryPath InspectionCacheFor()
     var inputs = new List<FilePath> { inspectionSettings.Path };
     inputs.AddRange(GetFiles("./.editorconfig"));
     inputs.AddRange(GetFiles("./src/**/.editorconfig"));
+    inputs.AddRange(GetFiles("./samples/**/.editorconfig"));
 
     var root = MakeAbsolute(Directory("."));
     var ordered = inputs
@@ -298,6 +356,38 @@ Task("Inspect-Code")
         solution.Path,
         (inspectionDirectory + File("inspectcode.sarif")).Path,
         solution.Path.FullPath);
+});
+
+// One sample per run, named by --sample, because the samples workflow runs a job for each sample, so a
+// failure says which sample it is.
+//
+// Not dependent on Build, which compiles the solution under src. A sample does not use it: the samples
+// reference the published packages, and the workflow has already built the sample itself by the time
+// this runs.
+Task("Inspect-Sample")
+    .Description("Runs JetBrains InspectCode over one sample solution. Pass --sample=Workbench.")
+    .Does(() =>
+{
+    if (string.IsNullOrWhiteSpace(sampleName))
+    {
+        throw new Exception("Pass which sample to inspect, for example --sample=Workbench.");
+    }
+
+    var sampleSolution = File($"./samples/{sampleName}/MorseCode.Toolkit.Samples.{sampleName}.slnx");
+
+    if (!FileExists(sampleSolution))
+    {
+        throw new Exception($"No sample solution at {sampleSolution.Path}.");
+    }
+
+    // Not cleaned, unlike the inspection of the libraries: each sample writes its own report, and
+    // running all of them locally should end with all of them.
+    EnsureDirectoryExists(inspectionDirectory);
+
+    RunInspection(
+        sampleSolution.Path,
+        (inspectionDirectory + File($"inspectcode-{sampleName}.sarif")).Path,
+        $"the {sampleName} sample");
 });
 
 Task("Publish")

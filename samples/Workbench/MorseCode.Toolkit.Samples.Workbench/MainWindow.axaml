@@ -1,0 +1,57 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:mc="clr-namespace:MorseCode.Avalonia.Controls;assembly=MorseCode.Avalonia.Controls"
+        xmlns:local="clr-namespace:MorseCode.Toolkit.Samples.Workbench"
+        x:Class="MorseCode.Toolkit.Samples.Workbench.MainWindow"
+        x:DataType="local:IWorkbenchViewModel"
+        Title="MorseCode Toolkit sample"
+        Width="520"
+        Height="640">
+
+    <DockPanel Margin="16">
+
+        <StackPanel DockPanel.Dock="Top" Spacing="8" Margin="0,0,0,12">
+            <TextBlock TextWrapping="Wrap">
+                <Run Text="The list has"/>
+                <Run Text="{Binding TotalCount, StringFormat={}{0:N0}}" FontWeight="Bold"/>
+                <Run Text="items. A view model is built only for a row on the screen, and for the few rows that just left it."/>
+            </TextBlock>
+            <TextBlock>
+                <Run Text="Row view models built:"/>
+                <Run Text="{Binding BuiltRows.Value, StringFormat={}{0:N0}}" FontWeight="Bold"/>
+            </TextBlock>
+            <TextBlock>
+                <Run Text="Row view models alive:"/>
+                <Run Text="{Binding AliveRows.Value, StringFormat={}{0:N0}}" FontWeight="Bold"/>
+            </TextBlock>
+            <Button Name="JumpButton" Command="{Binding Jump}" Content="Scroll far down the list"/>
+        </StackPanel>
+
+        <mc:VirtualizingItemsControl Name="RowList"
+                                     TotalCount="{Binding TotalCount}"
+                                     Rows="{Binding Rows.Value}"
+                                     VisibleRange="{Binding VisibleRange.Value, Mode=OneWayToSource}"
+                                     ScrollRequest="{Binding ScrollRequest.Value}"
+                                     Buffer="5">
+            <mc:VirtualizingItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="local:IRowViewModel">
+                    <Border Height="48" Padding="8,4" BorderThickness="0,0,0,1" BorderBrush="Gray">
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="{Binding Title.Value}"/>
+                            <TextBlock Text="{Binding Detail.Value}" FontSize="11" Opacity="0.6"/>
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+            </mc:VirtualizingItemsControl.ItemTemplate>
+
+            <!-- The placeholder is as high as a row, so the control asks for no more rows than fit. -->
+            <mc:VirtualizingItemsControl.PlaceholderTemplate>
+                <DataTemplate>
+                    <Border Height="48"/>
+                </DataTemplate>
+            </mc:VirtualizingItemsControl.PlaceholderTemplate>
+        </mc:VirtualizingItemsControl>
+
+    </DockPanel>
+
+</Window>

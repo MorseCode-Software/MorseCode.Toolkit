@@ -1,0 +1,70 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>WinExe</OutputType>
+        <TargetFramework>net10.0</TargetFramework>
+        <LangVersion>14</LangVersion>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>disable</ImplicitUsings>
+        <AssemblyName>MorseCode.Toolkit.Samples.Workbench</AssemblyName>
+        <RootNamespace>MorseCode.Toolkit.Samples.Workbench</RootNamespace>
+        <IsPackable>false</IsPackable>
+        <!-- The views bind to interfaces, and the compiler checks each binding against its type. -->
+        <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    </PropertyGroup>
+
+    <!-- The tests start the view models of this project. -->
+    <ItemGroup>
+        <InternalsVisibleTo Include="MorseCode.Toolkit.Samples.Workbench.Tests"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Avalonia" Version="12.1.3"/>
+        <PackageReference Include="Avalonia.Desktop" Version="12.1.3"/>
+        <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.3"/>
+        <PackageReference Include="SodaFlow" Version="5.0.1"/>
+        <PackageReference Include="SodaFlow.Collections" Version="2.0.0"/>
+    </ItemGroup>
+
+    <!--
+        The packages of this repository, at the versions that are published, and not the projects
+        under src/. The sample tests what a user installs. A change under src/ cannot break it, and
+        a new release that breaks it shows only when someone changes these versions. MorseCode.Mvvm
+        asks for MorseCode.StagedConstruction too, but the sample uses staged construction itself, so
+        it names that package. Changing a version means restoring and committing the lock file that
+        the restore writes.
+    -->
+    <ItemGroup>
+        <PackageReference Include="MorseCode.Avalonia.Controls" Version="0.2.1"/>
+        <PackageReference Include="MorseCode.Mvvm" Version="0.2.4"/>
+        <PackageReference Include="MorseCode.StagedConstruction" Version="0.2.1"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <AvaloniaXaml Include="App.axaml">
+            <SubType>Designer</SubType>
+        </AvaloniaXaml>
+        <Compile Include="App.axaml.cs">
+            <DependentUpon>App.axaml</DependentUpon>
+            <SubType>Code</SubType>
+        </Compile>
+        <Compile Include="CompositionRoot.cs"/>
+        <Compile Include="IRowTracker.cs"/>
+        <Compile Include="IRowViewModel.cs"/>
+        <Compile Include="IWorkbenchViewModel.cs"/>
+        <AvaloniaXaml Include="MainWindow.axaml">
+            <SubType>Designer</SubType>
+        </AvaloniaXaml>
+        <Compile Include="MainWindow.axaml.cs">
+            <DependentUpon>MainWindow.axaml</DependentUpon>
+            <SubType>Code</SubType>
+        </Compile>
+        <Compile Include="Program.cs"/>
+        <Compile Include="RowState.cs"/>
+        <Compile Include="RowTracker.cs"/>
+        <Compile Include="RowViewModel.cs"/>
+        <Compile Include="TrackedViewModelBase.cs"/>
+        <Compile Include="WorkbenchViewModel.cs"/>
+    </ItemGroup>
+
+</Project>

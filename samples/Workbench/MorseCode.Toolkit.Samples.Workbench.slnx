@@ -1,0 +1,4 @@
+<Solution>
+    <Project Path="MorseCode.Toolkit.Samples.Workbench/MorseCode.Toolkit.Samples.Workbench.csproj"/>
+    <Project Path="MorseCode.Toolkit.Samples.Workbench.Tests/MorseCode.Toolkit.Samples.Workbench.Tests.csproj"/>
+</Solution>
