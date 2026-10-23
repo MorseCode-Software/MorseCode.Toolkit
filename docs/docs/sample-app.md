@@ -99,13 +99,13 @@ the screen.
 The button **Scroll far down the list** has no code in the window. It binds its `Command` to the
 `Jump` action of the view model, which is an `IBindableAction`. The view model decides where to go:
 
-- `Jump` fires a stream. A `Map` turns each firing into `Maybe.Some(position)`, 90 percent of the way
-  down the list.
-- That stream is merged with the edits that the view writes, and `Hold` keeps the last value, which
-  starts at `Maybe.None`.
-- The result is the `ScrollRequest` bindable value, a two-way `ITwoWayBindableValue<Maybe<int>>`. The
-  list binds its `ScrollRequest` property to it.
-- The list scrolls to the position, and writes `Maybe.None` back. That edit clears the request.
+- `Jump` fires a stream. A `Map` turns each firing into a position, 90 percent of the way down the
+  list.
+- `CreateScrollRequest`, a method of `MorseCode.Mvvm` that extends the bindable factory, takes that
+  stream of positions. It makes the `ScrollRequest` bindable value, a two-way
+  `ITwoWayBindableValue<Maybe<int>>` that starts as `Maybe.None` and becomes `Maybe.Some(position)` for
+  each position. The list binds its `ScrollRequest` property to it.
+- The list scrolls to the position, and writes `Maybe.None` back. That write clears the request.
 
 The request is a value and not an event, so a jump that the view model asks for before the window
 has laid out is not lost. The list keeps it until it can scroll. The control page explains the
