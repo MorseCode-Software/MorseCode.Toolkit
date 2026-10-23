@@ -128,23 +128,16 @@ internal sealed class WorkbenchViewModel : ViewModelBase, IWorkbenchViewModel
 
                         // The jump asks for a position far down the list. The request is a value, thus it
                         // is not lost when it comes before the window binds. The list writes none after
-                        // it scrolls, and that edit clears the request.
+                        // it scrolls, and that write clears the request.
                         int jumpTarget = totalCount * 9 / 10;
                         StreamSink<Unit> jumpFirings = Stream.CreateSink<Unit>();
-                        StreamSink<Maybe<int>> scrollEdits = Stream.CreateSink<Maybe<int>>();
-
-                        Cell<Maybe<int>> scrollRequestCell =
-                            jumpFirings.Map(f: _ => Maybe<int>.Some(value: jumpTarget))
-                                .OrElse(s2: scrollEdits)
-                                .Hold(initialValue: Maybe<int>.None);
 
                         IBindableAction jump =
                             output.BindableFactory.CreateBindableAction(firingsStreamSink: jumpFirings);
 
                         ITwoWayBindableValue<Maybe<int>> scrollRequest =
-                            output.BindableFactory.CreateTwoWay(
-                                cell: scrollRequestCell,
-                                editsStreamSink: scrollEdits);
+                            output.BindableFactory.CreateScrollRequest(
+                                requests: jumpFirings.Map(f: _ => jumpTarget));
 
                         IOneWayBindableValue<int> builtRows =
                             output.BindableFactory.CreateOneWay(cell: tracker.Built);

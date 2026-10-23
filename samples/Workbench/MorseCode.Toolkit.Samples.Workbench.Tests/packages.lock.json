@@ -266,8 +266,8 @@
       },
       "MorseCode.Mvvm": {
         "type": "Transitive",
-        "resolved": "0.2.3",
-        "contentHash": "bI2wcSoZiLld373nIGETXte11LN6Oc/p8VElvada47ngBRCx5oZoveQZtxCXCSxjme+/JzV7zx6LU2/0Z1SAMw==",
+        "resolved": "0.2.4",
+        "contentHash": "KqixEWmksI+1c0zhkYhj93IaKQpdF0H+/ALolm0MLNPy89nqLq6I+AgroOmUz6HdPRzMS8R05GsAKF1HD8daWQ==",
         "dependencies": {
           "MorseCode.StagedConstruction": "[0.2.1, 0.3.0)",
           "SodaFlow.Bindable.ObjectModel": "4.0.0"
@@ -408,7 +408,7 @@
           "Avalonia.Desktop": "[12.1.3, )",
           "Avalonia.Themes.Fluent": "[12.1.3, )",
           "MorseCode.Avalonia.Controls": "[0.2.1, )",
-          "MorseCode.Mvvm": "[0.2.3, )",
+          "MorseCode.Mvvm": "[0.2.4, )",
           "MorseCode.StagedConstruction": "[0.2.1, )",
           "SodaFlow": "[5.0.1, )",
           "SodaFlow.Collections": "[2.0.0, )"

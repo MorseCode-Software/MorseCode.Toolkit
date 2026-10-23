@@ -54,9 +54,9 @@
       },
       "MorseCode.Mvvm": {
         "type": "Direct",
-        "requested": "[0.2.3, )",
-        "resolved": "0.2.3",
-        "contentHash": "bI2wcSoZiLld373nIGETXte11LN6Oc/p8VElvada47ngBRCx5oZoveQZtxCXCSxjme+/JzV7zx6LU2/0Z1SAMw==",
+        "requested": "[0.2.4, )",
+        "resolved": "0.2.4",
+        "contentHash": "KqixEWmksI+1c0zhkYhj93IaKQpdF0H+/ALolm0MLNPy89nqLq6I+AgroOmUz6HdPRzMS8R05GsAKF1HD8daWQ==",
         "dependencies": {
           "MorseCode.StagedConstruction": "[0.2.1, 0.3.0)",
           "SodaFlow.Bindable.ObjectModel": "4.0.0"
