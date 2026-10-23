@@ -24,6 +24,7 @@
 
     <ItemGroup>
         <Compile Include="ActionDisposable.cs"/>
+        <Compile Include="BindableFactoryExtensions.cs"/>
         <Compile Include="CompositeDisposable.cs"/>
         <Compile Include="EmptyDisposable.cs"/>
         <Compile Include="IViewModel.cs"/>
