@@ -116,24 +116,27 @@ itself. The request is a value and not an event, so it isn't lost when the view 
 the view is bound, or before the list has laid out. The control keeps the request until it can use
 it, scrolls, and then writes `Maybe.None` back.
 
-In the view model, an action takes the position, and a two-way bindable value holds the request:
+In the view model, an action takes the position, and `CreateScrollRequest` makes the two-way
+bindable value that holds the request. It is an extension method of `IBindableFactory` in
+`MorseCode.Mvvm`, from version 0.2.4:
 
 ```csharp
 StreamSink<int> scrollTo = Stream.CreateSink<int>();
-StreamSink<Maybe<int>> edits = Stream.CreateSink<Maybe<int>>();
-
-// The action sets the request. The edits are what the view writes, which is none after a scroll.
-Cell<Maybe<int>> request =
-    scrollTo.Map(static position => Maybe<int>.Some(position))
-        .OrElse(edits)
-        .Hold(Maybe<int>.None);
 
 IBindableAction<int> scrollToAction = output.BindableFactory.CreateBindableAction(scrollTo);
-ITwoWayBindableValue<Maybe<int>> scrollRequest =
-    output.BindableFactory.CreateTwoWay(request, edits);
+ITwoWayBindableValue<Maybe<int>> scrollRequest = output.BindableFactory.CreateScrollRequest(scrollTo);
 ```
 
-Code runs the action with `ScrollTo.Execute(position)`, and a view binds a `Command` to it as it
+`CreateScrollRequest` takes a `Stream<int>` of positions. The value starts as `None`, each position
+makes it `Some(position)`, and the write of `None` by the control clears it. The graph behind it is
+a `Hold` over the positions merged with the writes of the view. You don't make the sink for the
+writes of the view, because it is always the same.
+
+An overload also takes a `Stream<Unit>` of clears. Each firing of it sets the value to `None`, so the
+view model can withdraw a request that the control didn't use yet. When a request and a clear come in
+one transaction, the request wins.
+
+Code runs the action with `scrollToAction.Execute(position)`, and a view binds a `Command` to it as it
 does to any `ICommand`. To scroll to an item, find its position first, for example with
 `collection.IndexOf(key)`.
 
@@ -147,8 +150,8 @@ that are on screen. The scroll brings the position into view, as `ScrollIntoView
   arrival of its `None` is cleared with the first, because the `None` doesn't say which request the
   control scrolled to. Two requests in one turn of the dispatcher are fine, and so are two requests
   that are a moment apart.
-- The tests run this view model against a real SodaFlow graph with a bindable action and a two-way
-  bindable value, including a request made before the view binds.
+- The tests of the control use this method with a real SodaFlow graph, including a request made
+  before the view binds. The tests of `CreateScrollRequest` itself are in `MorseCode.Mvvm`.
 
 ### Give the placeholder the height of a row
 

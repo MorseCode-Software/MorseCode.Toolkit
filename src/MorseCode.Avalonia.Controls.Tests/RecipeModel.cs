@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
+using MorseCode.Mvvm;
 using SodaFlow;
 using SodaFlow.Bindable.ObjectModel;
 using SodaFlow.Collections;
@@ -101,15 +102,9 @@ internal sealed class RecipeModel : INotifyPropertyChanged, IDisposable
                 f: () =>
                 {
                     StreamSink<int> scrollTo = Stream.CreateSink<int>();
-                    StreamSink<Maybe<int>> edits = Stream.CreateSink<Maybe<int>>();
-
-                    Cell<Maybe<int>> request =
-                        scrollTo.Map(f: static position => Maybe<int>.Some(value: position))
-                            .OrElse(s2: edits)
-                            .Hold(initialValue: Maybe<int>.None);
 
                     return (factory.CreateBindableAction(firingsStreamSink: scrollTo),
-                        factory.CreateTwoWay(cell: request, editsStreamSink: edits));
+                        factory.CreateScrollRequest(requests: scrollTo));
                 });
     }
 

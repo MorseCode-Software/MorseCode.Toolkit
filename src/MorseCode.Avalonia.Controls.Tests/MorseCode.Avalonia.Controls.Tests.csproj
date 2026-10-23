@@ -64,6 +64,8 @@
 
     <ItemGroup>
         <ProjectReference Include="..\MorseCode.Avalonia.Controls\MorseCode.Avalonia.Controls.csproj"/>
+        <!-- The model of the recipe makes its scroll request with the helper of MorseCode.Mvvm. -->
+        <ProjectReference Include="..\MorseCode.Mvvm\MorseCode.Mvvm.csproj"/>
     </ItemGroup>
 
 </Project>
