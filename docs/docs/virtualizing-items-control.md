@@ -150,8 +150,8 @@ that are on screen. The scroll brings the position into view, as `ScrollIntoView
   arrival of its `None` is cleared with the first, because the `None` doesn't say which request the
   control scrolled to. Two requests in one turn of the dispatcher are fine, and so are two requests
   that are a moment apart.
-- The tests of the control build the same graph by hand against a real SodaFlow graph, including a
-  request made before the view binds. The tests of `CreateScrollRequest` are in `MorseCode.Mvvm`.
+- The tests of the control use this method with a real SodaFlow graph, including a request made
+  before the view binds. The tests of `CreateScrollRequest` itself are in `MorseCode.Mvvm`.
 
 ### Give the placeholder the height of a row
 
