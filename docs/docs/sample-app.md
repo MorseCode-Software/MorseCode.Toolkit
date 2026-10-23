@@ -40,7 +40,7 @@ dotnet run --project samples/Workbench/MorseCode.Toolkit.Samples.Workbench
 | `TrackedViewModelBase.cs` | A base with two stages. |
 | `RowViewModel.cs` | A row, built on that base. |
 | `RowTracker.cs` | The two counters, as folds over what the rows report. |
-| `MainWindow.axaml` | The view. It binds the control to the view model. |
+| `MainWindow.axaml` | The view. It binds the control and the button to the view model. |
 
 ## ViewModelBase and the lifecycle
 
@@ -94,6 +94,24 @@ page:
 The placeholder is as high as a row. If it were not, Avalonia would ask for more rows than fit on
 the screen.
 
+## Scrolling from the view model
+
+The button **Scroll far down the list** has no code in the window. It binds its `Command` to the
+`Jump` action of the view model, which is an `IBindableAction`. The view model decides where to go:
+
+- `Jump` fires a stream. A `Map` turns each firing into `Maybe.Some(position)`, 90 percent of the way
+  down the list.
+- That stream is merged with the edits that the view writes, and `Hold` keeps the last value, which
+  starts at `Maybe.None`.
+- The result is the `ScrollRequest` bindable value, a two-way `ITwoWayBindableValue<Maybe<int>>`. The
+  list binds its `ScrollRequest` property to it.
+- The list scrolls to the position, and writes `Maybe.None` back. That edit clears the request.
+
+The request is a value and not an event, so a jump that the view model asks for before the window
+has laid out is not lost. The list keeps it until it can scroll. The control page explains the
+rules, including the one case that can lose a request. See
+[VirtualizingItemsControl](virtualizing-items-control.md).
+
 ## The tests
 
 `samples/Workbench/MorseCode.Toolkit.Samples.Workbench.Tests` checks the behavior, not the layout:
@@ -101,5 +119,7 @@ the screen.
 - With no UI, a range builds exactly the rows in it, starting at the offset.
 - A row that leaves the range is disposed only after more rows than the bound have left.
 - Disposing the view model disposes every row.
-- With the real window and a headless Avalonia, the window builds a handful of rows, and a jump of
-  hundreds of thousands of positions builds only the rows it lands on.
+- The `Jump` action sets the request, and the write of `None` clears it.
+- With the real window and a headless Avalonia, the window builds a handful of rows. A click on the
+  button, with the pointer events of Avalonia, scrolls the list hundreds of thousands of positions
+  and builds only the rows it lands on.
