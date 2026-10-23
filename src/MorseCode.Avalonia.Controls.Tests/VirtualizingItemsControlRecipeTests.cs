@@ -1,6 +1,7 @@
 using System.Linq;
 using System.Threading.Tasks;
 using Avalonia;
+using SodaFlow.Functional;
 using TUnit.Assertions;
 using TUnit.Assertions.Enums;
 using TUnit.Assertions.Extensions;
@@ -46,6 +47,39 @@ public sealed class VirtualizingItemsControlRecipeTests
                 await Assert.That(shown.Shown().Any(predicate: static pair => pair.Text == "placeholder")).IsFalse();
                 await Assert.That(model.Built.Count).IsEqualTo(expected: 20);
                 await Assert.That(model.Built.Any(predicate: static key => key is > 9 and < 500)).IsFalse();
+            });
+
+    // The view model asks with its action, and the request is a two-way bindable value. The control scrolls
+    // and writes none back, which clears the request in the graph.
+    [Test]
+    public Task AnActionOfTheViewModelScrollsTheListAndTheControlClearsTheRequest() =>
+        TestApplication.Run(
+            test: static async () =>
+            {
+                using RecipeModel model = new(total: 1000, retainedBeyondTheView: 512);
+                using ShownVirtual shown = new(model: model, buffer: 0);
+
+                model.ScrollTo.Execute(parameter: 700);
+                shown.Settle();
+
+                await Assert.That(shown.Shown().Any(predicate: static pair => pair.Text == "Row 700")).IsTrue();
+                await Assert.That(model.ScrollRequest.Value).IsEqualTo(expected: Maybe<int>.None);
+            });
+
+    // The same, when the view model asks before the view binds.
+    [Test]
+    public Task AnActionOfTheViewModelBeforeTheViewBindsScrollsTheListWhenItBinds() =>
+        TestApplication.Run(
+            test: static async () =>
+            {
+                using RecipeModel model = new(total: 1000, retainedBeyondTheView: 512);
+
+                model.ScrollTo.Execute(parameter: 700);
+
+                using ShownVirtual shown = new(model: model, buffer: 0);
+
+                await Assert.That(shown.Shown().Any(predicate: static pair => pair.Text == "Row 700")).IsTrue();
+                await Assert.That(model.ScrollRequest.Value).IsEqualTo(expected: Maybe<int>.None);
             });
 
     [Test]

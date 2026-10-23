@@ -56,6 +56,23 @@ internal sealed class ShownVirtual : IDisposable
             property: VirtualizingItemsControl.VisibleRangeProperty,
             binding: new ReflectionBinding(path: "VisibleRange") { Mode = BindingMode.OneWayToSource });
 
+        // The stand-in model has a plain property for the request. The model of the recipe has a bindable
+        // value, as a view model does, and the binding goes through its Value.
+        string? requestPath =
+            model switch
+            {
+                VirtualModel => "ScrollRequest",
+                RecipeModel => "ScrollRequest.Value",
+                _ => null
+            };
+
+        if (requestPath is not null)
+        {
+            this.List.Bind(
+                property: VirtualizingItemsControl.ScrollRequestProperty,
+                binding: new ReflectionBinding(path: requestPath) { Mode = BindingMode.TwoWay });
+        }
+
         this.window = new Window { Content = this.List, Width = 300, Height = 200 };
         this.window.Show();
         this.Settle();

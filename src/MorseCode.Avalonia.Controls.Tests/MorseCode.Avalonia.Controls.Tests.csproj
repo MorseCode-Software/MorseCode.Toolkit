@@ -24,6 +24,7 @@
         <PackageReference Include="Avalonia.Headless" Version="12.1.3"/>
         <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.3"/>
         <PackageReference Include="SodaFlow" Version="5.0.1"/>
+        <PackageReference Include="SodaFlow.Bindable.ObjectModel" Version="4.0.0"/>
         <PackageReference Include="SodaFlow.Collections" Version="2.0.0"/>
         <PackageReference Include="TUnit" Version="1.66.27"/>
     </ItemGroup>
