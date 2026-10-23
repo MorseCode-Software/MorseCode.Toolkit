@@ -1,4 +1,3 @@
-using Avalonia.Controls;
 using SodaFlow.Bindable.ObjectModel;
 
 namespace MorseCode.Toolkit.Samples.Workbench;
@@ -16,15 +15,14 @@ internal static class CompositionRoot
     private const int RetainedBeyondTheView = 64;
 
     /// <summary>
-    ///     Builds the main window with its view model.
+    ///     Builds the view model of the main window.
     /// </summary>
     /// <param name="bindingScheduler">The scheduler that the bindable values use.</param>
-    /// <returns>The window.</returns>
-    public static Window CreateMainWindow(IBindingScheduler bindingScheduler) =>
-        new MainWindow(
-            viewModel: WorkbenchViewModel.Create(
-                bindingScheduler: bindingScheduler,
-                tracker: RowTracker.Create(),
-                totalCount: TotalCount,
-                retainedBeyondTheView: RetainedBeyondTheView));
+    /// <returns>The view model.</returns>
+    public static IWorkbenchViewModel CreateViewModel(IBindingScheduler bindingScheduler) =>
+        WorkbenchViewModel.Create(
+            bindingScheduler: bindingScheduler,
+            tracker: RowTracker.Create(),
+            totalCount: TotalCount,
+            retainedBeyondTheView: RetainedBeyondTheView);
 }

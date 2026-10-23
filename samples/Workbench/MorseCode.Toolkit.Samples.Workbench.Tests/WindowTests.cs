@@ -27,7 +27,7 @@ public sealed class WindowTests
                 IWorkbenchViewModel viewModel =
                     WorkbenchViewModelTests.Create(tracker: tracker, retainedBeyondTheView: 16);
 
-                MainWindow window = new(viewModel: viewModel);
+                MainWindow window = new() { DataContext = viewModel };
                 window.Show();
                 Settle(window: window);
 
@@ -62,7 +62,9 @@ public sealed class WindowTests
                 await Assert.That(built).IsLessThan(maximum: 300);
                 await Assert.That(alive).IsLessThan(maximum: 100);
 
+                // The application releases the view model when it exits. The test does the same.
                 window.Close();
+                viewModel.Dispose();
 
                 await Assert.That(WorkbenchViewModelTests.Count(cell: tracker.Alive)).IsEqualTo(expected: 0);
             });

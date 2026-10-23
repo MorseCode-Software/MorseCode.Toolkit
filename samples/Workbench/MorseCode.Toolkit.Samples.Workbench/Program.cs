@@ -19,8 +19,8 @@ file static class Program
                 // The scheduler is the one of the user interface thread. This function runs on that
                 // thread when the framework is ready.
                 static () => new App(
-                    createMainWindow: static () =>
-                        CompositionRoot.CreateMainWindow(
+                    createViewModel: static () =>
+                        CompositionRoot.CreateViewModel(
                             bindingScheduler: SynchronizationContextBindingScheduler.Capture())))
             .UsePlatformDetect()
             .StartWithClassicDesktopLifetime(args: args);
