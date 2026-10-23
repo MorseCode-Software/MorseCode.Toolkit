@@ -35,12 +35,12 @@ dotnet run --project samples/Workbench/MorseCode.Toolkit.Samples.Workbench
 
 | File | What it shows |
 | --- | --- |
-| `Program.cs` and `CompositionRoot.cs` | Pure dependency injection. There is no container. One place builds the view model and gives it what it needs, and the scheduler is captured on the UI thread. |
+| `Program.cs`, `CompositionRoot.cs`, and `App.axaml.cs` | Pure dependency injection. There is no container. One place builds the view model and gives it what it needs, and the scheduler is captured on the UI thread. `App` gives the view model to the window as its data context, and disposes it when the application exits. The window builds nothing. |
 | `WorkbenchViewModel.cs` | The view model of the window: `ViewModelBase`, and the recipe of `VirtualizingItemsControl`. |
 | `TrackedViewModelBase.cs` | A base with two stages. |
 | `RowViewModel.cs` | A row, built on that base. |
 | `RowTracker.cs` | The two counters, as folds over what the rows report. |
-| `MainWindow.axaml` | The view. It binds the control and the button to the view model. |
+| `MainWindow.axaml` | The view. It holds only markup, and it binds the control and the button to the view model that it receives. |
 
 ## ViewModelBase and the lifecycle
 
@@ -50,14 +50,14 @@ subscription and bindable value the view model makes goes through that output:
 - `output.AddDisposable` registers the `MappedItems` that builds the rows.
 - `output.BindableFactory` makes the bindable values for the rows, the range, and the two counters.
 
-Nothing is released by hand. When the window closes, `Dispose` on the view model releases all of it.
+Nothing is released by hand. When the application exits, `App` calls `Dispose` on the view model, and that releases all of it.
 It releases the last registration first. The `MappedItems` is registered before the bindable
 values that read it, so the bindable values stop first and the rows stop last. The same rule runs
 in each row: `TrackedViewModelBase` registers the "this row is gone" notice first, so it runs
 after every bindable value of the row has stopped.
 
-The registrations close when the constructor returns. The tests check that closing the window
-disposes every row.
+The registrations close when the constructor returns. The tests check that disposing the view model
+disposes every row. They do not start the application, so they do not check the call in `App`.
 
 ## Staged construction
 
