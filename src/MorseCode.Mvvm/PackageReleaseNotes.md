@@ -1,3 +1,18 @@
+0.2.4
+
+New: BindableFactoryExtensions.CreateScrollRequest, an extension method of
+IBindableFactory. It makes the two-way bindable value of Maybe<int> that asks
+VirtualizingItemsControl to scroll, from a Stream<int> of positions. The value
+starts as none, each position makes it that position, and the write of none by
+the control after it scrolls clears it. The method makes the sink for the writes
+of the view, so you do not. An overload also takes a Stream<Unit> of clears, which
+set the value to none, for a view model that withdraws a request. When a request
+and a clear come in one transaction, the request wins. Both overloads refuse a
+null argument with an ArgumentNullException that names it.
+
+No existing type changed, and the package has no new dependency. The
+documentation page for VirtualizingItemsControl shows the method.
+
 0.2.3
 
 No signature or behavior changed. This release reformats the code and the

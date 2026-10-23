@@ -282,6 +282,16 @@
           "Avalonia": "[12.1.3, )",
           "SodaFlow.Functional": "[3.0.2, )"
         }
+      },
+      "morsecode.mvvm": {
+        "type": "Project",
+        "dependencies": {
+          "MorseCode.StagedConstruction": "[1.0.0, )",
+          "SodaFlow.Bindable.ObjectModel": "[4.0.0, )"
+        }
+      },
+      "morsecode.stagedconstruction": {
+        "type": "Project"
       }
     }
   }
