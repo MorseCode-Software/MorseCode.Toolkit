@@ -52,7 +52,7 @@ MappedItems<IRowViewModel> rows = collection
 // The offset and the rows come from the same transaction, so they always agree.
 Cell<VirtualRows> rowsAtOffset = offset.Lift(
     rows.Items,
-    static (first, items) => new VirtualRows(first, items.Cast<object?>().ToList()));
+    static (first, items) => new VirtualRows(first, items));
 
 // The view writes this property. It sends both values in one transaction.
 public ItemRange VisibleRange
@@ -70,6 +70,12 @@ key that has left until more than `retainedBeyondTheView` keys have left (512 by
 then it calls `onEvicted` for the oldest. Scrolling back over rows you have just seen is free, and
 the number of live view models stays bounded however long the list is. Dispose the `MappedItems`
 with the view model, so it releases the rows that are still in use.
+
+Pass `items` to `VirtualRows` as it is. A list of rows is an `IReadOnlyList<IRowViewModel>`, and
+that is accepted where an `IReadOnlyList<object?>` is expected, so no copy is needed. The control
+reads the list when it needs a row, not when it receives the value, so the list must never change
+after you hand it over. The list that `Map` gives for each version is a new list that nothing else
+holds. If you build the list yourself, make a new one for each change.
 
 Expose `rowsAtOffset` and the count of the collection through your usual bindables.
 
@@ -143,8 +149,10 @@ does to any `ICommand`. To scroll to an item, find its position first, for examp
 The request is a position and not an item, because the control has a row only for the positions
 that are on screen. The scroll brings the position into view, as `ScrollIntoView` does.
 
-- A request for a position beyond `TotalCount` waits until the count grows. A negative position can
-  never apply, so the control clears it at once.
+- A request for a position beyond `TotalCount` waits until the count grows, and it stays until then.
+  If the list is reloaded later and is long enough by then, the control scrolls to the old position
+  at that point, which can surprise the user. Withdraw a request that has gone stale with the
+  `clears` overload. A negative position can never apply, so the control clears it at once.
 - A new request replaces one that is waiting. The last request wins.
 - A second request that the view model makes in the instant between the control's scroll and the
   arrival of its `None` is cleared with the first, because the `None` doesn't say which request the
@@ -161,6 +169,12 @@ view model would build rows nobody can see. Make the placeholder about as high a
 
 If rows differ in height, use a typical height. Avalonia corrects its estimate as real rows
 arrive.
+
+### The control uses the style of `ListBox`
+
+The control borrows the template of `ListBox`, which gives it a scroll viewer. As a result, a style
+in your application with the selector `ListBox` also applies to the control. Give the control a
+class or a name if you need to style it apart from your list boxes.
 
 ### Do not set `ItemsSource`
 

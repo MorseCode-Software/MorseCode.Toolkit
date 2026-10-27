@@ -128,7 +128,7 @@ internal sealed class WorkbenchViewModel : ViewModelBase, IWorkbenchViewModel
                         // The jump asks for a position far down the list. The request is a value, thus it
                         // is not lost when it comes before the window binds. The list writes none after
                         // it scrolls, and that write clears the request.
-                        int jumpTarget = totalCount * 9 / 10;
+                        int jumpTarget = totalCount - totalCount / 10;
                         StreamSink<Unit> jumpFirings = Stream.CreateSink<Unit>();
 
                         IBindableAction jump =

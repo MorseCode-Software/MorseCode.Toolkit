@@ -46,6 +46,10 @@ namespace MorseCode.Avalonia.Controls;
 ///         placeholders than the screen needs, and the view model builds rows that the
 ///         user cannot see.
 ///     </para>
+///     <para>
+///         The control uses the style of <see cref="ListBox" />. Thus, a style in the application
+///         that selects <c>ListBox</c> also applies to this control.
+///     </para>
 /// </remarks>
 [PublicAPI]
 // ReSharper disable once InheritdocConsiderUsage - The summary of ItemsControl does not say what this control reports.
