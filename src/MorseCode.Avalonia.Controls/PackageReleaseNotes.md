@@ -1,3 +1,22 @@
+0.3.0
+
+Breaking: VirtualizingItemsControl.ScrollRequest no longer binds two-way and the control no
+longer writes none to it. The control now reports the position that it handled in the new
+property ScrollHandled, a Maybe<int> that binds one way to the source. It sets the property
+to Some(position) when it scrolled to the request, or when the position is negative and can
+never apply, and then straight back to none, so that a report of the same position again is a
+change that the binding sends.
+
+The reason: a write of none did not say which request the control had served, so a request
+that the view model made while the write was on its way was cleared with the old one. A view
+model now clears a request only if the request is still the position in the report. The
+control also scrolls once for each value of ScrollRequest, so a change of TotalCount before
+the view model has cleared the request does not scroll again.
+
+To move from 0.2.x: bind ScrollRequest one way, bind ScrollHandled one way to the source, and
+use MorseCode.Mvvm 0.3.0 CreateScrollRequest, which makes both. A view model that cleared the
+request itself on a write of none must now clear it on a report of its position.
+
 0.2.2
 
 Changed: a large change of TotalCount now raises one reset of the list, where it raised an

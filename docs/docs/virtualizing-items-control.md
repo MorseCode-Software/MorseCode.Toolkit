@@ -88,6 +88,7 @@ Expose `rowsAtOffset` and the count of the collection through your usual bindabl
                                  Rows="{Binding RowsAtOffset.Value}"
                                  VisibleRange="{Binding VisibleRange, Mode=OneWayToSource}"
                                  ScrollRequest="{Binding ScrollRequest.Value}"
+                                 ScrollHandled="{Binding ScrollHandled.Value, Mode=OneWayToSource}"
                                  Buffer="10">
         <mc:VirtualizingItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:IRowViewModel">
@@ -110,7 +111,8 @@ Expose `rowsAtOffset` and the count of the collection through your usual bindabl
 | `TotalCount` | The number of positions in the whole list. |
 | `Rows` | The rows for some of the positions, and the position of the first. |
 | `VisibleRange` | The positions on screen, with `Buffer` more on each side. The control sets it. Bind it one way to the source. |
-| `ScrollRequest` | The position that the view model wants to show, as a `Maybe<int>`. The control scrolls there and sets it back to none. Binds two-way. |
+| `ScrollRequest` | The position that the view model wants to show, as a `Maybe<int>`. Binds one way from the view model. |
+| `ScrollHandled` | The position of the request that the control handled, as a `Maybe<int>`. The control sets it. Bind it one way to the source. |
 | `Buffer` | How many positions to add on each side of `VisibleRange`. The default is 10. |
 | `PlaceholderTemplate` | What a position shows until its row arrives. |
 | `ItemTemplate` | What a row shows, as on any items control. |
@@ -120,27 +122,34 @@ Expose `rowsAtOffset` and the count of the collection through your usual bindabl
 A view model asks for a scroll through `ScrollRequest`, and the view doesn't call `ScrollIntoView`
 itself. The request is a value and not an event, so it isn't lost when the view model asks before
 the view is bound, or before the list has laid out. The control keeps the request until it can use
-it, scrolls, and then writes `Maybe.None` back.
+it, scrolls, and then reports the position it handled in `ScrollHandled`. The view model clears the
+request when it receives the report, and only if the request is still that position.
 
-In the view model, an action takes the position, and `CreateScrollRequest` makes the two-way
-bindable value that holds the request. It is an extension method of `IBindableFactory` in
-`MorseCode.Mvvm`, from version 0.2.4:
+In the view model, an action takes the position, and `CreateScrollRequest` makes the two bindable
+values: the request, and the report. It is an extension method of `IBindableFactory` in
+`MorseCode.Mvvm`, from version 0.3.0:
 
 ```csharp
 StreamSink<int> scrollTo = Stream.CreateSink<int>();
 
 IBindableAction<int> scrollToAction = output.BindableFactory.CreateBindableAction(scrollTo);
-ITwoWayBindableValue<Maybe<int>> scrollRequest = output.BindableFactory.CreateScrollRequest(scrollTo);
+ScrollRequestBindables scroll = output.BindableFactory.CreateScrollRequest(scrollTo);
+
+// Expose scroll.Request and scroll.Handled as ScrollRequest and ScrollHandled.
 ```
 
-`CreateScrollRequest` takes a `Stream<int>` of positions. The value starts as `None`, each position
-makes it `Some(position)`, and the write of `None` by the control clears it. The graph behind it is
-a `Hold` over the positions merged with the writes of the view. You don't make the sink for the
-writes of the view, because it is always the same.
+`CreateScrollRequest` takes a `Stream<int>` of positions. The request starts as `None`, each position
+makes it `Some(position)`, and a report of that same position clears it. The graph behind it is an
+`Accum` over the positions merged with the reports. You don't make the sink for the reports, because
+it is always the same.
 
-An overload also takes a `Stream<Unit>` of clears. Each firing of it sets the value to `None`, so the
+An overload also takes a `Stream<Unit>` of clears. Each firing of it sets the request to `None`, so the
 view model can withdraw a request that the control didn't use yet. When a request and a clear come in
 one transaction, the request wins.
+
+The control sets `ScrollHandled` to `Some(position)` and then straight back to `None`. The second
+write makes the same position a change again, so a second request for it is reported too. The view
+model ignores the `None`.
 
 Code runs the action with `scrollToAction.Execute(position)`, and a view binds a `Command` to it as it
 does to any `ICommand`. To scroll to an item, find its position first, for example with
@@ -152,12 +161,15 @@ that are on screen. The scroll brings the position into view, as `ScrollIntoView
 - A request for a position beyond `TotalCount` waits until the count grows, and it stays until then.
   If the list is reloaded later and is long enough by then, the control scrolls to the old position
   at that point, which can surprise the user. Withdraw a request that has gone stale with the
-  `clears` overload. A negative position can never apply, so the control clears it at once.
+  `clears` overload. A negative position can never apply, so the control reports it at once and does
+  not scroll.
 - A new request replaces one that is waiting. The last request wins.
-- A second request that the view model makes in the instant between the control's scroll and the
-  arrival of its `None` is cleared with the first, because the `None` doesn't say which request the
-  control scrolled to. Two requests in one turn of the dispatcher are fine, and so are two requests
-  that are a moment apart.
+- A request that the view model makes while a report is on its way is kept. The report names the
+  position it handled, and the view model clears the request only if it is still that position. The
+  one gap left is a new request for the same position inside that window, which the report clears.
+  The position was just shown, so nothing is lost.
+- The control scrolls once for each request. A change of `TotalCount` before the view model has
+  cleared the request does not scroll again.
 - The tests of the control use this method with a real SodaFlow graph, including a request made
   before the view binds. The tests of `CreateScrollRequest` itself are in `MorseCode.Mvvm`.
 

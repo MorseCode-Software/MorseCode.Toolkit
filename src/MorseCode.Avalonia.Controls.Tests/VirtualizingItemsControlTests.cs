@@ -224,7 +224,9 @@ public sealed class VirtualizingItemsControlTests
                 await Assert.That(model.ScrollRequest).IsEqualTo(expected: Maybe<int>.None);
 
                 await Assert.That(model.ScrollWrites)
-                    .IsEquivalentTo(expected: [Maybe<int>.None], ordering: CollectionOrdering.Matching);
+                    .IsEquivalentTo(
+                        expected: [Maybe<int>.Some(value: 700), Maybe<int>.None],
+                        ordering: CollectionOrdering.Matching);
             });
 
     [Test]
@@ -242,7 +244,9 @@ public sealed class VirtualizingItemsControlTests
                 await Assert.That(model.ScrollRequest).IsEqualTo(expected: Maybe<int>.None);
 
                 await Assert.That(model.ScrollWrites)
-                    .IsEquivalentTo(expected: [Maybe<int>.None], ordering: CollectionOrdering.Matching);
+                    .IsEquivalentTo(
+                        expected: [Maybe<int>.Some(value: 700), Maybe<int>.None],
+                        ordering: CollectionOrdering.Matching);
 
                 await Assert.That(model.Built.Any(predicate: static position => position is > 9 and < 690)).IsFalse();
             });
@@ -288,7 +292,9 @@ public sealed class VirtualizingItemsControlTests
                 await Assert.That(model.ScrollRequest).IsEqualTo(expected: Maybe<int>.None);
 
                 await Assert.That(model.ScrollWrites)
-                    .IsEquivalentTo(expected: [Maybe<int>.None], ordering: CollectionOrdering.Matching);
+                    .IsEquivalentTo(
+                        expected: [Maybe<int>.Some(value: 500), Maybe<int>.None],
+                        ordering: CollectionOrdering.Matching);
             });
 
     // A negative position can never apply, thus the control clears it and does not scroll.
@@ -346,7 +352,78 @@ public sealed class VirtualizingItemsControlTests
                 shown.Settle();
 
                 await Assert.That(Texts(shown: shown).Any(predicate: static text => text == "Row 700")).IsTrue();
-                await Assert.That(model.ScrollWrites.Count).IsEqualTo(expected: 2);
+                await Assert.That(model.ScrollWrites.Count).IsEqualTo(expected: 4);
+            });
+
+    // The view model clears the request when the report reaches it, and that can be later than a change of
+    // the count. The control must not scroll again to a request that it already handled.
+    [Test]
+    public Task ARequestThatTheViewModelHasNotClearedYetDoesNotScrollAgainWhenTheCountChanges() =>
+        TestApplication.Run(
+            test: static async () =>
+            {
+                VirtualModel model = new(total: 1000) { KeepsHandledRequest = true };
+                using ShownVirtual shown = new(model: model, buffer: 0);
+
+                model.Request(position: 700);
+                shown.Settle();
+                shown.Scroller.Offset = new Vector(x: 0, y: 0);
+                shown.Settle();
+
+                model.Resize(total: 1001);
+                shown.Settle();
+
+                await Assert.That(Texts(shown: shown)[0]).IsEqualTo(expected: "Row 0");
+
+                await Assert.That(model.ScrollWrites)
+                    .IsEquivalentTo(
+                        expected: [Maybe<int>.Some(value: 700), Maybe<int>.None],
+                        ordering: CollectionOrdering.Matching);
+            });
+
+    // A request that replaces a handled one, before the view model clears the old one, is a new request.
+    [Test]
+    public Task ANewRequestAfterAHandledOneScrollsEvenWhileTheOldOneIsNotCleared() =>
+        TestApplication.Run(
+            test: static async () =>
+            {
+                VirtualModel model = new(total: 1000) { KeepsHandledRequest = true };
+                using ShownVirtual shown = new(model: model, buffer: 0);
+
+                model.Request(position: 300);
+                shown.Settle();
+                model.Request(position: 700);
+                shown.Settle();
+
+                await Assert.That(Texts(shown: shown).Any(predicate: static text => text == "Row 700")).IsTrue();
+
+                await Assert.That(model.ScrollWrites)
+                    .IsEquivalentTo(
+                        expected:
+                        [
+                            Maybe<int>.Some(value: 300), Maybe<int>.None, Maybe<int>.Some(value: 700),
+                            Maybe<int>.None
+                        ],
+                        ordering: CollectionOrdering.Matching);
+            });
+
+    // The control only reads ScrollRequest and only writes ScrollHandled, so a test that uses the CLR
+    // properties on their own shows that each one reads back what it holds.
+    [Test]
+    public Task TheScrollPropertiesHoldTheirValuesAndStartAsNone() =>
+        TestApplication.Run(
+            test: static async () =>
+            {
+                VirtualizingItemsControl list = new();
+
+                await Assert.That(list.ScrollRequest).IsEqualTo(expected: Maybe<int>.None);
+                await Assert.That(list.ScrollHandled).IsEqualTo(expected: Maybe<int>.None);
+
+                list.ScrollRequest = Maybe<int>.Some(value: 3);
+                list.ScrollHandled = Maybe<int>.Some(value: 4);
+
+                await Assert.That(list.ScrollRequest).IsEqualTo(expected: Maybe<int>.Some(value: 3));
+                await Assert.That(list.ScrollHandled).IsEqualTo(expected: Maybe<int>.Some(value: 4));
             });
 
     private static List<string> Texts(ShownVirtual shown) =>

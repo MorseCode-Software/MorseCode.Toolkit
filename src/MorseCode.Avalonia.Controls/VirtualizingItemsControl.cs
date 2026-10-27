@@ -37,8 +37,9 @@ namespace MorseCode.Avalonia.Controls;
 ///     </para>
 ///     <para>
 ///         To scroll, the view model sets <see cref="ScrollRequest" /> to the position that it wants
-///         to show. The control scrolls there when it can, and then sets the property back to
-///         none. Thus, a request made before the control is bound or laid out is not lost.
+///         to show. The control scrolls there when it can, and then reports the position in
+///         <see cref="ScrollHandled" />. Thus, a request made before the control is bound or laid out
+///         is not lost.
 ///     </para>
 ///     <para>
 ///         Do not set <see cref="ItemsControl.ItemsSource" />. The control sets it. A
@@ -87,8 +88,16 @@ public class VirtualizingItemsControl : ItemsControl
     public static readonly StyledProperty<Maybe<int>> ScrollRequestProperty =
         AvaloniaProperty.Register<VirtualizingItemsControl, Maybe<int>>(
             name: nameof(ScrollRequest),
+            defaultValue: Maybe<int>.None);
+
+    /// <summary>
+    ///     Defines the <see cref="ScrollHandled" /> property.
+    /// </summary>
+    public static readonly StyledProperty<Maybe<int>> ScrollHandledProperty =
+        AvaloniaProperty.Register<VirtualizingItemsControl, Maybe<int>>(
+            name: nameof(ScrollHandled),
             defaultValue: Maybe<int>.None,
-            defaultBindingMode: BindingMode.TwoWay);
+            defaultBindingMode: BindingMode.OneWayToSource);
 
     /// <summary>
     ///     Defines the <see cref="VisibleRange" /> property.
@@ -109,6 +118,10 @@ public class VirtualizingItemsControl : ItemsControl
 
     // True from a request to scroll until the dispatcher runs it.
     private bool isScrollPending;
+
+    // True from the moment that the control handled the request that it holds until the request changes.
+    // The view model clears the request after it receives the report, and that can take a moment.
+    private bool isRequestHandled;
 
     private ItemRange visibleRange = ItemRange.Empty;
 
@@ -176,20 +189,23 @@ public class VirtualizingItemsControl : ItemsControl
 
     /// <summary>
     ///     Gets or sets the position that the view model wants to show. The control scrolls to it
-    ///     and then sets the property to none.
+    ///     and then reports the position in <see cref="ScrollHandled" />.
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///         Bind this property two-way. The view model sets a position. The control scrolls
-    ///         there, and writes none back to say that it did. The view model keeps the last request
-    ///         until then, thus a request made before the control is bound is still there when the
-    ///         control binds.
+    ///         Bind this property one way from the view model. The view model keeps the last request
+    ///         until it receives the report. Thus, a request made before the control is bound is
+    ///         still there when the control binds. The control does not write to this property.
     ///     </para>
     ///     <para>
     ///         The control waits for its Loaded event and for at least that many positions. A request
     ///         for a position beyond <see cref="TotalCount" /> stays until the count grows or the
     ///         view model sets another request. A negative position can never apply, so the control
-    ///         sets it back to none at once. A new request replaces one that waits.
+    ///         reports it at once and does not scroll. A new request replaces one that waits.
+    ///     </para>
+    ///     <para>
+    ///         The control scrolls once for each value of this property. If the view model has not
+    ///         cleared the request yet, a change of <see cref="TotalCount" /> does not scroll again.
     ///     </para>
     ///     <para>
     ///         The position is a number and not an item, because the control has no row for a
@@ -201,6 +217,28 @@ public class VirtualizingItemsControl : ItemsControl
     {
         get => this.GetValue(property: ScrollRequestProperty);
         set => this.SetValue(property: ScrollRequestProperty, value: value);
+    }
+
+    /// <summary>
+    ///     Gets the position of the request that the control handled last. Bind it one way to the
+    ///     source.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The control sets this property to the position of a request when it scrolled to it, or
+    ///         when the position can never apply. The view model clears the request only if the
+    ///         request is still that position. Thus, a newer request that arrived while the report
+    ///         was on its way is not cleared.
+    ///     </para>
+    ///     <para>
+    ///         The control sets the property to none again at once. Thus, a second report of the same
+    ///         position is a change that the binding sends. A view model ignores none.
+    ///     </para>
+    /// </remarks>
+    public Maybe<int> ScrollHandled
+    {
+        get => this.GetValue(property: ScrollHandledProperty);
+        set => this.SetValue(property: ScrollHandledProperty, value: value);
     }
 
     /// <summary>
@@ -233,6 +271,12 @@ public class VirtualizingItemsControl : ItemsControl
         else if (change.Property == BufferProperty)
         {
             this.RequestReport();
+        }
+
+        // A new request value is a request that the control has not handled.
+        if (change.Property == ScrollRequestProperty)
+        {
+            this.isRequestHandled = false;
         }
 
         // A request can wait for the count, and the count can arrive after the request.
@@ -284,25 +328,39 @@ public class VirtualizingItemsControl : ItemsControl
         this.Dispatcher.Post(action: this.ApplyScroll, priority: DispatcherPriority.Normal);
     }
 
-    // The request is a value of the view model, thus it stays until the control can use it. Setting it
-    // back to none is how the control says that it scrolled.
+    // The request is a value of the view model, thus it stays until the control can use it. The report in
+    // ScrollHandled is how the control says that it used it.
     private void ApplyScroll()
     {
         this.isScrollPending = false;
+
+        if (this.isRequestHandled)
+        {
+            return;
+        }
 
         this.ScrollRequest.MatchSome(
             onSome: position =>
             {
                 if (position < 0)
                 {
-                    this.ScrollRequest = Maybe<int>.None;
+                    this.Handle(position: position);
                 }
                 else if (this.IsLoaded && this.ItemsPanelRoot is not null && position < this.items.Count)
                 {
                     this.ScrollIntoView(index: position);
-                    this.ScrollRequest = Maybe<int>.None;
+                    this.Handle(position: position);
                 }
             });
+    }
+
+    private void Handle(int position)
+    {
+        // The flag comes first. The report can make the view model clear or replace the request at once,
+        // and that change of the request resets the flag.
+        this.isRequestHandled = true;
+        this.ScrollHandled = Maybe<int>.Some(value: position);
+        this.ScrollHandled = Maybe<int>.None;
     }
 
     private void RequestReport()

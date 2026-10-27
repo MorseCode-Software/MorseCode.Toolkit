@@ -25,8 +25,8 @@ Building blocks for view models. It holds:
   view model makes during construction, and one `Dispose` releases them. See
   [View models](view-models.md).
 - `IViewModel`, the interface a view model shows to its view.
-- `CreateScrollRequest`, an extension method of `IBindableFactory` that makes the two-way bindable
-  value a view model uses to ask `VirtualizingItemsControl` to scroll. See
+- `CreateScrollRequest`, an extension method of `IBindableFactory` that makes the bindable values
+  a view model uses to ask `VirtualizingItemsControl` to scroll, and to receive its report. See
   [VirtualizingItemsControl](virtualizing-items-control.md).
 - The `Disposable` helpers that `ViewModelBase` uses: `Composite`, `FromAction`, and `Empty`. See
   [The Disposable helpers](disposable.md).

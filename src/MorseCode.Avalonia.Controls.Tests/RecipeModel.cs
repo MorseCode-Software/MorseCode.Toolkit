@@ -91,19 +91,22 @@ internal sealed class RecipeModel : INotifyPropertyChanged, IDisposable
         this.listener = listen;
 
         // The view model asks for a scroll with the action. The request is a value, thus a request that
-        // comes before the view binds is still there when it binds. The view writes none after it
-        // scrolls, and that edit clears the request.
+        // comes before the view binds is still there when it binds. The view reports the position that
+        // it handled, and that report clears the request.
         BindableFactory factory = new(bindingScheduler: BindingScheduler.Immediate);
 
-        (this.ScrollTo, this.ScrollRequest) =
+        (ScrollRequestBindables scroll, this.ScrollTo) =
             Transaction.Run(
                 f: () =>
                 {
                     StreamSink<int> scrollTo = Stream.CreateSink<int>();
 
-                    return (factory.CreateBindableAction(firingsStreamSink: scrollTo),
-                        factory.CreateScrollRequest(requests: scrollTo));
+                    return (factory.CreateScrollRequest(requests: scrollTo),
+                        factory.CreateBindableAction(firingsStreamSink: scrollTo));
                 });
+
+        this.ScrollRequest = scroll.Request;
+        this.ScrollHandled = scroll.Handled;
     }
 
     /// <inheritdoc />
@@ -150,7 +153,13 @@ internal sealed class RecipeModel : INotifyPropertyChanged, IDisposable
     ///     Gets the position that the view model wants to show, or none.
     /// </summary>
     // ReSharper disable once UnusedAutoPropertyAccessor.Global - A binding in the view reads this property by its name.
-    public ITwoWayBindableValue<Maybe<int>> ScrollRequest { get; }
+    public IOneWayBindableValue<Maybe<int>> ScrollRequest { get; }
+
+    /// <summary>
+    ///     Gets the position that the view handled.
+    /// </summary>
+    // ReSharper disable once UnusedAutoPropertyAccessor.Global - A binding in the view writes this property by its name.
+    public IOneWayToSourceBindableValue<Maybe<int>> ScrollHandled { get; }
 
     /// <summary>
     ///     Gets the key of each row that the map built, in sequence.
