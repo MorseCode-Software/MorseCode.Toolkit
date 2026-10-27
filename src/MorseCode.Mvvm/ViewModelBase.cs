@@ -128,15 +128,19 @@ public class ViewModelBase : IViewModel
         StageContinuation<IOutput, Constructor<ViewModelBase>, TResult> continuation)
     {
         // The null checks occur here, where the caller is on the stack, and before the output exists.
+#pragma warning disable CA1510 // ArgumentNullException.ThrowIfNull does not exist on netstandard2.0 and net472.
         if (bindingScheduler is null)
         {
             throw new ArgumentNullException(paramName: nameof(bindingScheduler));
         }
+#pragma warning restore CA1510
 
+#pragma warning disable CA1510 // ArgumentNullException.ThrowIfNull does not exist on netstandard2.0 and net472.
         if (continuation is null)
         {
             throw new ArgumentNullException(paramName: nameof(continuation));
         }
+#pragma warning restore CA1510
 
         Output output = new(bindingScheduler: bindingScheduler);
 

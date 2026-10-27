@@ -3,7 +3,12 @@
 Breaking: BindableFactoryExtensions.CreateScrollRequest is no longer in this package, and the type
 BindableFactoryExtensions is gone. It served only VirtualizingItemsControl, so it moved into
 MorseCode.Avalonia.Controls 0.3.0, where it is not public. Use CreateVirtualItemsSource there to
-make the scroll request with the rest of the source. Nothing else in this package changed.
+make the scroll request with the rest of the source.
+
+New: the package has a net8.0 build, next to net472, net6.0, and netstandard2.0. It is the same
+code, compiled for net8.0. A project that targets net8.0 or later now takes the net8.0 build and
+not the netstandard2.0 build. MorseCode.Avalonia.Controls references this package, and it targets
+net8.0.
 
 0.2.4
 
