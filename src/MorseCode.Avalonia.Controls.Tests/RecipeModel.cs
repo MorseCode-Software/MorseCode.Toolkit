@@ -71,9 +71,7 @@ internal sealed class RecipeModel : INotifyPropertyChanged, IDisposable
                         this.offset.Lift(
                             c2: rows.Items,
                             f: static (first, items) =>
-                                new VirtualRows(
-                                    Offset: first,
-                                    Items: [.. items.Cast<object?>()]));
+                                new VirtualRows(Offset: first, Items: items));
 
                     IListener subscription =
                         answer.Listen(

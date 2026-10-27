@@ -15,7 +15,8 @@ namespace MorseCode.Avalonia.Controls;
 /// <param name="Offset">The position of the first item in the whole list.</param>
 /// <param name="Items">
 ///     The items, in sequence. The item at index <c>i</c> shows at position
-///     <c>Offset + i</c>.
+///     <c>Offset + i</c>. The control reads this list when it needs a row, and not when it
+///     receives the value. Thus, the list must not change. Give a new list for each change.
 /// </param>
 [PublicAPI]
 public sealed record VirtualRows(int Offset, IReadOnlyList<object?> Items)

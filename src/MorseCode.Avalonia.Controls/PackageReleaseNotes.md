@@ -1,3 +1,16 @@
+0.2.2
+
+Changed: a large change of TotalCount now raises one reset of the list, where it raised an
+add or remove event that held one item for each position. A change of 0 to 500,000 positions
+took about 9 ms and allocated about 8 MB before. A change of 512 positions or fewer raises the
+same events as before. VirtualizingItemsControl also no longer forces a layout pass each time
+it reports VisibleRange. The reported ranges do not change.
+
+The documentation of VirtualRows now says that Items must not change after it is handed over.
+The documentation page says that the control uses the style of ListBox, and what happens to a
+scroll request that is beyond TotalCount when the count grows later. No type or member changed,
+and the package has no new dependency.
+
 0.2.1
 
 New: VirtualizingItemsControl.ScrollRequest, a Maybe<int> that lets a view model

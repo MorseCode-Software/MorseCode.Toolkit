@@ -46,6 +46,10 @@ namespace MorseCode.Avalonia.Controls;
 ///         placeholders than the screen needs, and the view model builds rows that the
 ///         user cannot see.
 ///     </para>
+///     <para>
+///         The control uses the style of <see cref="ListBox" />. Thus, a style in the application
+///         that selects <c>ListBox</c> also applies to this control.
+///     </para>
 /// </remarks>
 [PublicAPI]
 // ReSharper disable once InheritdocConsiderUsage - The summary of ItemsControl does not say what this control reports.
@@ -316,11 +320,6 @@ public class VirtualizingItemsControl : ItemsControl
     {
         this.isReportPending = false;
 
-        // A change of the items makes the panel clear its containers and make them again at the next
-        // layout. A count before that layout sees none of them, and reports an empty range. Then the
-        // view model answers with no rows, and the cycle repeats without end.
-        this.UpdateLayout();
-
         ItemRange range = this.Measure();
 
         this.SetAndRaise(property: VisibleRangeProperty, field: ref this.visibleRange, value: range);
@@ -338,8 +337,10 @@ public class VirtualizingItemsControl : ItemsControl
 
         if (realized.Count == 0)
         {
-            // No container, with positions to show, means that the control is not laid out. Thus, the
-            // last range stays. The view model then does not drop its rows.
+            // No container, with positions to show, means that the control is not laid out. This is also
+            // the case after a change of the items. The panel clears its containers then, and makes them
+            // again at the next layout. Thus, the last range stays. If it did not, the view model would
+            // drop its rows, the items would change again, and the cycle would repeat without end.
             return this.items.Count == 0 ? ItemRange.Empty : this.visibleRange;
         }
 
