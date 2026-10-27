@@ -142,8 +142,8 @@ position.
 
 `CreateVirtualItemsSource` takes a `Stream<int>` of positions. The request starts as `None`, each
 position makes it `Some(position)`, and a report of that same position clears it. The graph behind
-it is the one that `CreateScrollRequest` makes, an extension method of `IBindableFactory` in the same
-namespace. Call it alone if you bind the values yourself.
+it is an `Accum` over the positions, the clears, and the reports. You don't make
+the sink for the reports, because it is always the same.
 
 Both overloads take an optional `Stream<Unit>` of clears. Each firing of it sets the request to
 `None`, so the view model can withdraw a request that the control didn't use yet. When a request
@@ -173,7 +173,7 @@ that are on screen. The scroll brings the position into view, as `ScrollIntoView
 - The control scrolls once for each request. A change of `TotalCount` before the view model has
   cleared the request does not scroll again.
 - The tests of the control use these methods with a real SodaFlow graph, including a request made
-  before the view binds. `CreateScrollRequest` has tests of its own.
+  before the view binds. The graph of the request has tests of its own.
 
 ### Give the placeholder the height of a row
 

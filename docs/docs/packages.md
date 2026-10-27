@@ -54,9 +54,8 @@ Avalonia controls for views that bind to view models on SodaFlow. It holds:
 - `VirtualizingItemsControl`, which shows a long list over a SodaFlow `ReactiveCollection` and
   builds the heavy view model of a row only when the row is on screen. See
   [VirtualizingItemsControl](virtualizing-items-control.md).
-- `CreateVirtualItemsSource` and `CreateScrollRequest`, extension methods of `IBindableFactory` that
-  make the object a view model gives to `VirtualizingItemsControl`, and the values that ask it to
-  scroll. See [VirtualizingItemsControl](virtualizing-items-control.md).
+- `CreateVirtualItemsSource`, an extension method of `IBindableFactory` that makes the object a view
+  model gives to `VirtualizingItemsControl`. See [VirtualizingItemsControl](virtualizing-items-control.md).
 
 It targets `net8.0` and `net10.0`, as Avalonia 12 does, rather than the older targets of the other
 packages.

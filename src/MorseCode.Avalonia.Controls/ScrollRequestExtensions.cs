@@ -1,5 +1,4 @@
 using System;
-using JetBrains.Annotations;
 using SodaFlow;
 using SodaFlow.Bindable.ObjectModel;
 using SodaFlow.Functional;
@@ -9,8 +8,7 @@ namespace MorseCode.Avalonia.Controls;
 /// <summary>
 ///     Makes the bindable values that ask a list control to scroll to a position.
 /// </summary>
-[PublicAPI]
-public static class ScrollRequestExtensions
+internal static class ScrollRequestExtensions
 {
     /// <summary>
     ///     Makes the bindable values that ask a list control to scroll to a position, and that
@@ -35,7 +33,7 @@ public static class ScrollRequestExtensions
     /// <exception cref="ArgumentNullException">
     ///     <paramref name="bindableFactory" /> or <paramref name="requests" /> is null.
     /// </exception>
-    public static ScrollRequestBindables CreateScrollRequest(
+    internal static ScrollRequestBindables CreateScrollRequest(
         this IBindableFactory bindableFactory,
         Stream<int> requests) =>
         bindableFactory.CreateScrollRequest(requests: requests, clears: Stream.Never<Unit>());
@@ -62,7 +60,7 @@ public static class ScrollRequestExtensions
     ///     <paramref name="bindableFactory" />, <paramref name="requests" />, or
     ///     <paramref name="clears" /> is null.
     /// </exception>
-    public static ScrollRequestBindables CreateScrollRequest(
+    internal static ScrollRequestBindables CreateScrollRequest(
         this IBindableFactory bindableFactory,
         Stream<int> requests,
         Stream<Unit> clears)

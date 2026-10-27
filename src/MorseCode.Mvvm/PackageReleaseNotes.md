@@ -1,11 +1,9 @@
 0.3.0
 
-Breaking: BindableFactoryExtensions.CreateScrollRequest is no longer in this package. It served
-only VirtualizingItemsControl, so it moved to MorseCode.Avalonia.Controls 0.3.0, where it is
-ScrollRequestExtensions.CreateScrollRequest in the namespace MorseCode.Avalonia.Controls. It also
-returns a ScrollRequestBindables there, the request and the report of the control, and not a
-single two-way value. The type BindableFactoryExtensions is gone. Nothing else in this package
-changed.
+Breaking: BindableFactoryExtensions.CreateScrollRequest is no longer in this package, and the type
+BindableFactoryExtensions is gone. It served only VirtualizingItemsControl, so it moved into
+MorseCode.Avalonia.Controls 0.3.0, where it is not public. Use CreateVirtualItemsSource there to
+make the scroll request with the rest of the source. Nothing else in this package changed.
 
 0.2.4
 

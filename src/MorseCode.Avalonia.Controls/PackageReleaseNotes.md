@@ -20,9 +20,8 @@ still that position. A request that the view model made while the report was on 
 cleared with the old one before. The control also scrolls once for each request, so a change of
 the count before the view model clears the request does not scroll again.
 
-Moved: CreateScrollRequest is now ScrollRequestExtensions.CreateScrollRequest in this package. It
-was in MorseCode.Mvvm 0.2.4, and it returns a ScrollRequestBindables, the request and the report,
-and not one two-way value. CreateVirtualItemsSource uses it, and you can call it alone.
+Moved: the helper CreateScrollRequest of MorseCode.Mvvm 0.2.4 is now inside this package and is
+not public. CreateVirtualItemsSource uses it to make the request and the report.
 
 The package now depends on SodaFlow, SodaFlow.Bindable.ObjectModel, and SodaFlow.Collections. To
 move from 0.2.x: build the source in the view model, expose it as an IVirtualItemsSource, and
