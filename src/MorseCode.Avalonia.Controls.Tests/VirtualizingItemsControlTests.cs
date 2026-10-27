@@ -407,6 +407,25 @@ public sealed class VirtualizingItemsControlTests
                         ordering: CollectionOrdering.Matching);
             });
 
+    // The control only reads ScrollRequest and only writes ScrollHandled, so a test that uses the CLR
+    // properties on their own shows that each one reads back what it holds.
+    [Test]
+    public Task TheScrollPropertiesHoldTheirValuesAndStartAsNone() =>
+        TestApplication.Run(
+            test: static async () =>
+            {
+                VirtualizingItemsControl list = new();
+
+                await Assert.That(list.ScrollRequest).IsEqualTo(expected: Maybe<int>.None);
+                await Assert.That(list.ScrollHandled).IsEqualTo(expected: Maybe<int>.None);
+
+                list.ScrollRequest = Maybe<int>.Some(value: 3);
+                list.ScrollHandled = Maybe<int>.Some(value: 4);
+
+                await Assert.That(list.ScrollRequest).IsEqualTo(expected: Maybe<int>.Some(value: 3));
+                await Assert.That(list.ScrollHandled).IsEqualTo(expected: Maybe<int>.Some(value: 4));
+            });
+
     private static List<string> Texts(ShownVirtual shown) =>
     [
         .. shown.Shown().Select(selector: static pair => pair.Text)
