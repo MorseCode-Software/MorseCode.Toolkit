@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Linq;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Operations;
@@ -128,8 +129,24 @@ public sealed class NamedArgumentOrderAnalyzer : DiagnosticAnalyzer
 
         // The position of the parameter that the compiler binds an argument to. A value that goes into a params
         // array has no operation of its own, thus it takes the last parameter, which is the params parameter.
-        int Ordinal(ArgumentSyntax argument) =>
-            arguments.FirstOrDefault(predicate: operation => operation.Syntax == argument)?.Parameter?.Ordinal
-            ?? method.Parameters.Length - 1;
+        // The operation of an argument with the null-forgiving operator has the syntax of its expression
+        // without the operator.
+        int Ordinal(ArgumentSyntax argument)
+        {
+            ExpressionSyntax withoutSuppression = WithoutSuppression(expression: argument.Expression);
+
+            return arguments.FirstOrDefault(predicate: operation => operation.Syntax == argument)?.Parameter?.Ordinal
+                   ?? (withoutSuppression == argument.Expression
+                       ? null
+                       : arguments.FirstOrDefault(predicate: operation => operation.Syntax == withoutSuppression)
+                           ?.Parameter?.Ordinal)
+                   ?? method.Parameters.Length - 1;
+        }
     }
+
+    private static ExpressionSyntax WithoutSuppression(ExpressionSyntax expression) =>
+        expression is PostfixUnaryExpressionSyntax suppressed
+        && suppressed.IsKind(kind: SyntaxKind.SuppressNullableWarningExpression)
+            ? suppressed.Operand
+            : expression;
 }
