@@ -49,8 +49,8 @@ public sealed class VirtualizingItemsControlRecipeTests
                 await Assert.That(model.Built.Any(predicate: static key => key is > 9 and < 500)).IsFalse();
             });
 
-    // The view model asks with its action, and the request is a two-way bindable value. The control scrolls
-    // and writes none back, which clears the request in the graph.
+    // The view model asks with its action. The control scrolls and reports the position, which clears the
+    // request in the graph.
     [Test]
     public Task AnActionOfTheViewModelScrollsTheListAndTheControlClearsTheRequest() =>
         TestApplication.Run(

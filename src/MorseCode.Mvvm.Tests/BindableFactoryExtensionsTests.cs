@@ -16,61 +16,91 @@ public sealed class BindableFactoryExtensionsTests
     private static readonly BindableFactory Factory = new(bindingScheduler: BindingScheduler.Immediate);
 
     [Test]
-    public async Task TheValueIsNoneUntilARequestComes()
+    public async Task TheRequestIsNoneUntilARequestComes()
     {
         StreamSink<int> requests = Stream.CreateSink<int>();
 
-        ITwoWayBindableValue<Maybe<int>> scrollRequest = Factory.CreateScrollRequest(requests: requests);
+        ScrollRequestBindables scroll = Factory.CreateScrollRequest(requests: requests);
 
-        await Assert.That(scrollRequest.Value).IsEqualTo(expected: Maybe<int>.None);
+        await Assert.That(scroll.Request.Value).IsEqualTo(expected: Maybe<int>.None);
     }
 
     [Test]
     public async Task ARequestMakesTheValueThatPosition()
     {
         StreamSink<int> requests = Stream.CreateSink<int>();
-        ITwoWayBindableValue<Maybe<int>> scrollRequest = Factory.CreateScrollRequest(requests: requests);
+        ScrollRequestBindables scroll = Factory.CreateScrollRequest(requests: requests);
 
         requests.Send(a: 700);
 
-        await Assert.That(scrollRequest.Value).IsEqualTo(expected: Maybe<int>.Some(value: 700));
+        await Assert.That(scroll.Request.Value).IsEqualTo(expected: Maybe<int>.Some(value: 700));
     }
 
     [Test]
     public async Task TheLastRequestWins()
     {
         StreamSink<int> requests = Stream.CreateSink<int>();
-        ITwoWayBindableValue<Maybe<int>> scrollRequest = Factory.CreateScrollRequest(requests: requests);
+        ScrollRequestBindables scroll = Factory.CreateScrollRequest(requests: requests);
 
         requests.Send(a: 300);
         requests.Send(a: 700);
 
-        await Assert.That(scrollRequest.Value).IsEqualTo(expected: Maybe<int>.Some(value: 700));
+        await Assert.That(scroll.Request.Value).IsEqualTo(expected: Maybe<int>.Some(value: 700));
     }
 
     // The control does this after it scrolls.
     [Test]
-    public async Task AWriteOfNoneByTheViewClearsTheRequest()
+    public async Task AReportOfTheRequestThatIsThereClearsIt()
     {
         StreamSink<int> requests = Stream.CreateSink<int>();
-        ITwoWayBindableValue<Maybe<int>> scrollRequest = Factory.CreateScrollRequest(requests: requests);
+        ScrollRequestBindables scroll = Factory.CreateScrollRequest(requests: requests);
 
         requests.Send(a: 700);
-        scrollRequest.Value = Maybe<int>.None;
+        scroll.Handled.Value = Maybe<int>.Some(value: 700);
 
-        await Assert.That(scrollRequest.Value).IsEqualTo(expected: Maybe<int>.None);
+        await Assert.That(scroll.Request.Value).IsEqualTo(expected: Maybe<int>.None);
+    }
+
+    // The race that this design removes: the request changed while the report was on its way.
+    [Test]
+    public async Task AReportOfAnOlderRequestLeavesTheNewerRequest()
+    {
+        StreamSink<int> requests = Stream.CreateSink<int>();
+        ScrollRequestBindables scroll = Factory.CreateScrollRequest(requests: requests);
+
+        requests.Send(a: 700);
+        requests.Send(a: 800);
+        scroll.Handled.Value = Maybe<int>.Some(value: 700);
+
+        await Assert.That(scroll.Request.Value).IsEqualTo(expected: Maybe<int>.Some(value: 800));
+    }
+
+    // The control sets its report to none after each report, so that the same position is a change again.
+    [Test]
+    public async Task AReportOfNoneClearsNothing()
+    {
+        StreamSink<int> requests = Stream.CreateSink<int>();
+        ScrollRequestBindables scroll = Factory.CreateScrollRequest(requests: requests);
+
+        requests.Send(a: 700);
+        scroll.Handled.Value = Maybe<int>.Some(value: 700);
+        requests.Send(a: 700);
+        scroll.Handled.Value = Maybe<int>.None;
+
+        await Assert.That(scroll.Request.Value).IsEqualTo(expected: Maybe<int>.Some(value: 700));
     }
 
     [Test]
-    public async Task ARequestAfterTheClearMakesTheValueThatPositionAgain()
+    public async Task ARequestAfterTheReportMakesTheValueThatPositionAgain()
     {
         StreamSink<int> requests = Stream.CreateSink<int>();
-        ITwoWayBindableValue<Maybe<int>> scrollRequest = Factory.CreateScrollRequest(requests: requests);
+        ScrollRequestBindables scroll = Factory.CreateScrollRequest(requests: requests);
         List<Maybe<int>> seen = [];
-        scrollRequest.PropertyChanged += (_, _) => seen.Add(item: scrollRequest.Value);
+        scroll.Request.PropertyChanged += (_, _) => seen.Add(item: scroll.Request.Value);
 
         requests.Send(a: 700);
-        scrollRequest.Value = Maybe<int>.None;
+        scroll.Handled.Value = Maybe<int>.Some(value: 700);
+        scroll.Handled.Value = Maybe<int>.None;
         requests.Send(a: 700);
 
         await Assert.That(seen)
@@ -85,13 +115,12 @@ public sealed class BindableFactoryExtensionsTests
         StreamSink<int> requests = Stream.CreateSink<int>();
         StreamSink<Unit> clears = Stream.CreateSink<Unit>();
 
-        ITwoWayBindableValue<Maybe<int>> scrollRequest =
-            Factory.CreateScrollRequest(requests: requests, clears: clears);
+        ScrollRequestBindables scroll = Factory.CreateScrollRequest(requests: requests, clears: clears);
 
         requests.Send(a: 700);
         clears.Send(a: Unit.Value);
 
-        await Assert.That(scrollRequest.Value).IsEqualTo(expected: Maybe<int>.None);
+        await Assert.That(scroll.Request.Value).IsEqualTo(expected: Maybe<int>.None);
     }
 
     [Test]
@@ -100,8 +129,7 @@ public sealed class BindableFactoryExtensionsTests
         StreamSink<int> requests = Stream.CreateSink<int>();
         StreamSink<Unit> clears = Stream.CreateSink<Unit>();
 
-        ITwoWayBindableValue<Maybe<int>> scrollRequest =
-            Factory.CreateScrollRequest(requests: requests, clears: clears);
+        ScrollRequestBindables scroll = Factory.CreateScrollRequest(requests: requests, clears: clears);
 
         Transaction.RunVoid(
             action: () =>
@@ -110,7 +138,7 @@ public sealed class BindableFactoryExtensionsTests
                 requests.Send(a: 700);
             });
 
-        await Assert.That(scrollRequest.Value).IsEqualTo(expected: Maybe<int>.Some(value: 700));
+        await Assert.That(scroll.Request.Value).IsEqualTo(expected: Maybe<int>.Some(value: 700));
     }
 
     // A view model gets its factory from IOutput. Dispose of the view model releases the value.
@@ -118,7 +146,7 @@ public sealed class BindableFactoryExtensionsTests
     public async Task TheValueStopsItsNotificationsWhenTheViewModelIsDisposed()
     {
         StreamSink<int> requests = Stream.CreateSink<int>();
-        List<ITwoWayBindableValue<Maybe<int>>> made = [];
+        List<ScrollRequestBindables> made = [];
 
         ViewModelBase viewModel =
             ViewModelBase.CreateBase(
@@ -131,7 +159,7 @@ public sealed class BindableFactoryExtensionsTests
                 });
 
         int notifications = 0;
-        made[0].PropertyChanged += (_, _) => notifications++;
+        made[0].Request.PropertyChanged += (_, _) => notifications++;
 
         requests.Send(a: 1);
         int notificationsBeforeDispose = notifications;

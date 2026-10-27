@@ -63,22 +63,42 @@ internal sealed class VirtualModel(in int total) : INotifyPropertyChanged
     }
 
     /// <summary>
-    ///     Gets or sets the position that the view model wants to show. Only the view calls the setter,
-    ///     and the value that it writes is none. A test makes a request with <see cref="Request" />.
+    ///     Gets the position that the view model wants to show. A test makes a request with
+    ///     <see cref="Request" />, and a report of the view can clear it.
     /// </summary>
-    // ReSharper disable once UnusedMember.Global - A binding in the view reads and writes this property by its name.
-    public Maybe<int> ScrollRequest
-    {
-        get => this.scrollRequest;
-        set
-        {
-            this.ScrollWrites.Add(item: value);
-            this.scrollRequest = value;
-        }
-    }
+    // ReSharper disable once UnusedMember.Global - A binding in the view reads this property by its name.
+    public Maybe<int> ScrollRequest => this.scrollRequest;
 
     /// <summary>
-    ///     Gets each value that the view wrote to <see cref="ScrollRequest" />, in sequence.
+    ///     Gets or sets the position that the view handled. Only the view calls the setter. The model
+    ///     clears the request if it is still that position, as a view model does, unless
+    ///     <see cref="KeepsHandledRequest" /> is true.
+    /// </summary>
+    // ReSharper disable once UnusedMember.Global - A binding in the view writes this property by its name.
+    public Maybe<int> ScrollHandled
+    {
+        get;
+        set
+        {
+            field = value;
+            this.ScrollWrites.Add(item: value);
+
+            if (!this.KeepsHandledRequest && this.scrollRequest.Equals(other: value))
+            {
+                this.scrollRequest = Maybe<int>.None;
+                this.Raise(propertyName: nameof(this.ScrollRequest));
+            }
+        }
+    } = Maybe<int>.None;
+
+    /// <summary>
+    ///     Gets or sets whether the model leaves the request when the view reports it. This stands for
+    ///     the time that a report takes to reach the view model.
+    /// </summary>
+    public bool KeepsHandledRequest { get; init; }
+
+    /// <summary>
+    ///     Gets each value that the view wrote to <see cref="ScrollHandled" />, in sequence.
     /// </summary>
     public List<Maybe<int>> ScrollWrites { get; } = [];
 
