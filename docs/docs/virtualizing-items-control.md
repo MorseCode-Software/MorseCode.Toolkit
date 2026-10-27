@@ -53,29 +53,29 @@ to the view, and the view binds one property. The control attaches to all five v
 
 `CreateVirtualItemsSource` makes the source from a `ReactiveCollection`. It slices the collection
 with the range that the control reports, builds the rows with `Map`, and counts the keys for
-`TotalCount`. It is an extension method of `IBindableFactory`, in `MorseCode.Avalonia.Controls`:
+`TotalCount`. It is an extension method of the `IOutput` that `ViewModelBase` gives your constructor,
+in `MorseCode.Avalonia.Controls`:
 
 ```csharp
 StreamSink<int> scrollTo = Stream.CreateSink<int>();
 
-VirtualItemsSource source = output.AddDisposable(
-    output.BindableFactory.CreateVirtualItemsSource(
-        collection: collection,
-        project: key => new RowViewModel(key, /* bindables built from collection.StateCell(key) */),
-        scrollRequests: scrollTo,
-        onEvicted: static row => row.Dispose()));
+IVirtualItemsSource source = output.CreateVirtualItemsSource(
+    collection: collection,
+    project: key => new RowViewModel(key, /* bindables built from collection.StateCell(key) */),
+    scrollRequests: scrollTo,
+    onEvicted: static row => row.Dispose());
 
 IBindableAction<int> scrollToAction = output.BindableFactory.CreateBindableAction(scrollTo);
 ```
 
-Expose `source` on your view model interface as an `IVirtualItemsSource`.
+Expose `source` on your view model interface.
 
 `Map` builds a row for a key the first time the key is inside the slice. It keeps the row for a
 key that has left until more than `retainedBeyondTheView` keys have left (512 by default), and
 then it calls `onEvicted` for the oldest. Scrolling back over rows you have just seen is free, and
-the number of live view models stays bounded however long the list is. The source owns the
-`MappedItems`, so disposing of the source with the view model releases the rows that are still in
-use.
+the number of live view models stays bounded however long the list is. The helper registers
+the `MappedItems` with the output, so disposing of the view model releases the rows that are still
+in use. You cannot forget it.
 
 The offset and the rows come from one cell, so they always agree. The rows are the list that `Map`
 gives, passed on without a copy. The control reads that list when it needs a row, and not when it
@@ -91,7 +91,7 @@ agree:
 ```csharp
 CellSink<ItemRange> range = Cell.CreateSink(ItemRange.Empty);
 
-VirtualItemsSource source = output.BindableFactory.CreateVirtualItemsSource(
+IVirtualItemsSource source = output.CreateVirtualItemsSource(
     totalCount: count,
     rows: rowsAtOffset,
     visibleRange: range,
@@ -213,5 +213,6 @@ The control gives Avalonia its own list, one position per item. Setting `ItemsSo
 ## Targets and dependencies
 
 The control is in `MorseCode.Avalonia.Controls`, which targets `net8.0` and `net10.0`. It depends on
-SodaFlow, `SodaFlow.Bindable.ObjectModel`, and `SodaFlow.Collections`, because the source is made of
-SodaFlow bindable values.
+SodaFlow, `SodaFlow.Bindable.ObjectModel`, `SodaFlow.Collections`, and `MorseCode.Mvvm` 0.2.4 or
+later. The source is made of SodaFlow bindable values, and `CreateVirtualItemsSource` works with the
+`IOutput` of a `ViewModelBase`.

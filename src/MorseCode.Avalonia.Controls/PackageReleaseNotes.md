@@ -7,11 +7,12 @@ TotalCount, Rows, ScrollRequest, VisibleRange, and ScrollHandled. The control at
 them when Source is set, so none of them can be left unbound. The two pairs, range with rows and
 request with report, are made together.
 
-New: CreateVirtualItemsSource, an extension method of IBindableFactory. One overload takes a
+New: CreateVirtualItemsSource, an extension method of the IOutput of a ViewModelBase from
+MorseCode.Mvvm. One overload takes a
 ReactiveCollection, a function that builds the row for a key, and a Stream of scroll positions.
 It slices the collection with the range that the control reports, maps each key in the slice to a
-row, and counts the keys. It returns a VirtualItemsSource, which you dispose of with the view
-model to release the rows. The other overload takes the count, the rows, and the range sink
+row, and counts the keys. It returns an IVirtualItemsSource, and it registers the rows with the
+output, so disposing of the view model releases them. The other overload takes the count, the rows, and the range sink
 yourself. Both take an optional Stream of clears that withdraw a scroll request.
 
 The scroll protocol is also new. The control no longer writes none to ScrollRequest. It reports
@@ -23,7 +24,8 @@ the count before the view model clears the request does not scroll again.
 Moved: the helper CreateScrollRequest of MorseCode.Mvvm 0.2.4 is now inside this package and is
 not public. CreateVirtualItemsSource uses it to make the request and the report.
 
-The package now depends on SodaFlow, SodaFlow.Bindable.ObjectModel, and SodaFlow.Collections. To
+The package now depends on SodaFlow, SodaFlow.Bindable.ObjectModel, SodaFlow.Collections, and
+MorseCode.Mvvm 0.2.4 or later. To
 move from 0.2.x: build the source in the view model, expose it as an IVirtualItemsSource, and
 replace the bindings in the view with Source="{Binding Source}".
 
