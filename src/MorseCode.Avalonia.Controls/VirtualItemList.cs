@@ -71,6 +71,15 @@ internal sealed class VirtualItemList : IList, IReadOnlyList<object?>, INotifyCo
         this.Count = newCount;
         this.rows = newRows;
 
+        // The events for a long run of added or removed positions would hold one item for each of them.
+        // That costs memory in proportion to the change, thus a large change is a reset.
+        if (Math.Abs(value: newCount - oldCount) > ResetThreshold)
+        {
+            this.Raise(args: new NotifyCollectionChangedEventArgs(action: NotifyCollectionChangedAction.Reset));
+
+            return;
+        }
+
         // A listener that reads the list while it handles an event sees the final state. Each event is
         // still correct for its own positions, because it names a position and the item that is there.
         List<int> changed =
