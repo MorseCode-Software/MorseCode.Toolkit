@@ -1,5 +1,6 @@
 using System;
 using JetBrains.Annotations;
+using MorseCode.Mvvm;
 using SodaFlow;
 using SodaFlow.Bindable.ObjectModel;
 using SodaFlow.Collections;
@@ -8,7 +9,7 @@ using SodaFlow.Functional;
 namespace MorseCode.Avalonia.Controls;
 
 /// <summary>
-///     Makes the <see cref="VirtualItemsSource" /> that a view model gives to a
+///     Makes the <see cref="IVirtualItemsSource" /> that a view model gives to a
 ///     <see cref="VirtualizingItemsControl" />.
 /// </summary>
 [PublicAPI]
@@ -27,8 +28,8 @@ public static class VirtualItemsSourceExtensions
     ///     <para>
     ///         The <c>Map</c> keeps a row for a key that left the slice until more than
     ///         <paramref name="retainedBeyondTheView" /> keys have left. Then it calls
-    ///         <paramref name="onEvicted" /> for the oldest. Dispose of the source with the view model, so
-    ///         that it releases the rows that are still in use.
+    ///         <paramref name="onEvicted" /> for the oldest. When you dispose of the view model, the output
+    ///         releases the rows that are still in use.
     ///     </para>
     /// </remarks>
     /// <typeparam name="TKey">The type of the keys of the collection.</typeparam>
@@ -38,20 +39,20 @@ public static class VirtualItemsSourceExtensions
     ///     The type of the row for a key. It is a class so that the rows fit <see cref="VirtualRows" />
     ///     without a copy.
     /// </typeparam>
-    /// <param name="bindableFactory">The factory that makes the values. A view model gets it from <c>IOutput</c>.</param>
+    /// <param name="output">The output of the view model. The source uses its factory, and the output releases the rows.</param>
     /// <param name="collection">The collection to show.</param>
     /// <param name="project">Builds the row for a key. It runs one time for each key that the map keeps.</param>
     /// <param name="scrollRequests">The positions to scroll to.</param>
     /// <param name="clears">The events that withdraw a request that the control did not use yet. None by default.</param>
     /// <param name="retainedBeyondTheView">The number of keys that left the slice, for which the map keeps a row.</param>
     /// <param name="onEvicted">Receives a row that the map removed. Release its resources here.</param>
-    /// <returns>The source. Bind <see cref="VirtualizingItemsControl.Source" /> to it.</returns>
+    /// <returns>The source. Expose it on the view model, and bind <see cref="VirtualizingItemsControl.Source" /> to it.</returns>
     /// <exception cref="ArgumentNullException">
-    ///     <paramref name="bindableFactory" />, <paramref name="collection" />, <paramref name="project" />,
+    ///     <paramref name="output" />, <paramref name="collection" />, <paramref name="project" />,
     ///     or <paramref name="scrollRequests" /> is null.
     /// </exception>
-    public static VirtualItemsSource CreateVirtualItemsSource<TKey, TIdentity, TState, TRow>(
-        this IBindableFactory bindableFactory,
+    public static IVirtualItemsSource CreateVirtualItemsSource<TKey, TIdentity, TState, TRow>(
+        this ViewModelBase.IOutput output,
         ReactiveCollection<TKey, TIdentity, TState> collection,
         Func<TKey, TRow> project,
         Stream<int> scrollRequests,
@@ -62,7 +63,7 @@ public static class VirtualItemsSourceExtensions
         where TIdentity : notnull
         where TRow : class
     {
-        ArgumentNullException.ThrowIfNull(argument: bindableFactory);
+        ArgumentNullException.ThrowIfNull(argument: output);
         ArgumentNullException.ThrowIfNull(argument: collection);
         ArgumentNullException.ThrowIfNull(argument: project);
         ArgumentNullException.ThrowIfNull(argument: scrollRequests);
@@ -78,12 +79,14 @@ public static class VirtualItemsSourceExtensions
                 Cell<int> offset = range.Map(f: static visible => visible.First);
                 Cell<int> limit = range.Map(f: static visible => visible.Count);
 
+                // The output releases the rows with the view model. A caller cannot forget it.
                 MappedItems<TRow> mapped =
-                    collection.Slice(offsetCell: offset, limitCell: limit)
-                        .Map(
-                            project: project,
-                            retainedBeyondTheView: retainedBeyondTheView,
-                            onEvicted: onEvicted);
+                    output.AddDisposable(
+                        disposable: collection.Slice(offsetCell: offset, limitCell: limit)
+                            .Map(
+                                project: project,
+                                retainedBeyondTheView: retainedBeyondTheView,
+                                onEvicted: onEvicted));
 
                 // The offset and the rows are one value. Thus, they always agree.
                 Cell<VirtualRows> rows =
@@ -94,13 +97,12 @@ public static class VirtualItemsSourceExtensions
                 Cell<int> totalCount = collection.KeysCell.Map(f: static keys => keys.Count);
 
                 return Build(
-                    bindableFactory: bindableFactory,
+                    bindableFactory: output.BindableFactory,
                     totalCount: totalCount,
                     rows: rows,
                     visibleRange: range,
                     scrollRequests: scrollRequests,
-                    clears: clears,
-                    owned: mapped);
+                    clears: clears);
             });
     }
 
@@ -113,26 +115,26 @@ public static class VirtualItemsSourceExtensions
     ///     <paramref name="rows" />. Make the rows and their offset from one cell, so that they always
     ///     agree.
     /// </remarks>
-    /// <param name="bindableFactory">The factory that makes the values. A view model gets it from <c>IOutput</c>.</param>
+    /// <param name="output">The output of the view model. The source makes its values with the factory of the output.</param>
     /// <param name="totalCount">The number of positions in the whole list.</param>
     /// <param name="rows">The rows for some of the positions, with the position of the first.</param>
     /// <param name="visibleRange">The cell that receives the range that the control reports.</param>
     /// <param name="scrollRequests">The positions to scroll to.</param>
     /// <param name="clears">The events that withdraw a request that the control did not use yet. None by default.</param>
-    /// <returns>The source. Bind <see cref="VirtualizingItemsControl.Source" /> to it.</returns>
+    /// <returns>The source. Expose it on the view model, and bind <see cref="VirtualizingItemsControl.Source" /> to it.</returns>
     /// <exception cref="ArgumentNullException">
-    ///     <paramref name="bindableFactory" />, <paramref name="totalCount" />, <paramref name="rows" />,
+    ///     <paramref name="output" />, <paramref name="totalCount" />, <paramref name="rows" />,
     ///     <paramref name="visibleRange" />, or <paramref name="scrollRequests" /> is null.
     /// </exception>
-    public static VirtualItemsSource CreateVirtualItemsSource(
-        this IBindableFactory bindableFactory,
+    public static IVirtualItemsSource CreateVirtualItemsSource(
+        this ViewModelBase.IOutput output,
         Cell<int> totalCount,
         Cell<VirtualRows> rows,
         CellSink<ItemRange> visibleRange,
         Stream<int> scrollRequests,
         Stream<Unit>? clears = null)
     {
-        ArgumentNullException.ThrowIfNull(argument: bindableFactory);
+        ArgumentNullException.ThrowIfNull(argument: output);
         ArgumentNullException.ThrowIfNull(argument: totalCount);
         ArgumentNullException.ThrowIfNull(argument: rows);
         ArgumentNullException.ThrowIfNull(argument: visibleRange);
@@ -141,13 +143,12 @@ public static class VirtualItemsSourceExtensions
         return Transaction.Run(
             f: () =>
                 Build(
-                    bindableFactory: bindableFactory,
+                    bindableFactory: output.BindableFactory,
                     totalCount: totalCount,
                     rows: rows,
                     visibleRange: visibleRange,
                     scrollRequests: scrollRequests,
-                    clears: clears,
-                    owned: null));
+                    clears: clears));
     }
 
     private static VirtualItemsSource Build(
@@ -156,8 +157,7 @@ public static class VirtualItemsSourceExtensions
         Cell<VirtualRows> rows,
         CellSink<ItemRange> visibleRange,
         Stream<int> scrollRequests,
-        Stream<Unit>? clears,
-        IDisposable? owned)
+        Stream<Unit>? clears)
     {
         ScrollRequestBindables scroll =
             bindableFactory.CreateScrollRequest(
@@ -169,7 +169,6 @@ public static class VirtualItemsSourceExtensions
             rows: bindableFactory.CreateOneWay(cell: rows),
             visibleRange: bindableFactory.CreateOneWayToSource(sink: visibleRange),
             scrollRequest: scroll.Request,
-            scrollHandled: scroll.Handled,
-            owned: owned);
+            scrollHandled: scroll.Handled);
     }
 }

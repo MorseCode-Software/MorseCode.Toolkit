@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using MorseCode.Mvvm;
 using SodaFlow;
 using SodaFlow.Bindable.ObjectModel;
 using SodaFlow.Collections;
@@ -16,7 +17,8 @@ namespace MorseCode.Avalonia.Controls.Tests;
 // ReSharper disable once InheritdocConsiderUsage - The summary of IVirtualItemsSource does not say what this model builds.
 internal sealed class RecipeModel : IVirtualItemsSource, IDisposable
 {
-    private readonly VirtualItemsSource source;
+    private readonly IVirtualItemsSource source;
+    private readonly ViewModelBase viewModel;
 
     /// <summary>
     ///     Makes the model.
@@ -41,19 +43,19 @@ internal sealed class RecipeModel : IVirtualItemsSource, IDisposable
                 ],
                 Stream.CreateSink<CollectionEdit<int, RecipeId, RecipeState>>());
 
-        BindableFactory factory = new(bindingScheduler: BindingScheduler.Immediate);
-
         // The view model asks for a scroll with the action. The request is a value, thus a request that
         // comes before the view binds is still there when it binds. The view reports the position that
-        // it handled, and that report clears the request.
-        (this.source, this.ScrollTo) =
-            Transaction.Run(
-                f: () =>
+        // it handled, and that report clears the request. The base view model owns the source, and it
+        // releases the rows when the model is disposed of.
+        (this.viewModel, this.source, this.ScrollTo) =
+            ViewModelBase.CreateBase(
+                bindingScheduler: BindingScheduler.Immediate,
+                continuation: (output, construct) =>
                 {
-                    StreamSink<int> scrollTo = Stream.CreateSink<int>();
+                    StreamSink<int> requests = Stream.CreateSink<int>();
 
-                    VirtualItemsSource made =
-                        factory.CreateVirtualItemsSource(
+                    IVirtualItemsSource made =
+                        output.CreateVirtualItemsSource(
                             collection: collection,
                             project: key =>
                             {
@@ -61,11 +63,14 @@ internal sealed class RecipeModel : IVirtualItemsSource, IDisposable
 
                                 return new VirtualRow(Position: key);
                             },
-                            scrollRequests: scrollTo,
+                            scrollRequests: requests,
                             retainedBeyondTheView: retainedBeyondTheView,
                             onEvicted: row => this.Evicted.Add(item: row.Position));
 
-                    return (made, factory.CreateBindableAction(firingsStreamSink: scrollTo));
+                    IBindableAction<int> scrollTo =
+                        output.BindableFactory.CreateBindableAction(firingsStreamSink: requests);
+
+                    return construct.Construct(constructor: viewModelBase => (viewModelBase, made, scrollTo));
                 });
     }
 
@@ -100,7 +105,7 @@ internal sealed class RecipeModel : IVirtualItemsSource, IDisposable
     public List<int> Evicted { get; } = [];
 
     /// <inheritdoc />
-    public void Dispose() => this.source.Dispose();
+    public void Dispose() => this.viewModel.Dispose();
 
     private sealed record RecipeId(int Value);
 

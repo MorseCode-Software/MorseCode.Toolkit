@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using MorseCode.Mvvm;
 using SodaFlow;
 using SodaFlow.Bindable.ObjectModel;
 using SodaFlow.Collections;
@@ -14,12 +15,11 @@ using TUnit.Core;
 namespace MorseCode.Avalonia.Controls.Tests;
 
 /// <summary>
-///     Checks the sources that <c>CreateVirtualItemsSource</c> makes, without a control.
+///     Checks the sources that <c>CreateVirtualItemsSource</c> makes, without a control. Each test makes
+///     its source inside a view model, as production code does, and disposes of the view model.
 /// </summary>
 public sealed class VirtualItemsSourceExtensionsTests
 {
-    private static readonly BindableFactory Factory = new(bindingScheduler: BindingScheduler.Immediate);
-
     [Test]
     public async Task TheCellsAndSinksOfTheViewModelAreTheValuesOfTheSource()
     {
@@ -28,12 +28,16 @@ public sealed class VirtualItemsSourceExtensionsTests
         CellSink<ItemRange> range = Cell.CreateSink(initialValue: ItemRange.Empty);
         StreamSink<int> requests = Stream.CreateSink<int>();
 
-        using VirtualItemsSource source =
-            Factory.CreateVirtualItemsSource(
-                totalCount: count,
-                rows: Cell.Constant(rows),
-                visibleRange: range,
-                scrollRequests: requests);
+        (IVirtualItemsSource source, ViewModelBase viewModel) =
+            Make(
+                make: output =>
+                    output.CreateVirtualItemsSource(
+                        totalCount: count,
+                        rows: Cell.Constant(rows),
+                        visibleRange: range,
+                        scrollRequests: requests));
+
+        using ViewModelBase owner = viewModel;
 
         await Assert.That(source.TotalCount.Value).IsEqualTo(expected: 10);
         await Assert.That(source.Rows.Value).IsSameReferenceAs(expected: rows);
@@ -50,12 +54,16 @@ public sealed class VirtualItemsSourceExtensionsTests
     {
         StreamSink<int> requests = Stream.CreateSink<int>();
 
-        using VirtualItemsSource source =
-            Factory.CreateVirtualItemsSource(
-                totalCount: Cell.Constant(1),
-                rows: Cell.Constant(VirtualRows.Empty),
-                visibleRange: Cell.CreateSink(initialValue: ItemRange.Empty),
-                scrollRequests: requests);
+        (IVirtualItemsSource source, ViewModelBase viewModel) =
+            Make(
+                make: output =>
+                    output.CreateVirtualItemsSource(
+                        totalCount: Cell.Constant(1),
+                        rows: Cell.Constant(VirtualRows.Empty),
+                        visibleRange: Cell.CreateSink(initialValue: ItemRange.Empty),
+                        scrollRequests: requests));
+
+        using ViewModelBase owner = viewModel;
 
         await Assert.That(source.ScrollRequest.Value).IsEqualTo(expected: Maybe<int>.None);
 
@@ -74,13 +82,17 @@ public sealed class VirtualItemsSourceExtensionsTests
         StreamSink<int> requests = Stream.CreateSink<int>();
         StreamSink<Unit> clears = Stream.CreateSink<Unit>();
 
-        using VirtualItemsSource source =
-            Factory.CreateVirtualItemsSource(
-                totalCount: Cell.Constant(1),
-                rows: Cell.Constant(VirtualRows.Empty),
-                visibleRange: Cell.CreateSink(initialValue: ItemRange.Empty),
-                scrollRequests: requests,
-                clears: clears);
+        (IVirtualItemsSource source, ViewModelBase viewModel) =
+            Make(
+                make: output =>
+                    output.CreateVirtualItemsSource(
+                        totalCount: Cell.Constant(1),
+                        rows: Cell.Constant(VirtualRows.Empty),
+                        visibleRange: Cell.CreateSink(initialValue: ItemRange.Empty),
+                        scrollRequests: requests,
+                        clears: clears));
+
+        using ViewModelBase owner = viewModel;
 
         requests.Send(a: 5);
         clears.Send(a: Unit.Value);
@@ -93,16 +105,20 @@ public sealed class VirtualItemsSourceExtensionsTests
     {
         List<int> built = [];
 
-        using VirtualItemsSource source =
-            Factory.CreateVirtualItemsSource(
-                collection: Collection(total: 100),
-                project: key =>
-                {
-                    built.Add(item: key);
+        (IVirtualItemsSource source, ViewModelBase viewModel) =
+            Make(
+                make: output =>
+                    output.CreateVirtualItemsSource(
+                        collection: Collection(total: 100),
+                        project: key =>
+                        {
+                            built.Add(item: key);
 
-                    return new VirtualRow(Position: key);
-                },
-                scrollRequests: Stream.CreateSink<int>());
+                            return new VirtualRow(Position: key);
+                        },
+                        scrollRequests: Stream.CreateSink<int>()));
+
+        using ViewModelBase owner = viewModel;
 
         await Assert.That(source.TotalCount.Value).IsEqualTo(expected: 100);
         await Assert.That(source.Rows.Value.Items).IsEmpty();
@@ -124,16 +140,20 @@ public sealed class VirtualItemsSourceExtensionsTests
     {
         List<int> built = [];
 
-        using VirtualItemsSource source =
-            Factory.CreateVirtualItemsSource(
-                collection: Collection(total: 100),
-                project: key =>
-                {
-                    built.Add(item: key);
+        (IVirtualItemsSource source, ViewModelBase viewModel) =
+            Make(
+                make: output =>
+                    output.CreateVirtualItemsSource(
+                        collection: Collection(total: 100),
+                        project: key =>
+                        {
+                            built.Add(item: key);
 
-                    return new VirtualRow(Position: key);
-                },
-                scrollRequests: Stream.CreateSink<int>());
+                            return new VirtualRow(Position: key);
+                        },
+                        scrollRequests: Stream.CreateSink<int>()));
+
+        using ViewModelBase owner = viewModel;
 
         source.VisibleRange.Value = new ItemRange(First: 10, Count: 5);
         source.VisibleRange.Value = new ItemRange(First: 12, Count: 5);
@@ -142,23 +162,26 @@ public sealed class VirtualItemsSourceExtensionsTests
             .IsEquivalentTo(expected: [10, 11, 12, 13, 14, 15, 16], ordering: CollectionOrdering.Matching);
     }
 
+    // The caller does not dispose of the rows. The output of the view model does it.
     [Test]
-    public async Task DisposingOfTheSourceReleasesTheRowsThatItHolds()
+    public async Task DisposingOfTheViewModelReleasesTheRowsThatTheSourceHolds()
     {
         List<int> evicted = [];
 
-        VirtualItemsSource source =
-            Factory.CreateVirtualItemsSource(
-                collection: Collection(total: 100),
-                project: static key => new VirtualRow(Position: key),
-                scrollRequests: Stream.CreateSink<int>(),
-                onEvicted: row => evicted.Add(item: row.Position));
+        (IVirtualItemsSource source, ViewModelBase viewModel) =
+            Make(
+                make: output =>
+                    output.CreateVirtualItemsSource(
+                        collection: Collection(total: 100),
+                        project: static key => new VirtualRow(Position: key),
+                        scrollRequests: Stream.CreateSink<int>(),
+                        onEvicted: row => evicted.Add(item: row.Position)));
 
         source.VisibleRange.Value = new ItemRange(First: 10, Count: 3);
 
         await Assert.That(evicted).IsEmpty();
 
-        source.Dispose();
+        viewModel.Dispose();
 
         await Assert.That(evicted.Order())
             .IsEquivalentTo(expected: [10, 11, 12], ordering: CollectionOrdering.Matching);
@@ -180,52 +203,64 @@ public sealed class VirtualItemsSourceExtensionsTests
         Cell<VirtualRows> noRows = null!;
         CellSink<ItemRange> noRange = null!;
         Stream<int> noRequests = null!;
+        ViewModelBase.IOutput noOutput = null!;
 
         // ReSharper restore NullableWarningSuppressionIsUsed
 
         // Each call has one null, which is the input under test: the method must refuse it at run time.
+        // The output closes when the view model is built, so the calls that need a live one run inside Make.
         Exception[] refused =
         [
             Catch(
-                action: () => Factory.CreateVirtualItemsSource(
-                    collection: noCollection,
-                    project: static key => new VirtualRow(Position: key),
-                    scrollRequests: requests)),
-            Catch(
-                action: () => Factory.CreateVirtualItemsSource(
-                    collection: collection,
-                    project: noProject,
-                    scrollRequests: requests)),
-            Catch(
-                action: () => Factory.CreateVirtualItemsSource(
+                action: () => noOutput.CreateVirtualItemsSource(
                     collection: collection,
                     project: static key => new VirtualRow(Position: key),
-                    scrollRequests: noRequests)),
-            Catch(
-                action: () => Factory.CreateVirtualItemsSource(
-                    totalCount: noCount,
-                    rows: Cell.Constant(VirtualRows.Empty),
-                    visibleRange: range,
                     scrollRequests: requests)),
-            Catch(
-                action: () => Factory.CreateVirtualItemsSource(
-                    totalCount: Cell.Constant(0),
-                    rows: noRows,
-                    visibleRange: range,
-                    scrollRequests: requests)),
-            Catch(
-                action: () => Factory.CreateVirtualItemsSource(
-                    totalCount: Cell.Constant(0),
-                    rows: Cell.Constant(VirtualRows.Empty),
-                    visibleRange: noRange,
-                    scrollRequests: requests))
+            Catch(action: () => MakeAndRefuse(make: output => output.CreateVirtualItemsSource(
+                collection: noCollection,
+                project: static key => new VirtualRow(Position: key),
+                scrollRequests: requests))),
+            Catch(action: () => MakeAndRefuse(make: output => output.CreateVirtualItemsSource(
+                collection: collection,
+                project: noProject,
+                scrollRequests: requests))),
+            Catch(action: () => MakeAndRefuse(make: output => output.CreateVirtualItemsSource(
+                collection: collection,
+                project: static key => new VirtualRow(Position: key),
+                scrollRequests: noRequests))),
+            Catch(action: () => MakeAndRefuse(make: output => output.CreateVirtualItemsSource(
+                totalCount: noCount,
+                rows: Cell.Constant(VirtualRows.Empty),
+                visibleRange: range,
+                scrollRequests: requests))),
+            Catch(action: () => MakeAndRefuse(make: output => output.CreateVirtualItemsSource(
+                totalCount: Cell.Constant(0),
+                rows: noRows,
+                visibleRange: range,
+                scrollRequests: requests))),
+            Catch(action: () => MakeAndRefuse(make: output => output.CreateVirtualItemsSource(
+                totalCount: Cell.Constant(0),
+                rows: Cell.Constant(VirtualRows.Empty),
+                visibleRange: noRange,
+                scrollRequests: requests)))
         ];
 
         await Assert.That(refused.Select(selector: static exception => (exception as ArgumentNullException)?.ParamName ?? string.Empty))
             .IsEquivalentTo(
-                expected: ["collection", "project", "scrollRequests", "totalCount", "rows", "visibleRange"],
+                expected: ["output", "collection", "project", "scrollRequests", "totalCount", "rows", "visibleRange"],
                 ordering: CollectionOrdering.Matching);
     }
+
+    // The value that the construction returns carries the result and the view model out.
+    private static (T Result, ViewModelBase ViewModel) Make<T>(Func<ViewModelBase.IOutput, T> make) =>
+        ViewModelBase.CreateBase(
+            bindingScheduler: BindingScheduler.Immediate,
+            continuation: (output, construct) =>
+                construct.Construct(constructor: viewModelBase => (make(output), viewModelBase)));
+
+    // The exception of the make function leaves the construction, and the base releases its registrations.
+    private static void MakeAndRefuse(Func<ViewModelBase.IOutput, IVirtualItemsSource> make) =>
+        Make(make: make).ViewModel.Dispose();
 
     private static ReactiveCollection<int, int, int> Collection(int total) =>
         ReactiveCollection<int, int, int>.Create(

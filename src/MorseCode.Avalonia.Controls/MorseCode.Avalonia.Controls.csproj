@@ -43,6 +43,11 @@
         <PackageReference Include="SodaFlow.Functional" Version="3.0.2"/>
     </ItemGroup>
 
+    <!-- CreateVirtualItemsSource registers the disposal of its source with the IOutput of a view model. -->
+    <ItemGroup>
+        <PackageReference Include="MorseCode.Mvvm" Version="0.2.4"/>
+    </ItemGroup>
+
     <ItemGroup>
         <Compile Include="ComboBox.cs"/>
         <Compile Include="IVirtualItemsSource.cs"/>

@@ -1,39 +1,27 @@
-using System;
-using JetBrains.Annotations;
 using SodaFlow.Bindable.ObjectModel;
 using SodaFlow.Functional;
 
 namespace MorseCode.Avalonia.Controls;
 
 /// <summary>
-///     The values of a <see cref="VirtualizingItemsControl" />, and the resources behind them. Dispose of
-///     it with the view model.
+///     The values of a <see cref="VirtualizingItemsControl" />. <c>CreateVirtualItemsSource</c> makes
+///     it, and gives it to the view model as an <see cref="IVirtualItemsSource" />.
 /// </summary>
-/// <remarks>
-///     Make it with <c>CreateVirtualItemsSource</c>. Disposing of it releases the rows that the
-///     collection overload built. It does not dispose of the bindable values, because the factory that
-///     made them owns them.
-/// </remarks>
-[PublicAPI]
-// ReSharper disable once InheritdocConsiderUsage - The summary of IVirtualItemsSource does not say what this class releases.
-public sealed class VirtualItemsSource : IVirtualItemsSource, IDisposable
+// ReSharper disable once InheritdocConsiderUsage - The summary of IVirtualItemsSource does not say how this class makes the source.
+internal sealed class VirtualItemsSource : IVirtualItemsSource
 {
-    private readonly IDisposable? owned;
-
     internal VirtualItemsSource(
         IOneWayBindableValue<int> totalCount,
         IOneWayBindableValue<VirtualRows> rows,
         IOneWayToSourceBindableValue<ItemRange> visibleRange,
         IOneWayBindableValue<Maybe<int>> scrollRequest,
-        IOneWayToSourceBindableValue<Maybe<int>> scrollHandled,
-        IDisposable? owned)
+        IOneWayToSourceBindableValue<Maybe<int>> scrollHandled)
     {
         this.TotalCount = totalCount;
         this.Rows = rows;
         this.VisibleRange = visibleRange;
         this.ScrollRequest = scrollRequest;
         this.ScrollHandled = scrollHandled;
-        this.owned = owned;
     }
 
     /// <inheritdoc />
@@ -50,7 +38,4 @@ public sealed class VirtualItemsSource : IVirtualItemsSource, IDisposable
 
     /// <inheritdoc />
     public IOneWayToSourceBindableValue<Maybe<int>> ScrollHandled { get; }
-
-    /// <inheritdoc />
-    public void Dispose() => this.owned?.Dispose();
 }
