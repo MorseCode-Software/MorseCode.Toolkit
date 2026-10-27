@@ -213,6 +213,6 @@ The control gives Avalonia its own list, one position per item. Setting `ItemsSo
 ## Targets and dependencies
 
 The control is in `MorseCode.Avalonia.Controls`, which targets `net8.0` and `net10.0`. It depends on
-SodaFlow, `SodaFlow.Bindable.ObjectModel`, `SodaFlow.Collections`, and `MorseCode.Mvvm` 0.2.4 or
+SodaFlow, `SodaFlow.Bindable.ObjectModel`, `SodaFlow.Collections`, and `MorseCode.Mvvm` 0.3.0 or
 later. The source is made of SodaFlow bindable values, and `CreateVirtualItemsSource` works with the
 `IOutput` of a `ViewModelBase`.

@@ -25,7 +25,7 @@ Moved: the helper CreateScrollRequest of MorseCode.Mvvm 0.2.4 is now inside this
 not public. CreateVirtualItemsSource uses it to make the request and the report.
 
 The package now depends on SodaFlow, SodaFlow.Bindable.ObjectModel, SodaFlow.Collections, and
-MorseCode.Mvvm 0.2.4 or later. To
+MorseCode.Mvvm 0.3.0 or later. To
 move from 0.2.x: build the source in the view model, expose it as an IVirtualItemsSource, and
 replace the bindings in the view with Source="{Binding Source}".
 

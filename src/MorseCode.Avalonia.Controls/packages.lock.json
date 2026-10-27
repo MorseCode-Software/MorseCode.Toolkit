@@ -25,16 +25,6 @@
         "resolved": "8.0.0",
         "contentHash": "AJy/KVjXgUbgjf6HiI8wAk4DSSq0SCmvXQF8aU6IB+pnIQq+YJvofvMczug2hqO8yEvnQY557ryew66KPpyCsA=="
       },
-      "MorseCode.Mvvm": {
-        "type": "Direct",
-        "requested": "[0.2.4, )",
-        "resolved": "0.2.4",
-        "contentHash": "KqixEWmksI+1c0zhkYhj93IaKQpdF0H+/ALolm0MLNPy89nqLq6I+AgroOmUz6HdPRzMS8R05GsAKF1HD8daWQ==",
-        "dependencies": {
-          "MorseCode.StagedConstruction": "[0.2.1, 0.3.0)",
-          "SodaFlow.Bindable.ObjectModel": "4.0.0"
-        }
-      },
       "SodaFlow": {
         "type": "Direct",
         "requested": "[5.0.1, )",
@@ -91,11 +81,6 @@
         "resolved": "0.11.6",
         "contentHash": "NdNWGDiZ6eS/Mf/9+QHR91cj1K7Hy+PX9yrHI/zM7xFYuj9IWT2uxtB6sCHjrnxAeLV9fut1R6zHDUGKX6f9lQ=="
       },
-      "MorseCode.StagedConstruction": {
-        "type": "Transitive",
-        "resolved": "0.2.1",
-        "contentHash": "bB9QwtWDtUinn/3vxOlRNasTYr++c5WayctaPCEM3dN1EwnPiEuwy03h+y54HKTFHb9SJ1L94aSCAeAJt0e0hg=="
-      },
       "SodaFlow.Bindable.ObjectModel.Core": {
         "type": "Transitive",
         "resolved": "4.0.0",
@@ -126,6 +111,16 @@
         "type": "Transitive",
         "resolved": "4.6.2",
         "contentHash": "yQgmjfFximrNm9LIV3mL6T5MzjeC+epeE5rl4hXxAlYmxby7RM1dPSkIKXk9HNkl6G54h2JHOmLD46+Pey+IRg=="
+      },
+      "morsecode.mvvm": {
+        "type": "Project",
+        "dependencies": {
+          "MorseCode.StagedConstruction": "[1.0.0, )",
+          "SodaFlow.Bindable.ObjectModel": "[4.0.0, )"
+        }
+      },
+      "morsecode.stagedconstruction": {
+        "type": "Project"
       }
     },
     "net8.0": {
@@ -151,16 +146,6 @@
         "requested": "[8.0.0, )",
         "resolved": "8.0.0",
         "contentHash": "AJy/KVjXgUbgjf6HiI8wAk4DSSq0SCmvXQF8aU6IB+pnIQq+YJvofvMczug2hqO8yEvnQY557ryew66KPpyCsA=="
-      },
-      "MorseCode.Mvvm": {
-        "type": "Direct",
-        "requested": "[0.2.4, )",
-        "resolved": "0.2.4",
-        "contentHash": "KqixEWmksI+1c0zhkYhj93IaKQpdF0H+/ALolm0MLNPy89nqLq6I+AgroOmUz6HdPRzMS8R05GsAKF1HD8daWQ==",
-        "dependencies": {
-          "MorseCode.StagedConstruction": "[0.2.1, 0.3.0)",
-          "SodaFlow.Bindable.ObjectModel": "4.0.0"
-        }
       },
       "SodaFlow": {
         "type": "Direct",
@@ -215,11 +200,6 @@
         "resolved": "0.11.6",
         "contentHash": "NdNWGDiZ6eS/Mf/9+QHR91cj1K7Hy+PX9yrHI/zM7xFYuj9IWT2uxtB6sCHjrnxAeLV9fut1R6zHDUGKX6f9lQ=="
       },
-      "MorseCode.StagedConstruction": {
-        "type": "Transitive",
-        "resolved": "0.2.1",
-        "contentHash": "bB9QwtWDtUinn/3vxOlRNasTYr++c5WayctaPCEM3dN1EwnPiEuwy03h+y54HKTFHb9SJ1L94aSCAeAJt0e0hg=="
-      },
       "SodaFlow.Bindable.ObjectModel.Core": {
         "type": "Transitive",
         "resolved": "4.0.0",
@@ -240,6 +220,16 @@
         "type": "Transitive",
         "resolved": "5.0.0",
         "contentHash": "LSJtWDGie+NbVqOzY/s9PxiNO3d5hAFgiFqne2I6dYOHH/9zcKd0oVZtlobkQBU1lh7eFB5Qz1pzJHiG7ERlug=="
+      },
+      "morsecode.mvvm": {
+        "type": "Project",
+        "dependencies": {
+          "MorseCode.StagedConstruction": "[1.0.0, )",
+          "SodaFlow.Bindable.ObjectModel": "[4.0.0, )"
+        }
+      },
+      "morsecode.stagedconstruction": {
+        "type": "Project"
       }
     }
   }
