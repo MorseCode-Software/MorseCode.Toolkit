@@ -117,8 +117,7 @@ internal sealed class WorkbenchViewModel : ViewModelBase, IWorkbenchViewModel
                         Cell<VirtualRows> rowsAtOffset =
                             offset.Lift(
                                 c2: mapped.Items,
-                                f: static (first, items) =>
-                                    new VirtualRows(Offset: first, Items: [.. items.Cast<object?>()]));
+                                f: static (first, items) => new VirtualRows(Offset: first, Items: items));
 
                         IOneWayBindableValue<VirtualRows> rows =
                             output.BindableFactory.CreateOneWay(cell: rowsAtOffset);
