@@ -1,21 +1,32 @@
 0.3.0
 
-Breaking: VirtualizingItemsControl.ScrollRequest no longer binds two-way and the control no
-longer writes none to it. The control now reports the position that it handled in the new
-property ScrollHandled, a Maybe<int> that binds one way to the source. It sets the property
-to Some(position) when it scrolled to the request, or when the position is negative and can
-never apply, and then straight back to none, so that a report of the same position again is a
-change that the binding sends.
+Breaking: VirtualizingItemsControl is now bound through one property, Source, and the
+public properties TotalCount, Rows, VisibleRange, and ScrollRequest are gone. The type of
+Source is the new interface IVirtualItemsSource. It holds five SodaFlow bindable values:
+TotalCount, Rows, ScrollRequest, VisibleRange, and ScrollHandled. The control attaches to all of
+them when Source is set, so none of them can be left unbound. The two pairs, range with rows and
+request with report, are made together.
 
-The reason: a write of none did not say which request the control had served, so a request
-that the view model made while the write was on its way was cleared with the old one. A view
-model now clears a request only if the request is still the position in the report. The
-control also scrolls once for each value of ScrollRequest, so a change of TotalCount before
-the view model has cleared the request does not scroll again.
+New: CreateVirtualItemsSource, an extension method of IBindableFactory. One overload takes a
+ReactiveCollection, a function that builds the row for a key, and a Stream of scroll positions.
+It slices the collection with the range that the control reports, maps each key in the slice to a
+row, and counts the keys. It returns a VirtualItemsSource, which you dispose of with the view
+model to release the rows. The other overload takes the count, the rows, and the range sink
+yourself. Both take an optional Stream of clears that withdraw a scroll request.
 
-To move from 0.2.x: bind ScrollRequest one way, bind ScrollHandled one way to the source, and
-use MorseCode.Mvvm 0.3.0 CreateScrollRequest, which makes both. A view model that cleared the
-request itself on a write of none must now clear it on a report of its position.
+The scroll protocol is also new. The control no longer writes none to ScrollRequest. It reports
+the position that it handled in ScrollHandled, and the view model clears a request only if it is
+still that position. A request that the view model made while the report was on its way was
+cleared with the old one before. The control also scrolls once for each request, so a change of
+the count before the view model clears the request does not scroll again.
+
+Moved: CreateScrollRequest is now ScrollRequestExtensions.CreateScrollRequest in this package. It
+was in MorseCode.Mvvm 0.2.4, and it returns a ScrollRequestBindables, the request and the report,
+and not one two-way value. CreateVirtualItemsSource uses it, and you can call it alone.
+
+The package now depends on SodaFlow, SodaFlow.Bindable.ObjectModel, and SodaFlow.Collections. To
+move from 0.2.x: build the source in the view model, expose it as an IVirtualItemsSource, and
+replace the bindings in the view with Source="{Binding Source}".
 
 0.2.2
 

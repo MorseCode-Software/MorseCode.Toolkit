@@ -1,16 +1,11 @@
 0.3.0
 
-Breaking: BindableFactoryExtensions.CreateScrollRequest now returns ScrollRequestBindables, a
-pair of bindable values, and not one two-way value. Request is the one-way value of Maybe<int>
-that the control reads. Handled is the one-way-to-source value that receives the position the
-control handled. A report of the position that the request still holds clears it. A report of
-an older position, or of none, clears nothing, so a request that came while the report was on
-its way is kept. The overload with a Stream<Unit> of clears is unchanged, and so is the rule
-that a request wins over a clear or a report in one transaction.
-
-Use it with MorseCode.Avalonia.Controls 0.3.0, which reports in the ScrollHandled property. It
-adds the class ScrollRequestBindables. The graph is an Accum over the merged streams, with no
-loop.
+Breaking: BindableFactoryExtensions.CreateScrollRequest is no longer in this package. It served
+only VirtualizingItemsControl, so it moved to MorseCode.Avalonia.Controls 0.3.0, where it is
+ScrollRequestExtensions.CreateScrollRequest in the namespace MorseCode.Avalonia.Controls. It also
+returns a ScrollRequestBindables there, the request and the report of the control, and not a
+single two-way value. The type BindableFactoryExtensions is gone. Nothing else in this package
+changed.
 
 0.2.4
 

@@ -50,6 +50,7 @@
         <Compile Include="MaybeConverterTests.cs"/>
         <Compile Include="MaybeSelectionModel.cs"/>
         <Compile Include="RecipeModel.cs"/>
+        <Compile Include="ScrollRequestExtensionsTests.cs"/>
         <Compile Include="SelectionModel.cs"/>
         <Compile Include="ShownMaybe.cs"/>
         <Compile Include="ShownVirtual.cs"/>
@@ -60,11 +61,12 @@
         <Compile Include="VirtualModel.cs"/>
         <Compile Include="VirtualRow.cs"/>
         <Compile Include="VirtualItemListTests.cs"/>
+        <Compile Include="VirtualItemsSourceExtensionsTests.cs"/>
     </ItemGroup>
 
     <ItemGroup>
         <ProjectReference Include="..\MorseCode.Avalonia.Controls\MorseCode.Avalonia.Controls.csproj"/>
-        <!-- The model of the recipe makes its scroll request with the helper of MorseCode.Mvvm. -->
+        <!-- The tests of the scroll request build a ViewModelBase, as a view model does. -->
         <ProjectReference Include="..\MorseCode.Mvvm\MorseCode.Mvvm.csproj"/>
     </ItemGroup>
 

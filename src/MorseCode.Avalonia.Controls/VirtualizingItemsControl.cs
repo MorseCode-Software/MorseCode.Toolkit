@@ -1,11 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Presenters;
 using Avalonia.Controls.Templates;
-using Avalonia.Data;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
 using JetBrains.Annotations;
@@ -20,26 +20,23 @@ namespace MorseCode.Avalonia.Controls;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         The control has a position for each of <see cref="TotalCount" /> items.
-///         Thus, the scroll bar, the size of the scroll area, and
-///         <see cref="ItemsControl.ScrollIntoView(int)" /> work as on any items control. Avalonia
-///         makes containers for the positions that show, and the control reports
-///         them in <see cref="VisibleRange" />, with <see cref="Buffer" /> more
-///         positions on each side. A position that <see cref="Rows" /> does not
-///         cover shows <see cref="PlaceholderTemplate" />.
+///         Set <see cref="Source" /> to the one object that the view model gives. The control has a
+///         position for each item that the source counts. Thus, the scroll bar, the size of the
+///         scroll area, and <see cref="ItemsControl.ScrollIntoView(int)" /> work as on any items
+///         control. Avalonia makes containers for the positions that show, and the control reports
+///         them to the source, with <see cref="Buffer" /> more positions on each side. A position
+///         that the rows of the source do not cover shows <see cref="PlaceholderTemplate" />.
 ///     </para>
 ///     <para>
-///         In the view model, send <see cref="VisibleRange" /> to the offset and the
-///         limit of <c>Slice</c>, and build the rows with <c>Map</c> after it. The
-///         <c>Map</c> builds a row for a key only when the key is inside the slice.
-///         Make a <see cref="VirtualRows" /> from the offset of the slice and the
-///         items of the map, and bind it to <see cref="Rows" />.
+///         In the view model, make the source with <c>CreateVirtualItemsSource</c>. It sends the
+///         reported range to the offset and the limit of <c>Slice</c>, and builds the rows with
+///         <c>Map</c> after it. The <c>Map</c> builds a row for a key only when the key is inside
+///         the slice.
 ///     </para>
 ///     <para>
-///         To scroll, the view model sets <see cref="ScrollRequest" /> to the position that it wants
-///         to show. The control scrolls there when it can, and then reports the position in
-///         <see cref="ScrollHandled" />. Thus, a request made before the control is bound or laid out
-///         is not lost.
+///         To scroll, the view model makes a request in the source. The control scrolls there when
+///         it can, and then reports the position back. Thus, a request made before the control is
+///         bound or laid out is not lost.
 ///     </para>
 ///     <para>
 ///         Do not set <see cref="ItemsControl.ItemsSource" />. The control sets it. A
@@ -57,18 +54,24 @@ namespace MorseCode.Avalonia.Controls;
 public class VirtualizingItemsControl : ItemsControl
 {
     /// <summary>
-    ///     Defines the <see cref="TotalCount" /> property.
+    ///     Defines the <see cref="Source" /> property.
     /// </summary>
-    public static readonly StyledProperty<int> TotalCountProperty =
+    public static readonly StyledProperty<IVirtualItemsSource?> SourceProperty =
+        AvaloniaProperty.Register<VirtualizingItemsControl, IVirtualItemsSource?>(name: nameof(Source));
+
+    // The source feeds these three properties, and the tests of the control read them.
+    internal static readonly StyledProperty<int> TotalCountProperty =
         AvaloniaProperty.Register<VirtualizingItemsControl, int>(name: nameof(TotalCount), defaultValue: 0);
 
-    /// <summary>
-    ///     Defines the <see cref="Rows" /> property.
-    /// </summary>
-    public static readonly StyledProperty<VirtualRows> RowsProperty =
+    internal static readonly StyledProperty<VirtualRows> RowsProperty =
         AvaloniaProperty.Register<VirtualizingItemsControl, VirtualRows>(
             name: nameof(Rows),
             defaultValue: VirtualRows.Empty);
+
+    internal static readonly StyledProperty<Maybe<int>> ScrollRequestProperty =
+        AvaloniaProperty.Register<VirtualizingItemsControl, Maybe<int>>(
+            name: nameof(ScrollRequest),
+            defaultValue: Maybe<int>.None);
 
     /// <summary>
     ///     Defines the <see cref="PlaceholderTemplate" /> property.
@@ -81,32 +84,6 @@ public class VirtualizingItemsControl : ItemsControl
     /// </summary>
     public static readonly StyledProperty<int> BufferProperty =
         AvaloniaProperty.Register<VirtualizingItemsControl, int>(name: nameof(Buffer), defaultValue: 10);
-
-    /// <summary>
-    ///     Defines the <see cref="ScrollRequest" /> property.
-    /// </summary>
-    public static readonly StyledProperty<Maybe<int>> ScrollRequestProperty =
-        AvaloniaProperty.Register<VirtualizingItemsControl, Maybe<int>>(
-            name: nameof(ScrollRequest),
-            defaultValue: Maybe<int>.None);
-
-    /// <summary>
-    ///     Defines the <see cref="ScrollHandled" /> property.
-    /// </summary>
-    public static readonly StyledProperty<Maybe<int>> ScrollHandledProperty =
-        AvaloniaProperty.Register<VirtualizingItemsControl, Maybe<int>>(
-            name: nameof(ScrollHandled),
-            defaultValue: Maybe<int>.None,
-            defaultBindingMode: BindingMode.OneWayToSource);
-
-    /// <summary>
-    ///     Defines the <see cref="VisibleRange" /> property.
-    /// </summary>
-    public static readonly DirectProperty<VirtualizingItemsControl, ItemRange> VisibleRangeProperty =
-        AvaloniaProperty.RegisterDirect<VirtualizingItemsControl, ItemRange>(
-            name: nameof(VisibleRange),
-            getter: static control => control.visibleRange,
-            defaultBindingMode: BindingMode.OneWayToSource);
 
     private static readonly FuncTemplate<Panel?> DefaultPanel =
         new(func: static () => new VirtualizingStackPanel());
@@ -123,7 +100,11 @@ public class VirtualizingItemsControl : ItemsControl
     // The view model clears the request after it receives the report, and that can take a moment.
     private bool isRequestHandled;
 
-    private ItemRange visibleRange = ItemRange.Empty;
+    // The source that the control reads and reports to, with the handlers on its values.
+    private IVirtualItemsSource? source;
+    private PropertyChangedEventHandler? onTotalCountChanged;
+    private PropertyChangedEventHandler? onRowsChanged;
+    private PropertyChangedEventHandler? onScrollRequestChanged;
 
     // The default panel of an items control does not virtualize. This is the default panel of the list
     // box of Avalonia.
@@ -142,25 +123,35 @@ public class VirtualizingItemsControl : ItemsControl
     }
 
     /// <summary>
-    ///     Gets or sets the number of positions in the whole list.
+    ///     Gets or sets the object that the view model gives to the control: the count, the rows, the
+    ///     range that shows, and the scroll request.
     /// </summary>
-    public int TotalCount
+    /// <remarks>
+    ///     The control reads the count, the rows, and the scroll request from the source, and writes
+    ///     the range that shows and the position that it scrolled to. Make the source with
+    ///     <c>CreateVirtualItemsSource</c>. A change of this property detaches the control from the
+    ///     old source and attaches it to the new one.
+    /// </remarks>
+    public IVirtualItemsSource? Source
+    {
+        get => this.GetValue(property: SourceProperty);
+        set => this.SetValue(property: SourceProperty, value: value);
+    }
+
+    internal int TotalCount
     {
         get => this.GetValue(property: TotalCountProperty);
         set => this.SetValue(property: TotalCountProperty, value: value);
     }
 
-    /// <summary>
-    ///     Gets or sets the rows for some of the positions.
-    /// </summary>
-    public VirtualRows Rows
+    internal VirtualRows Rows
     {
         get => this.GetValue(property: RowsProperty);
         set => this.SetValue(property: RowsProperty, value: value);
     }
 
     /// <summary>
-    ///     Gets or sets the template for a position that <see cref="Rows" /> does
+    ///     Gets or sets the template for a position that the rows of the source do
     ///     not cover.
     /// </summary>
     /// <remarks>
@@ -174,8 +165,8 @@ public class VirtualizingItemsControl : ItemsControl
     }
 
     /// <summary>
-    ///     Gets or sets the number of positions that <see cref="VisibleRange" />
-    ///     adds on each side of the positions that show.
+    ///     Gets or sets the number of positions that the control adds on each side of the
+    ///     positions that show, when it reports the range to the source.
     /// </summary>
     /// <remarks>
     ///     A scroll that is faster than the view model can answer shows placeholders.
@@ -187,68 +178,19 @@ public class VirtualizingItemsControl : ItemsControl
         set => this.SetValue(property: BufferProperty, value: value);
     }
 
-    /// <summary>
-    ///     Gets or sets the position that the view model wants to show. The control scrolls to it
-    ///     and then reports the position in <see cref="ScrollHandled" />.
-    /// </summary>
-    /// <remarks>
-    ///     <para>
-    ///         Bind this property one way from the view model. The view model keeps the last request
-    ///         until it receives the report. Thus, a request made before the control is bound is
-    ///         still there when the control binds. The control does not write to this property.
-    ///     </para>
-    ///     <para>
-    ///         The control waits for its Loaded event and for at least that many positions. A request
-    ///         for a position beyond <see cref="TotalCount" /> stays until the count grows or the
-    ///         view model sets another request. A negative position can never apply, so the control
-    ///         reports it at once and does not scroll. A new request replaces one that waits.
-    ///     </para>
-    ///     <para>
-    ///         The control scrolls once for each value of this property. If the view model has not
-    ///         cleared the request yet, a change of <see cref="TotalCount" /> does not scroll again.
-    ///     </para>
-    ///     <para>
-    ///         The position is a number and not an item, because the control has no row for a
-    ///         position that <see cref="Rows" /> does not cover. The scroll brings the position into
-    ///         view, as <see cref="ItemsControl.ScrollIntoView(int)" /> does.
-    ///     </para>
-    /// </remarks>
-    public Maybe<int> ScrollRequest
+    // The position that the view model wants to show. The control scrolls to it and then reports the
+    // position to the source. It scrolls once for each value of this property. If the view model has not
+    // cleared the request yet, a change of the count does not scroll again. A request beyond the count
+    // stays until the count grows. A negative position can never apply, so the control reports it at once
+    // and does not scroll.
+    internal Maybe<int> ScrollRequest
     {
         get => this.GetValue(property: ScrollRequestProperty);
         set => this.SetValue(property: ScrollRequestProperty, value: value);
     }
 
-    /// <summary>
-    ///     Gets the position of the request that the control handled last. Bind it one way to the
-    ///     source.
-    /// </summary>
-    /// <remarks>
-    ///     <para>
-    ///         The control sets this property to the position of a request when it scrolled to it, or
-    ///         when the position can never apply. The view model clears the request only if the
-    ///         request is still that position. Thus, a newer request that arrived while the report
-    ///         was on its way is not cleared.
-    ///     </para>
-    ///     <para>
-    ///         The control sets the property to none again at once. Thus, a second report of the same
-    ///         position is a change that the binding sends. A view model ignores none.
-    ///     </para>
-    /// </remarks>
-    public Maybe<int> ScrollHandled
-    {
-        get => this.GetValue(property: ScrollHandledProperty);
-        set => this.SetValue(property: ScrollHandledProperty, value: value);
-    }
-
-    /// <summary>
-    ///     Gets the positions that show, with <see cref="Buffer" /> more on each side.
-    /// </summary>
-    /// <remarks>
-    ///     Bind this property one-way to source. The control sets it after the
-    ///     containers change, in a later item of the dispatcher.
-    /// </remarks>
-    public ItemRange VisibleRange => this.visibleRange;
+    // The positions that show, with the buffer on each side. The control reports them to the source.
+    internal ItemRange VisibleRange { get; private set; } = ItemRange.Empty;
 
     /// <inheritdoc />
     protected override Type StyleKeyOverride => typeof(ListBox);
@@ -261,7 +203,7 @@ public class VirtualizingItemsControl : ItemsControl
         if (change.Property == ItemsSourceProperty && !ReferenceEquals(objA: change.NewValue, objB: this.items))
         {
             throw new InvalidOperationException(
-                message: "VirtualizingItemsControl sets ItemsSource itself. Bind TotalCount and Rows instead.");
+                message: "VirtualizingItemsControl sets ItemsSource itself. Set Source instead.");
         }
 
         if (change.Property == TotalCountProperty || change.Property == RowsProperty)
@@ -271,6 +213,10 @@ public class VirtualizingItemsControl : ItemsControl
         else if (change.Property == BufferProperty)
         {
             this.RequestReport();
+        }
+        else if (change.Property == SourceProperty)
+        {
+            this.AttachSource(newSource: change.GetNewValue<IVirtualItemsSource?>());
         }
 
         // A new request value is a request that the control has not handled.
@@ -359,8 +305,76 @@ public class VirtualizingItemsControl : ItemsControl
         // The flag comes first. The report can make the view model clear or replace the request at once,
         // and that change of the request resets the flag.
         this.isRequestHandled = true;
-        this.ScrollHandled = Maybe<int>.Some(value: position);
-        this.ScrollHandled = Maybe<int>.None;
+
+        // The second write makes a report of the same position a change again, for a source that drops
+        // an equal write.
+        if (this.source is not null)
+        {
+            this.source.ScrollHandled.Value = Maybe<int>.Some(value: position);
+            this.source.ScrollHandled.Value = Maybe<int>.None;
+        }
+    }
+
+    private void AttachSource(IVirtualItemsSource? newSource)
+    {
+        this.DetachSource();
+
+        this.source = newSource;
+
+        if (newSource is null)
+        {
+            return;
+        }
+
+        this.onTotalCountChanged = (_, _) => this.TotalCount = newSource.TotalCount.Value;
+        this.onRowsChanged = (_, _) => this.Rows = newSource.Rows.Value;
+        this.onScrollRequestChanged = (_, _) => this.ScrollRequest = newSource.ScrollRequest.Value;
+
+        newSource.TotalCount.PropertyChanged += this.onTotalCountChanged;
+        newSource.Rows.PropertyChanged += this.onRowsChanged;
+        newSource.ScrollRequest.PropertyChanged += this.onScrollRequestChanged;
+
+        // The source can hold values already. The rows go after the count, as a change of both does.
+        this.TotalCount = newSource.TotalCount.Value;
+        this.Rows = newSource.Rows.Value;
+        this.ScrollRequest = newSource.ScrollRequest.Value;
+
+        // The new source has no range yet.
+        this.VisibleRange = ItemRange.Empty;
+        this.RequestReport();
+    }
+
+    private void DetachSource()
+    {
+        if (this.source is null)
+        {
+            return;
+        }
+
+        if (this.onTotalCountChanged is not null)
+        {
+            this.source.TotalCount.PropertyChanged -= this.onTotalCountChanged;
+        }
+
+        if (this.onRowsChanged is not null)
+        {
+            this.source.Rows.PropertyChanged -= this.onRowsChanged;
+        }
+
+        if (this.onScrollRequestChanged is not null)
+        {
+            this.source.ScrollRequest.PropertyChanged -= this.onScrollRequestChanged;
+        }
+
+        this.source = null;
+        this.onTotalCountChanged = null;
+        this.onRowsChanged = null;
+        this.onScrollRequestChanged = null;
+
+        // A control with no source shows nothing and has no request.
+        this.ScrollRequest = Maybe<int>.None;
+        this.TotalCount = 0;
+        this.Rows = VirtualRows.Empty;
     }
 
     private void RequestReport()
@@ -380,7 +394,10 @@ public class VirtualizingItemsControl : ItemsControl
 
         ItemRange range = this.Measure();
 
-        this.SetAndRaise(property: VisibleRangeProperty, field: ref this.visibleRange, value: range);
+        this.VisibleRange = range;
+
+        // The source drops a write that equals the last one.
+        this.source?.VisibleRange.Value = range;
     }
 
     // Finds the positions of the containers that Avalonia shows now, and adds the buffer on each side.
@@ -399,7 +416,7 @@ public class VirtualizingItemsControl : ItemsControl
             // the case after a change of the items. The panel clears its containers then, and makes them
             // again at the next layout. Thus, the last range stays. If it did not, the view model would
             // drop its rows, the items would change again, and the cycle would repeat without end.
-            return this.items.Count == 0 ? ItemRange.Empty : this.visibleRange;
+            return this.items.Count == 0 ? ItemRange.Empty : this.VisibleRange;
         }
 
         int buffer = Math.Max(val1: 0, val2: this.Buffer);
