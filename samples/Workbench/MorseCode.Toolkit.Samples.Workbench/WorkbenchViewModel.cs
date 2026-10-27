@@ -117,8 +117,7 @@ internal sealed class WorkbenchViewModel : ViewModelBase, IWorkbenchViewModel
                         Cell<VirtualRows> rowsAtOffset =
                             offset.Lift(
                                 c2: mapped.Items,
-                                f: static (first, items) =>
-                                    new VirtualRows(Offset: first, Items: [.. items.Cast<object?>()]));
+                                f: static (first, items) => new VirtualRows(Offset: first, Items: items));
 
                         IOneWayBindableValue<VirtualRows> rows =
                             output.BindableFactory.CreateOneWay(cell: rowsAtOffset);
@@ -129,7 +128,7 @@ internal sealed class WorkbenchViewModel : ViewModelBase, IWorkbenchViewModel
                         // The jump asks for a position far down the list. The request is a value, thus it
                         // is not lost when it comes before the window binds. The list writes none after
                         // it scrolls, and that write clears the request.
-                        int jumpTarget = totalCount * 9 / 10;
+                        int jumpTarget = totalCount - totalCount / 10;
                         StreamSink<Unit> jumpFirings = Stream.CreateSink<Unit>();
 
                         IBindableAction jump =

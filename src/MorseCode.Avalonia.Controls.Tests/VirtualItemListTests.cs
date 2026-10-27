@@ -151,6 +151,46 @@ public sealed class VirtualItemListTests
     }
 
     [Test]
+    public async Task AListThatGrowsByManyPositionsRaisesOneReset()
+    {
+        VirtualItemList items = Items(count: 0, rows: VirtualRows.Empty);
+        List<NotifyCollectionChangedEventArgs> events = Record(items: items);
+
+        items.Update(newCount: 500_000, newRows: VirtualRows.Empty);
+
+        await Assert.That(events.Count).IsEqualTo(expected: 1);
+        await Assert.That(events[0].Action).IsEqualTo(expected: NotifyCollectionChangedAction.Reset);
+        await Assert.That(items.Count).IsEqualTo(expected: 500_000);
+    }
+
+    [Test]
+    public async Task AListThatShrinksByManyPositionsRaisesOneReset()
+    {
+        VirtualItemList items = Items(count: 500_000, rows: VirtualRows.Empty);
+        List<NotifyCollectionChangedEventArgs> events = Record(items: items);
+
+        items.Update(newCount: 10, newRows: VirtualRows.Empty);
+
+        await Assert.That(events.Count).IsEqualTo(expected: 1);
+        await Assert.That(events[0].Action).IsEqualTo(expected: NotifyCollectionChangedAction.Reset);
+        await Assert.That(items.Count).IsEqualTo(expected: 10);
+    }
+
+    // The largest change that is still one event for the added positions.
+    [Test]
+    public async Task AListThatGrowsByTheLimitStillRaisesOneAdd()
+    {
+        VirtualItemList items = Items(count: 100, rows: VirtualRows.Empty);
+        List<NotifyCollectionChangedEventArgs> events = Record(items: items);
+
+        items.Update(newCount: 612, newRows: VirtualRows.Empty);
+
+        await Assert.That(events.Count).IsEqualTo(expected: 1);
+        await Assert.That(events[0].Action).IsEqualTo(expected: NotifyCollectionChangedAction.Add);
+        await Assert.That(events[0].NewItems?.Count).IsEqualTo(expected: 512);
+    }
+
+    [Test]
     public async Task IndexOfFindsARowAndNeverAPlaceholder()
     {
         VirtualItemList items = Items(count: 10, rows: Rows(offset: 4, 4, 5));
