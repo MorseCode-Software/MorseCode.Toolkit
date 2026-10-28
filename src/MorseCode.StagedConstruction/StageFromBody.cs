@@ -6,7 +6,7 @@ namespace MorseCode.StagedConstruction;
 ///     The stage that <see cref="Stage.From{TInput,TOutput,TNext}" /> makes.
 /// </summary>
 // ReSharper disable once InheritdocConsiderUsage - The summary of Stage does not say which method makes this stage.
-internal sealed class StageFromBody<TInput, TOutput, TNext>(Func<TInput, (TOutput Output, TNext Next)> body)
+internal sealed class StageFromBody<TInput, TOutput, TNext>(in Func<TInput, (TOutput Output, TNext Next)> body)
     : Stage<TInput, TOutput, TNext>
 {
     private Func<TInput, (TOutput Output, TNext Next)> Body { get; } = body;
