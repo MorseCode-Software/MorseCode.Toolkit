@@ -142,6 +142,11 @@ public sealed class ViewModelBaseConcurrencyTests
     // value that nothing refers to, and then the test cannot see it. Thus, the test prevents garbage
     // collection until it reads the scheduler. That prevention applies to the full process, thus the
     // test runs alone.
+    //
+    // The runtime ends the region without a signal when the process allocates more than the budget. The
+    // test host allocates too, and the test does not control those allocations. A region that ended
+    // early does not show a defect, but it makes a pass uncertain. Thus, the test reports a skip then,
+    // and the budget is large so that this is rare.
     [Test]
     [NotInParallel]
     public async Task ConstructWhileTheFactoryMakesAnObjectDisposesTheObject()
@@ -152,7 +157,7 @@ public sealed class ViewModelBaseConcurrencyTests
         List<Exception> caught = [];
         int postsBeforeTheChange;
         int postsAfterTheChange;
-        bool collectionPrevented = GC.TryStartNoGCRegion(totalSize: 16 * 1024 * 1024);
+        bool collectionPrevented = GC.TryStartNoGCRegion(totalSize: 64 * 1024 * 1024);
         bool collectionPreventedToTheEnd;
         ViewModelBase viewModel;
 
@@ -208,9 +213,6 @@ public sealed class ViewModelBaseConcurrencyTests
             }
         }
 
-        await Assert.That(collectionPrevented).IsTrue();
-        await Assert.That(collectionPreventedToTheEnd).IsTrue();
-
         await Assert
             .That(log)
             .IsEquivalentTo(
@@ -222,6 +224,18 @@ public sealed class ViewModelBaseConcurrencyTests
         await Assert.That(postsAfterTheChange).IsEqualTo(expected: postsBeforeTheChange);
 
         viewModel.Dispose();
+
+        // A garbage collection can hide a leak, but it cannot make a released value post. Thus, the checks
+        // above come first, and a failure of them is a failure. A pass without the region is not a pass.
+        if (!collectionPrevented)
+        {
+            Skip.Test(reason: "The runtime refused the no-GC region. A leak could hide from the test.");
+        }
+
+        if (!collectionPreventedToTheEnd)
+        {
+            Skip.Test(reason: "The no-GC region ended before the test read the scheduler. A leak could hide from the test.");
+        }
     }
 
     private static Exception Catch(Action action)
