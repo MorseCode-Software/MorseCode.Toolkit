@@ -101,10 +101,22 @@ public class ViewModelBase : IViewModel
     ///     for its registrations, and the handle that constructs the base.
     /// </summary>
     /// <remarks>
-    ///     The subclass must call
-    ///     <see cref="Constructor{TBaseValues}.Construct{TResult}" /> one time only.
-    ///     A second call fails with an <see cref="InvalidOperationException" />,
-    ///     because two view models cannot own the same registrations.
+    ///     <para>
+    ///         The subclass must call
+    ///         <see cref="Constructor{TBaseValues}.Construct{TResult}" /> one time only.
+    ///         A second call fails with an <see cref="InvalidOperationException" />,
+    ///         because two view models cannot own the same registrations.
+    ///     </para>
+    ///     <para>
+    ///         A continuation that returns without a call to
+    ///         <see cref="Constructor{TBaseValues}.Construct{TResult}" /> fails with an
+    ///         <see cref="InvalidOperationException" />, and a continuation that throws
+    ///         lets its exception through. In both cases, the base releases the
+    ///         registrations that the continuation made, because no view model owns
+    ///         them. If a registration also throws when the base releases it, the
+    ///         caller gets an <see cref="AggregateException" /> with the first
+    ///         exception first.
+    ///     </para>
     /// </remarks>
     /// <param name="bindingScheduler">
     ///     The scheduler for the bindable values that
@@ -122,6 +134,10 @@ public class ViewModelBase : IViewModel
     /// <exception cref="ArgumentNullException">
     ///     <paramref name="bindingScheduler" /> or <paramref name="continuation" /> is
     ///     null.
+    /// </exception>
+    /// <exception cref="InvalidOperationException">
+    ///     <paramref name="continuation" /> returned without a call to
+    ///     <see cref="Constructor{TBaseValues}.Construct{TResult}" />.
     /// </exception>
     public static TResult CreateBase<TResult>(
         IBindingScheduler bindingScheduler,
@@ -143,8 +159,53 @@ public class ViewModelBase : IViewModel
 #pragma warning restore CA1510
 
         Output output = new(bindingScheduler: bindingScheduler);
+        ViewModelBaseConstructor constructor = new(output: output);
+        TResult result;
 
-        return continuation(output: output, next: new ViewModelBaseConstructor(output: output));
+        try
+        {
+            result = continuation(output: output, next: constructor);
+        }
+        catch (Exception continuationFailure)
+        {
+            // If the continuation called Construct, the base is in a view model that nobody received. If
+            // it did not, no view model exists. In both cases, nothing else can release the registrations.
+            // A second release after the one in ConstructCore does nothing.
+            Release(output: output, failure: continuationFailure);
+
+            throw;
+        }
+
+        if (constructor.IsConstructed)
+        {
+            return result;
+        }
+
+        // The continuation returned a value without a call to Construct. No view model owns the
+        // registrations, thus the base releases them.
+        InvalidOperationException notConstructed =
+            new(
+                message: "The continuation of CreateBase returned without a call to Construct. The base "
+                         + "released the registrations that the continuation made, because no view model "
+                         + "owns them.");
+
+        Release(output: output, failure: notConstructed);
+
+        throw notConstructed;
+    }
+
+    // Releases the registrations after a failure. If a registration also fails to stop, the caller gets
+    // both exceptions, and the first failure is the first.
+    private static void Release(Output output, Exception failure)
+    {
+        try
+        {
+            output.Dispose();
+        }
+        catch (Exception releaseFailure)
+        {
+            throw new AggregateException(failure, releaseFailure);
+        }
     }
 
     // The base owns the output from the start, and the output releases what it holds on the first Dispose
@@ -154,9 +215,14 @@ public class ViewModelBase : IViewModel
     {
         private readonly Output output = output;
 
+        // True from the first call of ConstructCore. CreateBase reads it when the continuation returns.
+        public bool IsConstructed { get; private set; }
+
         /// <inheritdoc />
         protected override TResult ConstructCore<TResult>(Func<ViewModelBase, TResult> constructor)
         {
+            this.IsConstructed = true;
+
             TResult result;
 
             try
@@ -165,17 +231,8 @@ public class ViewModelBase : IViewModel
             }
             catch (Exception constructionFailure)
             {
-                // The subclass cannot release a base that it never received, and nobody else can. If a
-                // registration also fails to stop, the caller gets both exceptions, and the exception of
-                // the constructor is the first.
-                try
-                {
-                    this.output.Dispose();
-                }
-                catch (Exception releaseFailure)
-                {
-                    throw new AggregateException(constructionFailure, releaseFailure);
-                }
+                // The subclass cannot release a base that it never received, and nobody else can.
+                Release(output: this.output, failure: constructionFailure);
 
                 throw;
             }
