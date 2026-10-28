@@ -2,18 +2,23 @@
 
 Breaking: VirtualizingItemsControl is now bound through one property, Source, and the
 public properties TotalCount, Rows, VisibleRange, and ScrollRequest are gone. The type of
-Source is the new interface IVirtualItemsSource. It holds five SodaFlow bindable values:
-TotalCount, Rows, ScrollRequest, VisibleRange, and ScrollHandled. The control attaches to all of
-them when Source is set, so none of them can be left unbound. The two pairs, range with rows and
-request with report, are made together.
+Source is the new interface IVirtualItemsSource. It holds the SodaFlow bindable values Rows,
+ScrollRequest, VisibleRange, and ScrollHandled. The control attaches to all of them when Source is
+set, so none of them can be left unbound. The two pairs, range with rows and request with report,
+are made together.
+
+Breaking: VirtualRows now carries the count of the whole list in TotalCount, next to Offset and
+Items, and there is no separate count. A change of the count and the rows reaches the control as
+one value, so the control applies both in one update and never shows a count with the rows of a
+different instant. Before, the two arrived one after the other, and the list was updated twice.
 
 New: CreateVirtualItemsSource, an extension method of the IOutput of a ViewModelBase from
 MorseCode.Mvvm. One overload takes a
 ReactiveCollection, a function that builds the row for a key, and a Stream of scroll positions.
 It slices the collection with the range that the control reports, maps each key in the slice to a
 row, and counts the keys. It returns an IVirtualItemsSource, and it registers the rows with the
-output, so disposing of the view model releases them. The other overload takes the count, the rows, and the range sink
-yourself. Both take an optional Stream of clears that withdraw a scroll request.
+output, so disposing of the view model releases them. The other overload takes the rows, with
+their count, and the range sink yourself. Both take an optional Stream of clears that withdraw a scroll request.
 
 The scroll protocol is also new. The control no longer writes none to ScrollRequest. It reports
 the position that it handled in ScrollHandled, and the view model clears a request only if it is

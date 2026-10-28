@@ -55,7 +55,7 @@ public sealed class VirtualItemListTests
         VirtualItemList items = Items(count: 5, rows: rows);
         List<NotifyCollectionChangedEventArgs> events = Record(items: items);
 
-        items.Update(newCount: 5, newRows: rows);
+        items.Update(newRows: rows with { TotalCount = 5 });
 
         await Assert.That(events).IsEmpty();
     }
@@ -68,13 +68,12 @@ public sealed class VirtualItemListTests
         VirtualItemList items =
             Items(
                 count: 10,
-                rows: new VirtualRows(Offset: 1, Items: [new VirtualRow(Position: 1), shared]));
+                rows: new VirtualRows(TotalCount: 0, Offset: 1, Items: [new VirtualRow(Position: 1), shared]));
 
         List<NotifyCollectionChangedEventArgs> events = Record(items: items);
 
         items.Update(
-            newCount: 10,
-            newRows: new VirtualRows(Offset: 2, Items: [shared, new VirtualRow(Position: 3)]));
+            newRows: new VirtualRows(TotalCount: 10, Offset: 2, Items: [shared, new VirtualRow(Position: 3)]));
 
         // Position 1 loses its row, and position 3 gets one. Position 2 keeps the same row.
         await Assert.That(events.Select(selector: static args => args.Action).ToList())
@@ -95,7 +94,7 @@ public sealed class VirtualItemListTests
         VirtualItemList items = Items(count: 3, rows: VirtualRows.Empty);
         List<NotifyCollectionChangedEventArgs> events = Record(items: items);
 
-        items.Update(newCount: 5, newRows: VirtualRows.Empty);
+        items.Update(newRows: VirtualRows.Empty with { TotalCount = 5 });
 
         await Assert.That(events.Count).IsEqualTo(expected: 1);
         await Assert.That(events[0].Action).IsEqualTo(expected: NotifyCollectionChangedAction.Add);
@@ -110,7 +109,7 @@ public sealed class VirtualItemListTests
         VirtualItemList items = Items(count: 5, rows: VirtualRows.Empty);
         List<NotifyCollectionChangedEventArgs> events = Record(items: items);
 
-        items.Update(newCount: 2, newRows: VirtualRows.Empty);
+        items.Update(newRows: VirtualRows.Empty with { TotalCount = 2 });
 
         await Assert.That(events.Count).IsEqualTo(expected: 1);
         await Assert.That(events[0].Action).IsEqualTo(expected: NotifyCollectionChangedAction.Remove);
@@ -124,7 +123,7 @@ public sealed class VirtualItemListTests
         VirtualItemList items = Items(count: 2, rows: VirtualRows.Empty);
         List<NotifyCollectionChangedEventArgs> events = Record(items: items);
 
-        items.Update(newCount: 4, newRows: Rows(offset: 1, 1, 2, 3));
+        items.Update(newRows: Rows(offset: 1, 1, 2, 3) with { TotalCount = 4 });
 
         await Assert.That(events.Select(selector: static args => args.Action).ToList())
             .IsEquivalentTo(
@@ -142,9 +141,7 @@ public sealed class VirtualItemListTests
         VirtualItemList items = Items(count: 5000, rows: VirtualRows.Empty);
         List<NotifyCollectionChangedEventArgs> events = Record(items: items);
 
-        items.Update(
-            newCount: 5000,
-            newRows: Rows(offset: 0, positions: [.. Enumerable.Range(start: 0, count: 1000)]));
+        items.Update(newRows: Rows(offset: 0, positions: [.. Enumerable.Range(start: 0, count: 1000)]) with { TotalCount = 5000 });
 
         await Assert.That(events.Count).IsEqualTo(expected: 1);
         await Assert.That(events[0].Action).IsEqualTo(expected: NotifyCollectionChangedAction.Reset);
@@ -156,7 +153,7 @@ public sealed class VirtualItemListTests
         VirtualItemList items = Items(count: 0, rows: VirtualRows.Empty);
         List<NotifyCollectionChangedEventArgs> events = Record(items: items);
 
-        items.Update(newCount: 500_000, newRows: VirtualRows.Empty);
+        items.Update(newRows: VirtualRows.Empty with { TotalCount = 500_000 });
 
         await Assert.That(events.Count).IsEqualTo(expected: 1);
         await Assert.That(events[0].Action).IsEqualTo(expected: NotifyCollectionChangedAction.Reset);
@@ -169,7 +166,7 @@ public sealed class VirtualItemListTests
         VirtualItemList items = Items(count: 500_000, rows: VirtualRows.Empty);
         List<NotifyCollectionChangedEventArgs> events = Record(items: items);
 
-        items.Update(newCount: 10, newRows: VirtualRows.Empty);
+        items.Update(newRows: VirtualRows.Empty with { TotalCount = 10 });
 
         await Assert.That(events.Count).IsEqualTo(expected: 1);
         await Assert.That(events[0].Action).IsEqualTo(expected: NotifyCollectionChangedAction.Reset);
@@ -183,7 +180,7 @@ public sealed class VirtualItemListTests
         VirtualItemList items = Items(count: 100, rows: VirtualRows.Empty);
         List<NotifyCollectionChangedEventArgs> events = Record(items: items);
 
-        items.Update(newCount: 612, newRows: VirtualRows.Empty);
+        items.Update(newRows: VirtualRows.Empty with { TotalCount = 612 });
 
         await Assert.That(events.Count).IsEqualTo(expected: 1);
         await Assert.That(events[0].Action).IsEqualTo(expected: NotifyCollectionChangedAction.Add);
@@ -217,6 +214,7 @@ public sealed class VirtualItemListTests
 
     private static VirtualRows Rows(int offset, params int[] positions) =>
         new(
+            TotalCount: 0,
             Offset: offset,
             Items: [.. positions.Select(selector: static position => new VirtualRow(Position: position))]);
 
@@ -227,7 +225,7 @@ public sealed class VirtualItemListTests
     private static VirtualItemList Items(int count, VirtualRows rows)
     {
         VirtualItemList items = new();
-        items.Update(newCount: count, newRows: rows);
+        items.Update(newRows: rows with { TotalCount = count });
 
         return items;
     }

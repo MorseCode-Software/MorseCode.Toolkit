@@ -23,29 +23,27 @@ public sealed class VirtualItemsSourceExtensionsTests
     [Test]
     public async Task TheCellsAndSinksOfTheViewModelAreTheValuesOfTheSource()
     {
-        CellSink<int> count = Cell.CreateSink(initialValue: 10);
-        VirtualRows rows = new(Offset: 2, Items: [new VirtualRow(Position: 2)]);
+        CellSink<VirtualRows> rows =
+            Cell.CreateSink(
+                initialValue: new VirtualRows(TotalCount: 10, Offset: 2, Items: [new VirtualRow(Position: 2)]));
+
         CellSink<ItemRange> range = Cell.CreateSink(initialValue: ItemRange.Empty);
         StreamSink<int> requests = Stream.CreateSink<int>();
 
         (IVirtualItemsSource source, ViewModelBase viewModel) =
             Make(
                 make: output =>
-                    output.CreateVirtualItemsSource(
-                        totalCount: count,
-                        rows: Cell.Constant(rows),
-                        visibleRange: range,
-                        scrollRequests: requests));
+                    output.CreateVirtualItemsSource(rows: rows, visibleRange: range, scrollRequests: requests));
 
         using ViewModelBase owner = viewModel;
 
-        await Assert.That(source.TotalCount.Value).IsEqualTo(expected: 10);
-        await Assert.That(source.Rows.Value).IsSameReferenceAs(expected: rows);
+        await Assert.That(source.Rows.Value).IsSameReferenceAs(expected: rows.Sample());
+        await Assert.That(source.Rows.Value.TotalCount).IsEqualTo(expected: 10);
 
-        count.Send(a: 12);
+        rows.Send(a: rows.Sample() with { TotalCount = 12 });
         source.VisibleRange.Value = new ItemRange(First: 3, Count: 4);
 
-        await Assert.That(source.TotalCount.Value).IsEqualTo(expected: 12);
+        await Assert.That(source.Rows.Value.TotalCount).IsEqualTo(expected: 12);
         await Assert.That(range.Sample()).IsEqualTo(expected: new ItemRange(First: 3, Count: 4));
     }
 
@@ -58,7 +56,6 @@ public sealed class VirtualItemsSourceExtensionsTests
             Make(
                 make: output =>
                     output.CreateVirtualItemsSource(
-                        totalCount: Cell.Constant(1),
                         rows: Cell.Constant(VirtualRows.Empty),
                         visibleRange: Cell.CreateSink(initialValue: ItemRange.Empty),
                         scrollRequests: requests));
@@ -86,7 +83,6 @@ public sealed class VirtualItemsSourceExtensionsTests
             Make(
                 make: output =>
                     output.CreateVirtualItemsSource(
-                        totalCount: Cell.Constant(1),
                         rows: Cell.Constant(VirtualRows.Empty),
                         visibleRange: Cell.CreateSink(initialValue: ItemRange.Empty),
                         scrollRequests: requests,
@@ -120,7 +116,7 @@ public sealed class VirtualItemsSourceExtensionsTests
 
         using ViewModelBase owner = viewModel;
 
-        await Assert.That(source.TotalCount.Value).IsEqualTo(expected: 100);
+        await Assert.That(source.Rows.Value.TotalCount).IsEqualTo(expected: 100);
         await Assert.That(source.Rows.Value.Items).IsEmpty();
         await Assert.That(built).IsEmpty();
 
@@ -199,7 +195,6 @@ public sealed class VirtualItemsSourceExtensionsTests
         // ReSharper disable NullableWarningSuppressionIsUsed - The null is the input under test.
         Func<int, VirtualRow> noProject = null!;
         ReactiveCollection<int, int, int> noCollection = null!;
-        Cell<int> noCount = null!;
         Cell<VirtualRows> noRows = null!;
         CellSink<ItemRange> noRange = null!;
         Stream<int> noRequests = null!;
@@ -229,17 +224,10 @@ public sealed class VirtualItemsSourceExtensionsTests
                 project: static key => new VirtualRow(Position: key),
                 scrollRequests: noRequests))),
             Catch(action: () => MakeAndRefuse(make: output => output.CreateVirtualItemsSource(
-                totalCount: noCount,
-                rows: Cell.Constant(VirtualRows.Empty),
-                visibleRange: range,
-                scrollRequests: requests))),
-            Catch(action: () => MakeAndRefuse(make: output => output.CreateVirtualItemsSource(
-                totalCount: Cell.Constant(0),
                 rows: noRows,
                 visibleRange: range,
                 scrollRequests: requests))),
             Catch(action: () => MakeAndRefuse(make: output => output.CreateVirtualItemsSource(
-                totalCount: Cell.Constant(0),
                 rows: Cell.Constant(VirtualRows.Empty),
                 visibleRange: noRange,
                 scrollRequests: requests)))
@@ -247,7 +235,7 @@ public sealed class VirtualItemsSourceExtensionsTests
 
         await Assert.That(refused.Select(selector: static exception => (exception as ArgumentNullException)?.ParamName ?? string.Empty))
             .IsEquivalentTo(
-                expected: ["output", "collection", "project", "scrollRequests", "totalCount", "rows", "visibleRange"],
+                expected: ["output", "collection", "project", "scrollRequests", "rows", "visibleRange"],
                 ordering: CollectionOrdering.Matching);
     }
 
