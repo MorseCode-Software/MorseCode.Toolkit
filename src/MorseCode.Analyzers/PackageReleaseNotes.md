@@ -1,3 +1,18 @@
+0.1.2
+
+Fix: MC0001 no longer reports a call whose named arguments are in order when
+an argument is written with the null-forgiving operator, such as
+Create(collection: collection, project: null!, scrollRequests: requests). The
+compiler gives such an argument a different syntax node, and the rule did not
+find its parameter. It took the last parameter instead, so a suppressed
+argument before the last one looked out of order. The rule now finds the
+parameter of an argument with the operator, in any position. A call that is
+really out of order is still reported, with or without the operator.
+
+MC0002 did not change. This is a patch version because no API changed and no
+rule changed its id. A project that put a suppression of MC0001 on such a call
+can remove it.
+
 0.1.1
 
 New rule: MC0002 reports an explicit cast, such as (int)value or (Square)shape.

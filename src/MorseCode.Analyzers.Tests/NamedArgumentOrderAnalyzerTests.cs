@@ -65,6 +65,10 @@ internal sealed class NamedArgumentOrderAnalyzerTests
         {
             public static int Three(int a, int b, int c) => a + b + c;
 
+            public static int Suppressed(int a, string? b, int c, int d = 0) => a + c + d;
+
+            public static int Texts(string? first, string? second, string? third, string? fourth = null) => 0;
+
             public static int Optional(int a, IEqualityComparer<int>? comparer = null) => a;
 
             public static int Sum(int start, params int[] rest) => start;
@@ -152,6 +156,57 @@ internal sealed class NamedArgumentOrderAnalyzerTests
                     "The arguments of Calls.Three(int, int, int) are not in the order of its parameters: a, b, c"
                 ],
                 ordering: CollectionOrdering.Matching);
+    }
+
+    // The null-forgiving operator changes the syntax that Roslyn gives to the operation of an argument. The
+    // arguments must keep their place, wherever the suppressed one is, also when it is not an expression of null.
+    [Test]
+    public async Task ASuppressedArgumentKeepsItsPositionWhereverItIs()
+    {
+        IReadOnlyList<Diagnostic> found =
+            await Analyze(
+                    body: """
+                          string text = "x";
+                          string? maybe = null;
+                          _ = Suppressed(a: 1, b: null!, c: 3);
+                          _ = Suppressed(a: 1, b: text!, c: 3);
+                          _ = Suppressed(a: 1, b: maybe!, c: 3);
+                          _ = Suppressed(a: 1, b: null!, c: Three(a: 1, b: 2, c: 3));
+                          _ = Suppressed(a: 1!, b: text, c: 3!);
+                          _ = Suppressed(a: 1, b: text, c: 3!);
+                          _ = Texts(first: null!, second: text, third: text);
+                          _ = Texts(first: text, second: null!, third: text);
+                          _ = Texts(first: text, second: text, third: null!);
+                          _ = Texts(first: null!, second: null!, third: null!, fourth: null!);
+                          """,
+                    baseArguments: "a: 1, b: 2")
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        await Assert.That(found).IsEmpty();
+    }
+
+    // A suppressed argument that is out of order is still a report, and the report is on the call.
+    [Test]
+    public async Task ASuppressedArgumentThatIsOutOfOrderGivesAReport()
+    {
+        IReadOnlyList<Diagnostic> found =
+            await Analyze(
+                    body: """
+                          string text = "x";
+                          _ = Suppressed(a: 1, c: 3, b: null!);
+                          _ = Suppressed(b: null!, a: 1, c: 3);
+                          _ = Suppressed(c: 3, b: text!, a: 1);
+                          _ = Texts(second: text, first: null!, third: text);
+                          _ = Texts(first: text, third: null!, second: text);
+                          """,
+                    baseArguments: "a: 1, b: 2")
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        int run = Declarations.Split(separator: '\n').Length;
+
+        await Assert.That(
+                found.Select(selector: static diagnostic => diagnostic.Location.GetLineSpan().StartLinePosition.Line))
+            .IsEquivalentTo(expected: [run + 1, run + 2, run + 3, run + 4, run + 5], ordering: CollectionOrdering.Matching);
     }
 
     // The compiler adds the value of an optional parameter that a call leaves out, and an empty params array.
