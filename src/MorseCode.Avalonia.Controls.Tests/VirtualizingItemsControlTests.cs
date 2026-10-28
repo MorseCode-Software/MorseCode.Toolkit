@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Avalonia;
+using Avalonia.Threading;
 using SodaFlow.Functional;
 using TUnit.Assertions;
 using TUnit.Assertions.Enums;
@@ -416,7 +418,8 @@ public sealed class VirtualizingItemsControlTests
             {
                 VirtualModel first = new(total: 1000);
                 VirtualModel second = new(total: 50);
-                VirtualizingItemsControl list = new() { Source = first };
+                using ShownVirtual shown = new(model: first, buffer: 0);
+                VirtualizingItemsControl list = shown.List;
 
                 await Assert.That(list.TotalCount).IsEqualTo(expected: 1000);
 
@@ -438,6 +441,86 @@ public sealed class VirtualizingItemsControlTests
                 await Assert.That(list.TotalCount).IsEqualTo(expected: 0);
                 await Assert.That(list.ScrollRequest).IsEqualTo(expected: Maybe<int>.None);
             });
+
+    // A view model can outlive its view: a tab closes, a page navigates away, and the view model stays.
+    // The control follows its source only while it is in a visual tree. A control that left the tree
+    // ignores the source, and reads it again when it returns.
+    [Test]
+    public Task AControlThatLeftTheTreeDoesNotFollowItsSourceUntilItReturns() =>
+        TestApplication.Run(
+            test: static async () =>
+            {
+                VirtualModel model = new(total: 1000);
+                using ShownVirtual shown = new(model: model, buffer: 0);
+
+                shown.Remove();
+                model.Resize(total: 2000);
+                model.Request(position: 700);
+                shown.Settle();
+
+                await Assert.That(shown.List.TotalCount).IsEqualTo(expected: 1000);
+                await Assert.That(shown.List.ScrollRequest).IsEqualTo(expected: Maybe<int>.None);
+                await Assert.That(model.ScrollWrites).IsEmpty();
+
+                shown.Return();
+
+                await Assert.That(shown.List.TotalCount).IsEqualTo(expected: 2000);
+                await Assert.That(Texts(shown: shown).Any(predicate: static text => text == "Row 700")).IsTrue();
+                await Assert.That(model.CurrentRequest).IsEqualTo(expected: Maybe<int>.None);
+            });
+
+    // The handlers on the values of the source are the only references from the source to the control.
+    // A control that left the tree removes them. Otherwise, a view model that outlives its view keeps
+    // every control that was bound to it, and the rows that each of them holds.
+    [Test]
+    public Task AControlThatLeftTheTreeIsNotKeptAliveByItsSource() =>
+        TestApplication.Run(
+            test: static async () =>
+            {
+                VirtualModel model = new(total: 1000);
+                WeakReference<VirtualizingItemsControl> control = ShowAndRemove(model: model);
+
+                // A job of the dispatcher that the window left behind can hold the control for one more
+                // turn. A leak holds it for all of them.
+                for (int attempt = 0; attempt < 50 && IsAlive(control: control); attempt++)
+                {
+                    await Task.Delay(millisecondsDelay: 10);
+                    Dispatcher.UIThread.RunJobs();
+                    GC.Collect();
+                    GC.WaitForPendingFinalizers();
+                    GC.Collect();
+                }
+
+                await Assert.That(IsAlive(control: control)).IsFalse();
+
+                // The source must be alive while the collector runs, because the source is what could
+                // keep the control.
+                GC.KeepAlive(obj: model);
+            });
+
+    // The control and the window must not stay on the stack of the test. Thus, a separate method makes
+    // them, and the frame of the test does not hold them.
+    [MethodImpl(methodImplOptions: MethodImplOptions.NoInlining)]
+    private static WeakReference<VirtualizingItemsControl> ShowAndRemove(IVirtualItemsSource model)
+    {
+        ShownVirtual shown = new(model: model, buffer: 0);
+        WeakReference<VirtualizingItemsControl> control = new(target: shown.List);
+
+        shown.Remove();
+        shown.Dispose();
+
+        // A report or a scroll that the control posted holds the control until the dispatcher runs it.
+        Dispatcher.UIThread.RunJobs();
+
+        return control;
+    }
+
+    // TryGetTarget gives a strong reference. In the frame of the test, that reference stays in a slot of
+    // the stack until the method returns, and the collector sees it. In a frame of its own, it is gone
+    // when the call returns.
+    [MethodImpl(methodImplOptions: MethodImplOptions.NoInlining)]
+    private static bool IsAlive(WeakReference<VirtualizingItemsControl> control) =>
+        control.TryGetTarget(target: out _);
 
     private static List<string> Texts(ShownVirtual shown) =>
     [

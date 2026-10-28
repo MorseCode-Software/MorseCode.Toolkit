@@ -8,6 +8,7 @@ using Avalonia.Controls.Presenters;
 using Avalonia.Controls.Templates;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using JetBrains.Annotations;
 using SodaFlow.Functional;
 
@@ -100,8 +101,12 @@ public class VirtualizingItemsControl : ItemsControl
     // The view model clears the request after it receives the report, and that can take a moment.
     private bool isRequestHandled;
 
-    // The source that the control reads and reports to, with the handlers on its values.
+    // The source that the control reads and reports to.
     private IVirtualItemsSource? source;
+
+    // The handlers on the values of the source. They are set only while the control follows the source,
+    // which is while it is in a visual tree. A handler is a reference from the source to the control, and
+    // a view model can outlive its view. Thus, a control that left the tree holds none.
     private PropertyChangedEventHandler? onTotalCountChanged;
     private PropertyChangedEventHandler? onRowsChanged;
     private PropertyChangedEventHandler? onScrollRequestChanged;
@@ -127,10 +132,17 @@ public class VirtualizingItemsControl : ItemsControl
     ///     range that shows, and the scroll request.
     /// </summary>
     /// <remarks>
-    ///     The control reads the count, the rows, and the scroll request from the source, and writes
-    ///     the range that shows and the position that it scrolled to. Make the source with
-    ///     <c>CreateVirtualItemsSource</c>. A change of this property detaches the control from the
-    ///     old source and attaches it to the new one.
+    ///     <para>
+    ///         The control reads the count, the rows, and the scroll request from the source, and writes
+    ///         the range that shows and the position that it scrolled to. Make the source with
+    ///         <c>CreateVirtualItemsSource</c>. A change of this property detaches the control from the
+    ///         old source and attaches it to the new one.
+    ///     </para>
+    ///     <para>
+    ///         The control follows the source only while it is in a visual tree. A control that left the
+    ///         tree keeps no reference in the source. Thus, a view model that outlives its view does not
+    ///         keep the view alive. The control reads the source again when it returns to a tree.
+    ///     </para>
     /// </remarks>
     public IVirtualItemsSource? Source
     {
@@ -242,6 +254,30 @@ public class VirtualizingItemsControl : ItemsControl
     }
 
     /// <inheritdoc />
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e: e);
+
+        // The source can change while the control is out of the tree. The range that the control
+        // reported last stays, thus the view model keeps the rows for it and the return shows no
+        // placeholders.
+        if (this.source is not null)
+        {
+            this.Follow(source: this.source);
+            this.ReadSource(source: this.source);
+            this.RequestReport();
+        }
+    }
+
+    /// <inheritdoc />
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        this.StopFollowing();
+
+        base.OnDetachedFromVisualTree(e: e);
+    }
+
+    /// <inheritdoc />
     protected override void PrepareContainerForItemOverride(Control container, object? item, int index)
     {
         base.PrepareContainerForItemOverride(container: container, item: item, index: index);
@@ -339,34 +375,44 @@ public class VirtualizingItemsControl : ItemsControl
 
     private void AttachSource(IVirtualItemsSource? newSource)
     {
-        this.DetachSource();
+        this.StopFollowing();
 
         this.source = newSource;
 
         if (newSource is null)
         {
+            // A control with no source shows nothing and has no request.
+            this.ScrollRequest = Maybe<int>.None;
+            this.TotalCount = 0;
+            this.Rows = VirtualRows.Empty;
+
             return;
         }
 
-        this.onTotalCountChanged = (_, _) => this.TotalCount = newSource.TotalCount.Value;
-        this.onRowsChanged = (_, _) => this.Rows = newSource.Rows.Value;
-        this.onScrollRequestChanged = (_, _) => this.ScrollRequest = newSource.ScrollRequest.Value;
+        if (this.IsAttachedToVisualTree())
+        {
+            this.Follow(source: newSource);
+        }
 
-        newSource.TotalCount.PropertyChanged += this.onTotalCountChanged;
-        newSource.Rows.PropertyChanged += this.onRowsChanged;
-        newSource.ScrollRequest.PropertyChanged += this.onScrollRequestChanged;
-
-        // The source can hold values already. The rows go after the count, as a change of both does.
-        this.TotalCount = newSource.TotalCount.Value;
-        this.Rows = newSource.Rows.Value;
-        this.ScrollRequest = newSource.ScrollRequest.Value;
+        this.ReadSource(source: newSource);
 
         // The new source has no range yet.
         this.VisibleRange = ItemRange.Empty;
         this.RequestReport();
     }
 
-    private void DetachSource()
+    private void Follow(IVirtualItemsSource source)
+    {
+        this.onTotalCountChanged = (_, _) => this.TotalCount = source.TotalCount.Value;
+        this.onRowsChanged = (_, _) => this.Rows = source.Rows.Value;
+        this.onScrollRequestChanged = (_, _) => this.ScrollRequest = source.ScrollRequest.Value;
+
+        source.TotalCount.PropertyChanged += this.onTotalCountChanged;
+        source.Rows.PropertyChanged += this.onRowsChanged;
+        source.ScrollRequest.PropertyChanged += this.onScrollRequestChanged;
+    }
+
+    private void StopFollowing()
     {
         if (this.source is null)
         {
@@ -388,15 +434,17 @@ public class VirtualizingItemsControl : ItemsControl
             this.source.ScrollRequest.PropertyChanged -= this.onScrollRequestChanged;
         }
 
-        this.source = null;
         this.onTotalCountChanged = null;
         this.onRowsChanged = null;
         this.onScrollRequestChanged = null;
+    }
 
-        // A control with no source shows nothing and has no request.
-        this.ScrollRequest = Maybe<int>.None;
-        this.TotalCount = 0;
-        this.Rows = VirtualRows.Empty;
+    // The source can hold values already. The rows go after the count, as a change of both does.
+    private void ReadSource(IVirtualItemsSource source)
+    {
+        this.TotalCount = source.TotalCount.Value;
+        this.Rows = source.Rows.Value;
+        this.ScrollRequest = source.ScrollRequest.Value;
     }
 
     private void RequestReport()

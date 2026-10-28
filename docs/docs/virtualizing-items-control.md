@@ -49,6 +49,11 @@ The values live together in one object, an `IVirtualItemsSource`. The view model
 to the view, and the view binds one property. The control attaches to all five values when you set
 `Source`, and detaches when you set it again or clear it.
 
+The control follows the source only while it is in a visual tree. When the view leaves the tree, as
+it does when a tab closes or a page navigates away, the control removes its handlers from the
+source. A view model that outlives its view therefore does not keep the view alive. When the view
+returns to a tree, the control reads the source again and catches up with whatever changed.
+
 ## The view model
 
 `CreateVirtualItemsSource` makes the source from a `ReactiveCollection`. It slices the collection

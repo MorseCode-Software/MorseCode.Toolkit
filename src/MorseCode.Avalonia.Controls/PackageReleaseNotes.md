@@ -24,10 +24,10 @@ the count before the view model clears the request does not scroll again.
 Moved: the helper CreateScrollRequest of MorseCode.Mvvm 0.2.4 is now inside this package and is
 not public. CreateVirtualItemsSource uses it to make the request and the report.
 
-The package now depends on SodaFlow, SodaFlow.Bindable.ObjectModel, SodaFlow.Collections, and
-MorseCode.Mvvm 0.3.0 or later. To
-move from 0.2.x: build the source in the view model, expose it as an IVirtualItemsSource, and
-replace the bindings in the view with Source="{Binding Source}".
+The control follows its source only while it is in a visual tree. When it leaves the tree, it
+removes its handlers from the values of the source, so a view model that outlives its view does
+not keep the view alive. When it returns, it reads the source again. A control that is not in a
+tree reads the source once when Source is set and does not follow it after that.
 
 A container that Avalonia recycles after a reset or a removal no longer builds its row template
 for no content. The base clears the content of a container before its template, and the
