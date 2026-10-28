@@ -1,3 +1,17 @@
+0.1.3
+
+Changed: MC0002 now marks only the type in parentheses, such as (int), and not the whole cast
+expression. A cast on a long expression, such as (int)Math.Abs(value: (long)obj), used to
+underline all of it, and a cast inside the value had a mark inside the first one. The rule
+reports the same casts, the same message, and the same id. Only the span of the mark changed.
+A suppression with a pragma or an attribute works as before.
+
+The tests now cover a cast to a tuple type, a pointer cast, and a cast from dynamic. The rule
+reports each of them. A conversion from dynamic is implicit for the compiler, so its message
+says the cast is not needed. That is true of the code, because a variable of the type takes
+the value, and the value is still checked only when the code runs. This is a patch version
+because no API changed and no rule changed its id.
+
 0.1.2
 
 Fix: MC0001 no longer reports a call whose named arguments are in order when
