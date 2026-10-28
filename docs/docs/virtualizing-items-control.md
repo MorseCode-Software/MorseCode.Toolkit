@@ -154,11 +154,31 @@ write makes the same position a change again, so a second request for it is repo
 model ignores the `None`.
 
 Code runs the action with `scrollToAction.Execute(position)`, and a view binds a `Command` to it as it
-does to any `ICommand`. To scroll to an item, find its position first, for example with
-`collection.IndexOf(key)`.
+does to any `ICommand`.
 
 The request is a position and not an item, because the control has a row only for the positions
 that are on screen. The scroll brings the position into view, as `ScrollIntoView` does.
+
+### Scroll to a key
+
+A view model usually knows the key of the item it wants to show, not its position, and positions
+move when the collection changes. `CreateVirtualItemsSourceByKey` takes a `Stream<TKey>` instead of
+a `Stream<int>`, and looks the position up in the collection inside the transaction of the request:
+
+```csharp
+StreamSink<OrderId> scrollTo = Stream.CreateSink<OrderId>();
+
+IVirtualItemsSource source = output.CreateVirtualItemsSourceByKey(
+    collection: collection,
+    project: key => new RowViewModel(key, /* ... */),
+    scrollRequests: scrollTo,
+    onEvicted: static row => row.Dispose());
+```
+
+A key that the collection doesn't have at that instant makes no request. Everything else is the
+same as with positions: the request waits for the control, the control reports it, and `clears`
+withdraw it. The method has its own name rather than being an overload, because a collection keyed
+by `int` would make the two overloads indistinguishable.
 
 - A request for a position beyond `TotalCount` waits until the count grows, and it stays until then.
   If the list is reloaded later and is long enough by then, the control scrolls to the old position

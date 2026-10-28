@@ -107,6 +107,77 @@ public static class VirtualItemsSourceExtensions
     }
 
     /// <summary>
+    ///     Makes the source of a collection, as
+    ///     <see cref="CreateVirtualItemsSource{TKey,TIdentity,TState,TRow}(ViewModelBase.IOutput,ReactiveCollection{TKey,TIdentity,TState},Func{TKey,TRow},Stream{int},Stream{Unit},int,Action{TRow})" />
+    ///     does, with scroll requests by key and not by position.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The source finds the position of a key in the collection in the transaction of the
+    ///         request. Thus, the view model does not keep positions, which move when the collection
+    ///         changes. A key that the collection does not have at that instant makes no request.
+    ///     </para>
+    ///     <para>
+    ///         This method has its own name. A collection with keys of type <c>int</c> would make an
+    ///         overload by position and an overload by key the same method.
+    ///     </para>
+    /// </remarks>
+    /// <typeparam name="TKey">The type of the keys of the collection.</typeparam>
+    /// <typeparam name="TIdentity">The type of the immutable part of an item.</typeparam>
+    /// <typeparam name="TState">The type of the mutable part of an item.</typeparam>
+    /// <typeparam name="TRow">
+    ///     The type of the row for a key. It is a class so that the rows fit <see cref="VirtualRows" />
+    ///     without a copy.
+    /// </typeparam>
+    /// <param name="output">The output of the view model. The source uses its factory, and the output releases the rows.</param>
+    /// <param name="collection">The collection to show.</param>
+    /// <param name="project">Builds the row for a key. It runs one time for each key that the map keeps.</param>
+    /// <param name="scrollRequests">The keys to scroll to.</param>
+    /// <param name="clears">The events that withdraw a request that the control did not use yet. None by default.</param>
+    /// <param name="retainedBeyondTheView">The number of keys that left the slice, for which the map keeps a row.</param>
+    /// <param name="onEvicted">Receives a row that the map removed. Release its resources here.</param>
+    /// <returns>The source. Expose it on the view model, and bind <see cref="VirtualizingItemsControl.Source" /> to it.</returns>
+    /// <exception cref="ArgumentNullException">
+    ///     <paramref name="output" />, <paramref name="collection" />, <paramref name="project" />,
+    ///     or <paramref name="scrollRequests" /> is null.
+    /// </exception>
+    public static IVirtualItemsSource CreateVirtualItemsSourceByKey<TKey, TIdentity, TState, TRow>(
+        this ViewModelBase.IOutput output,
+        ReactiveCollection<TKey, TIdentity, TState> collection,
+        Func<TKey, TRow> project,
+        Stream<TKey> scrollRequests,
+        Stream<Unit>? clears = null,
+        int retainedBeyondTheView = MappedItems.DefaultRetainedBeyondTheView,
+        Action<TRow>? onEvicted = null)
+        where TKey : notnull
+        where TIdentity : notnull
+        where TRow : class
+    {
+        ArgumentNullException.ThrowIfNull(argument: output);
+        ArgumentNullException.ThrowIfNull(argument: collection);
+        ArgumentNullException.ThrowIfNull(argument: project);
+        ArgumentNullException.ThrowIfNull(argument: scrollRequests);
+
+        return Transaction.Run(
+            f: () =>
+            {
+                // The position of the key at the instant of the request. A key that is not in the
+                // collection gives none, and the filter drops it.
+                Stream<int> positions =
+                    scrollRequests.Snapshot(c: collection.KeysCell, f: static (key, keys) => keys.IndexOf(key: key))
+                        .FilterSome();
+
+                return output.CreateVirtualItemsSource(
+                    collection: collection,
+                    project: project,
+                    scrollRequests: positions,
+                    clears: clears,
+                    retainedBeyondTheView: retainedBeyondTheView,
+                    onEvicted: onEvicted);
+            });
+    }
+
+    /// <summary>
     ///     Makes the source from cells and sinks that the view model already has. Use this when the rows
     ///     do not come from a <c>ReactiveCollection</c>.
     /// </summary>
