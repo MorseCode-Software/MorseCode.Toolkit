@@ -79,7 +79,7 @@ call `AddDisposable` for a bindable value.
 while that constructor runs. The constructor of a view model that derives from `ViewModelBase` can
 still add a subscription of its own to `output`, and `Dispose` releases it with the rest.
 
-The registrations close in one of three ways:
+The registrations close in one of these ways:
 
 - The constructor returns.
 - The constructor throws. The base releases every registration made so far, and the exception goes to
@@ -87,6 +87,10 @@ The registrations close in one of three ways:
   `AggregateException` that holds the exception of the constructor first.
 - `Dispose` runs, including a call from inside the constructor. It releases the registrations made
   so far.
+- The continuation returns without calling `Construct`, or throws. No view model owns the
+  registrations then, so the base releases them. A return without `Construct` fails with an
+  `InvalidOperationException`; an exception goes to the caller unchanged, with the same
+  `AggregateException` rule as above.
 
 After that, each member of `IOutput` fails with an `InvalidOperationException`. The
 `BindableFactory` methods check this before they make the object, so a refused call attaches
