@@ -36,6 +36,12 @@ Every cast expression, whatever the conversion is:
 - A conversion that you wrote: `(Money)1.5m`.
 - A cast that the compiler does without: `(object)big`. The message then says that an implicit
   conversion exists, and the cast isn't needed.
+- A cast to a tuple type, `((int, int))boxed`, a pointer, `(byte*)pointer`, or from `dynamic`.
+  The compiler treats a conversion from `dynamic` as implicit, so the message says the cast isn't
+  needed.
+
+The warning marks the type in parentheses, such as `(int)`, and not the value after it. A cast on
+a long expression doesn't underline the expression.
 
 It doesn't report `as`, `is`, a pattern, a conversion the compiler makes without a cast, a
 parenthesized expression such as `(big) + 1`, or code in a generated file.

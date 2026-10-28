@@ -3,6 +3,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
+using Microsoft.CodeAnalysis.Text;
 
 namespace MorseCode.Analyzers;
 
@@ -18,8 +19,10 @@ namespace MorseCode.Analyzers;
 ///         suppression with a reason.
 ///     </para>
 ///     <para>
-///         The analyzer reports each cast expression, whatever the conversion is. It
-///         does not report <c>as</c>, <c>is</c>, a pattern, or a conversion that the
+///         The analyzer reports each cast expression, whatever the conversion is. The
+///         report marks the type in parentheses, such as <c>(int)</c>, and not the
+///         value after it. Thus, a cast on a long expression does not mark the whole
+///         expression. It does not report <c>as</c>, <c>is</c>, a pattern, or a conversion that the
 ///         compiler makes without a cast. The message names the target type and says
 ///         which way out suits the kind of conversion.
 ///     </para>
@@ -72,7 +75,12 @@ public sealed class ExplicitCastAnalyzer : DiagnosticAnalyzer
                 nodeContext.ReportDiagnostic(
                     diagnostic: Diagnostic.Create(
                         descriptor: Rule,
-                        location: cast.GetLocation(),
+                        location:
+                        Location.Create(
+                            syntaxTree: cast.SyntaxTree,
+                            textSpan: TextSpan.FromBounds(
+                                start: cast.OpenParenToken.SpanStart,
+                                end: cast.CloseParenToken.Span.End)),
                         messageArgs:
                         [
                             target.ToDisplayString(format: SymbolDisplayFormat.CSharpShortErrorMessageFormat),

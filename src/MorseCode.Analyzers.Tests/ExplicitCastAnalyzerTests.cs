@@ -45,7 +45,7 @@ internal sealed class ExplicitCastAnalyzerTests
         }
         """;
 
-    // One cast of each kind of conversion. Each one gives one report, and the report covers the whole cast.
+    // One cast of each kind of conversion. Each one gives one report, and the report covers the type in parentheses.
     [Test]
     public async Task EachKindOfExplicitCastGivesOneReport()
     {
@@ -71,18 +71,18 @@ internal sealed class ExplicitCastAnalyzerTests
             .IsEquivalentTo(
                 expected:
                 [
-                    "(string)obj",
-                    "(int)obj",
-                    "(int)big",
-                    "(byte)big",
-                    "(int)color",
-                    "(Color)1",
-                    "(int)maybe",
-                    "(Square)shape",
-                    "(Money)1.5m",
-                    "(decimal)new Money()",
-                    "(string)obj",
-                    "(string)value"
+                    "(string)",
+                    "(int)",
+                    "(int)",
+                    "(byte)",
+                    "(int)",
+                    "(Color)",
+                    "(int)",
+                    "(Square)",
+                    "(Money)",
+                    "(decimal)",
+                    "(string)",
+                    "(string)"
                 ],
                 ordering: CollectionOrdering.Matching);
     }
@@ -113,6 +113,101 @@ internal sealed class ExplicitCastAnalyzerTests
                 .ConfigureAwait(continueOnCapturedContext: false);
 
         await Assert.That(found).IsEmpty();
+    }
+
+    // A cast on a long expression marks the type only. The value after it, with its own casts and calls, is
+    // outside the report, and a cast inside it has a report of its own.
+    [Test]
+    public async Task TheReportMarksTheTypeAndNotTheValueAfterIt()
+    {
+        IReadOnlyList<Diagnostic> found =
+            await Analyze(
+                    body: "_ = (int)Math.Abs(value: (long)obj);")
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        await Assert.That(found.Select(selector: static diagnostic => diagnostic.Location.SourceSpan.Length))
+            .IsEquivalentTo(expected: [5, 6], ordering: CollectionOrdering.Matching);
+
+        await Assert.That(found.Select(selector: static diagnostic => Covered(diagnostic: diagnostic)))
+            .IsEquivalentTo(expected: ["(int)", "(long)"], ordering: CollectionOrdering.Matching);
+    }
+
+    // A tuple type in the parentheses has its own commas and parentheses. The report still covers the whole type.
+    [Test]
+    public async Task ACastToATupleTypeGivesOneReportForTheType()
+    {
+        IReadOnlyList<Diagnostic> found =
+            await Analyze(
+                    body: """
+                          _ = ((int, int))obj;
+                          _ = ((int first, int second))(big, big);
+                          _ = (ValueTuple<int, int>)obj;
+                          """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        await Assert.That(found.Select(selector: static diagnostic => Covered(diagnostic: diagnostic)))
+            .IsEquivalentTo(
+                expected: ["((int, int))", "((int first, int second))", "(ValueTuple<int, int>)"],
+                ordering: CollectionOrdering.Matching);
+
+        await Assert.That(found.Select(selector: static diagnostic => diagnostic.GetMessage().Split(':')[0]))
+            .IsEquivalentTo(
+                expected:
+                [
+                    "Avoid the explicit cast to (int, int)",
+                    "Avoid the explicit cast to (int first, int second)",
+                    "Avoid the explicit cast to (int, int)"
+                ],
+                ordering: CollectionOrdering.Matching);
+    }
+
+    // A cast to or from dynamic is a cast, and the report names it. The compiler classes a conversion from
+    // dynamic as implicit, because int number = unknown compiles, thus the message says the cast is not needed.
+    // That is true, and the value is still checked only when the code runs.
+    [Test]
+    public async Task ACastFromDynamicGivesOneReportAndACastToDynamicSaysItIsNotNeeded()
+    {
+        IReadOnlyList<Diagnostic> found =
+            await Analyze(
+                    body: """
+                          dynamic unknown = obj;
+                          _ = (int)unknown;
+                          _ = (dynamic)obj;
+                          """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        await Assert.That(found.Select(selector: static diagnostic => diagnostic.GetMessage()))
+            .IsEquivalentTo(
+                expected:
+                [
+                    "Avoid the explicit cast to int: an implicit conversion exists, thus the cast is not needed",
+                    "Avoid the explicit cast to dynamic: an implicit conversion exists, thus the cast is not needed"
+                ],
+                ordering: CollectionOrdering.Matching);
+    }
+
+    // A pointer cast is a cast too. It needs an unsafe context, thus it has a sample of its own.
+    [Test]
+    public async Task APointerCastGivesOneReportForTheType()
+    {
+        IReadOnlyList<Diagnostic> found =
+            await AnalyzerHarness.Analyze(
+                    analyzer: new ExplicitCastAnalyzer(),
+                    source: """
+                            public static unsafe class Calls
+                            {
+                                public static void Run(int* pointer, long address)
+                                {
+                                    _ = (long)pointer;
+                                    _ = (byte*)pointer;
+                                    _ = (int*)address;
+                                }
+                            }
+                            """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        await Assert.That(found.Select(selector: static diagnostic => Covered(diagnostic: diagnostic)))
+            .IsEquivalentTo(expected: ["(long)", "(byte*)", "(int*)"], ordering: CollectionOrdering.Matching);
     }
 
     // The message names the type that the cast converts to, and gives the way out that suits the conversion.
@@ -164,7 +259,7 @@ internal sealed class ExplicitCastAnalyzerTests
                           """)
                 .ConfigureAwait(continueOnCapturedContext: false);
 
-        await Assert.That(found).IsEquivalentTo(expected: ["(int)big"], ordering: CollectionOrdering.Matching);
+        await Assert.That(found).IsEquivalentTo(expected: ["(int)"], ordering: CollectionOrdering.Matching);
     }
 
     // The attribute is the other way to suppress the rule, for a whole method.
@@ -209,14 +304,12 @@ internal sealed class ExplicitCastAnalyzerTests
     {
         IReadOnlyList<Diagnostic> found = await Analyze(body: body).ConfigureAwait(continueOnCapturedContext: false);
 
-        return
-        [
-            .. found.Select(
-                selector: static diagnostic =>
-                    diagnostic.Location.SourceTree?.GetText().ToString(span: diagnostic.Location.SourceSpan)
-                    ?? string.Empty)
-        ];
+        return [.. found.Select(selector: static diagnostic => Covered(diagnostic: diagnostic))];
     }
+
+    // The text that a report marks.
+    private static string Covered(Diagnostic diagnostic) =>
+        diagnostic.Location.SourceTree?.GetText().ToString(span: diagnostic.Location.SourceSpan) ?? string.Empty;
 
     private static Task<IReadOnlyList<Diagnostic>> Analyze(string body) =>
         AnalyzerHarness.Analyze(analyzer: new ExplicitCastAnalyzer(), source: Sample(body: body));

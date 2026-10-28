@@ -80,7 +80,8 @@ internal static class AnalyzerHarness
             references: references,
             options: new CSharpCompilationOptions(
                 outputKind: OutputKind.DynamicallyLinkedLibrary,
-                nullableContextOptions: NullableContextOptions.Enable));
+                nullableContextOptions: NullableContextOptions.Enable,
+                allowUnsafe: true));
 
     // The assemblies of the runtime that runs the tests, which the samples compile against.
     private static IEnumerable<MetadataReference> PlatformReferences() =>
