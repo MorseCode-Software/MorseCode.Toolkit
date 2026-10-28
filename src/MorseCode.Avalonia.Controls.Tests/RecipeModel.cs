@@ -75,9 +75,6 @@ internal sealed class RecipeModel : IVirtualItemsSource, IDisposable
     }
 
     /// <inheritdoc />
-    public IOneWayBindableValue<int> TotalCount => this.source.TotalCount;
-
-    /// <inheritdoc />
     public IOneWayBindableValue<VirtualRows> Rows => this.source.Rows;
 
     /// <inheritdoc />

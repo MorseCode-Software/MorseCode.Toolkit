@@ -67,7 +67,6 @@ internal sealed class VirtualModel : IVirtualItemsSource
                                         : current)))
                 .Accum(initialState: Maybe<int>.None, f: static (change, current) => change(arg: current));
 
-        this.TotalCount = factory.CreateOneWay(cell: this.totalCount);
         this.Rows = factory.CreateOneWay(cell: rowsCell);
         this.ScrollRequest = factory.CreateOneWay(cell: this.request);
 
@@ -80,9 +79,6 @@ internal sealed class VirtualModel : IVirtualItemsSource
         // These listeners only record.
         this.listeners = [rangeWrites.Listen(handler: this.RecordRange), handledWrites.Listen(handler: this.ScrollWrites.Add)];
     }
-
-    /// <inheritdoc />
-    public IOneWayBindableValue<int> TotalCount { get; }
 
     /// <inheritdoc />
     public IOneWayBindableValue<VirtualRows> Rows { get; }
@@ -169,9 +165,10 @@ internal sealed class VirtualModel : IVirtualItemsSource
 
     private VirtualRows Answer(ItemRange visible, int count)
     {
+        // The count is always current. Only the rows are late.
         if (this.isHeld)
         {
-            return this.lastRows;
+            return this.lastRows with { TotalCount = count };
         }
 
         int first = visible.First;
@@ -190,7 +187,7 @@ internal sealed class VirtualModel : IVirtualItemsSource
             items.Add(item: row);
         }
 
-        this.lastRows = new VirtualRows(Offset: first, Items: items);
+        this.lastRows = new VirtualRows(TotalCount: count, Offset: first, Items: items);
 
         return this.lastRows;
     }
