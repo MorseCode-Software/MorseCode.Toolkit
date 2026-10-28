@@ -29,6 +29,16 @@ MorseCode.Mvvm 0.3.0 or later. To
 move from 0.2.x: build the source in the view model, expose it as an IVirtualItemsSource, and
 replace the bindings in the view with Source="{Binding Source}".
 
+A container that Avalonia recycles after a reset or a removal no longer builds its row template
+for no content. The base clears the content of a container before its template, and the
+ContentPresenter of Avalonia 12 builds an explicit template also when the content is null. The
+control now clears the template first.
+
+The package now depends on SodaFlow, SodaFlow.Bindable.ObjectModel, SodaFlow.Collections, and
+MorseCode.Mvvm 0.3.0 or later. To
+move from 0.2.x: build the source in the view model, expose it as an IVirtualItemsSource, and
+replace the bindings in the view with Source="{Binding Source}".
+
 0.2.2
 
 Changed: a large change of TotalCount now raises one reset of the list, where it raised an

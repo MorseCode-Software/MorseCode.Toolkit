@@ -263,6 +263,28 @@ public class VirtualizingItemsControl : ItemsControl
         }
     }
 
+    /// <inheritdoc />
+    protected override void ClearContainerForItemOverride(Control container)
+    {
+        // The base clears the content before the template. A presenter in a tree builds its child again
+        // at each of the two changes. The ContentPresenter of Avalonia 12 builds an explicit template
+        // also for no content. Thus, the row template builds a row view for null, and the second change
+        // removes it. The template goes first here, so that the build for no content does not occur.
+        switch (container)
+        {
+            case ContentPresenter presenter:
+                presenter.ClearValue(property: ContentPresenter.ContentTemplateProperty);
+
+                break;
+            case ContentControl control:
+                control.ClearValue(property: ContentControl.ContentTemplateProperty);
+
+                break;
+        }
+
+        base.ClearContainerForItemOverride(container: container);
+    }
+
     private void RequestScroll()
     {
         if (this.isScrollPending)
