@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using MorseCode.Mvvm;
 using SodaFlow;
 using SodaFlow.Bindable.ObjectModel;
 using SodaFlow.Functional;
@@ -9,9 +10,9 @@ using TUnit.Assertions.Enums;
 using TUnit.Assertions.Extensions;
 using TUnit.Core;
 
-namespace MorseCode.Mvvm.Tests;
+namespace MorseCode.Avalonia.Controls.Tests;
 
-public sealed class BindableFactoryExtensionsTests
+public sealed class ScrollRequestExtensionsTests
 {
     private static readonly BindableFactory Factory = new(bindingScheduler: BindingScheduler.Immediate);
 
@@ -181,7 +182,7 @@ public sealed class BindableFactoryExtensionsTests
             Catch(
                 action: () =>
                     // ReSharper disable once NullableWarningSuppressionIsUsed - The null is the input under test.
-                    BindableFactoryExtensions.CreateScrollRequest(
+                    ScrollRequestExtensions.CreateScrollRequest(
                         bindableFactory: null!,
                         requests: requests));
 

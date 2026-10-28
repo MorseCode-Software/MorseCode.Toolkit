@@ -1,18 +1,16 @@
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.Linq;
 using Avalonia.Controls;
 using Avalonia.Controls.Presenters;
 using Avalonia.Controls.Templates;
-using Avalonia.Data;
 using Avalonia.VisualTree;
 
 namespace MorseCode.Avalonia.Controls.Tests;
 
 /// <summary>
-///     A <see cref="VirtualizingItemsControl" /> in a window, bound to a
-///     <see cref="VirtualModel" />. Each row and each placeholder is 20 high, and
+///     A <see cref="VirtualizingItemsControl" /> in a window, with the source of a
+///     model. Each row and each placeholder is 20 high, and
 ///     the window shows ten of them.
 /// </summary>
 // ReSharper disable once InheritdocConsiderUsage - The summary of IDisposable does not say what this closes.
@@ -27,12 +25,11 @@ internal sealed class ShownVirtual : IDisposable
     /// </summary>
     /// <param name="model">The model.</param>
     /// <param name="buffer">The buffer of the control.</param>
-    public ShownVirtual(INotifyPropertyChanged model, int buffer)
+    public ShownVirtual(IVirtualItemsSource model, int buffer)
     {
         this.List =
             new VirtualizingItemsControl
             {
-                DataContext = model,
                 Buffer = buffer,
                 ItemTemplate =
                     new FuncDataTemplate<VirtualRow>(
@@ -41,41 +38,9 @@ internal sealed class ShownVirtual : IDisposable
                 PlaceholderTemplate =
                     new FuncDataTemplate<object>(
                         build: static (_, _) => new TextBlock { Text = PlaceholderText, Height = 20 },
-                        supportsRecycling: true)
+                        supportsRecycling: true),
+                Source = model
             };
-
-        this.List.Bind(
-            property: VirtualizingItemsControl.TotalCountProperty,
-            binding: new ReflectionBinding(path: "TotalCount"));
-
-        this.List.Bind(
-            property: VirtualizingItemsControl.RowsProperty,
-            binding: new ReflectionBinding(path: "Rows"));
-
-        this.List.Bind(
-            property: VirtualizingItemsControl.VisibleRangeProperty,
-            binding: new ReflectionBinding(path: "VisibleRange") { Mode = BindingMode.OneWayToSource });
-
-        // The stand-in model has plain properties for the request and the report. The model of the recipe
-        // has bindable values, as a view model does, and the bindings go through their Value.
-        string? suffix =
-            model switch
-            {
-                VirtualModel => string.Empty,
-                RecipeModel => ".Value",
-                _ => null
-            };
-
-        if (suffix is not null)
-        {
-            this.List.Bind(
-                property: VirtualizingItemsControl.ScrollRequestProperty,
-                binding: new ReflectionBinding(path: "ScrollRequest" + suffix));
-
-            this.List.Bind(
-                property: VirtualizingItemsControl.ScrollHandledProperty,
-                binding: new ReflectionBinding(path: "ScrollHandled" + suffix) { Mode = BindingMode.OneWayToSource });
-        }
 
         this.window = new Window { Content = this.List, Width = 300, Height = 200 };
         this.window.Show();

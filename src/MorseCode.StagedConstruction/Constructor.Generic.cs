@@ -68,10 +68,12 @@ public abstract class Constructor<TBaseValues>
     public TResult Construct<TResult>(Func<TBaseValues, TResult> constructor)
     {
         // The null check occurs before the claim. Thus, a null constructor does not use the handle.
+#pragma warning disable CA1510 // ArgumentNullException.ThrowIfNull does not exist on netstandard2.0 and net472.
         if (constructor is null)
         {
             throw new ArgumentNullException(paramName: nameof(constructor));
         }
+#pragma warning restore CA1510
 
         SingleUse.Claim(usedBy: ref this.usedBy, member: nameof(this.Construct));
 
@@ -124,10 +126,12 @@ public abstract class Constructor<TBaseValues>
     {
         // The null check occurs here, where the caller is on the stack, and before the claim. Thus, a null
         // selector does not use the handle.
+#pragma warning disable CA1510 // ArgumentNullException.ThrowIfNull does not exist on netstandard2.0 and net472.
         if (selector is null)
         {
             throw new ArgumentNullException(paramName: nameof(selector));
         }
+#pragma warning restore CA1510
 
         SingleUse.Claim(usedBy: ref this.usedBy, member: nameof(this.Select));
 

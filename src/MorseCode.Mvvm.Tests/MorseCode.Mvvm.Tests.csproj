@@ -33,7 +33,6 @@
 
     <ItemGroup>
         <Compile Include="ActionDisposableTests.cs"/>
-        <Compile Include="BindableFactoryExtensionsTests.cs"/>
         <Compile Include="CompositeDisposableTests.cs"/>
         <Compile Include="ViewModelBaseBindableFactoryTests.cs"/>
         <Compile Include="ViewModelBaseConcurrencyTests.cs"/>

@@ -1,16 +1,14 @@
 using System;
-using JetBrains.Annotations;
 using SodaFlow;
 using SodaFlow.Bindable.ObjectModel;
 using SodaFlow.Functional;
 
-namespace MorseCode.Mvvm;
+namespace MorseCode.Avalonia.Controls;
 
 /// <summary>
-///     Makes the bindable values that a view model gives to a list control.
+///     Makes the bindable values that ask a list control to scroll to a position.
 /// </summary>
-[PublicAPI]
-public static class BindableFactoryExtensions
+internal static class ScrollRequestExtensions
 {
     /// <summary>
     ///     Makes the bindable values that ask a list control to scroll to a position, and that
@@ -35,7 +33,7 @@ public static class BindableFactoryExtensions
     /// <exception cref="ArgumentNullException">
     ///     <paramref name="bindableFactory" /> or <paramref name="requests" /> is null.
     /// </exception>
-    public static ScrollRequestBindables CreateScrollRequest(
+    internal static ScrollRequestBindables CreateScrollRequest(
         this IBindableFactory bindableFactory,
         Stream<int> requests) =>
         bindableFactory.CreateScrollRequest(requests: requests, clears: Stream.Never<Unit>());
@@ -62,25 +60,14 @@ public static class BindableFactoryExtensions
     ///     <paramref name="bindableFactory" />, <paramref name="requests" />, or
     ///     <paramref name="clears" /> is null.
     /// </exception>
-    public static ScrollRequestBindables CreateScrollRequest(
+    internal static ScrollRequestBindables CreateScrollRequest(
         this IBindableFactory bindableFactory,
         Stream<int> requests,
         Stream<Unit> clears)
     {
-        if (bindableFactory is null)
-        {
-            throw new ArgumentNullException(paramName: nameof(bindableFactory));
-        }
-
-        if (requests is null)
-        {
-            throw new ArgumentNullException(paramName: nameof(requests));
-        }
-
-        if (clears is null)
-        {
-            throw new ArgumentNullException(paramName: nameof(clears));
-        }
+        ArgumentNullException.ThrowIfNull(argument: bindableFactory);
+        ArgumentNullException.ThrowIfNull(argument: requests);
+        ArgumentNullException.ThrowIfNull(argument: clears);
 
         // One transaction, so that the values start from one instant as the rest of the view model does.
         return Transaction.Run(
@@ -111,35 +98,4 @@ public static class BindableFactoryExtensions
 
     // Names the type once, so that a lambda that changes the request reads as a value.
     private static Func<Maybe<int>, Maybe<int>> Change(Func<Maybe<int>, Maybe<int>> f) => f;
-}
-
-/// <summary>
-///     The bindable values of a scroll request: the request that the view model makes, and the report
-///     that the list control sends back.
-/// </summary>
-[PublicAPI]
-public sealed class ScrollRequestBindables
-{
-    /// <summary>
-    ///     Makes the pair.
-    /// </summary>
-    /// <param name="request">The position to show, or none.</param>
-    /// <param name="handled">The position that the control handled.</param>
-    public ScrollRequestBindables(
-        IOneWayBindableValue<Maybe<int>> request,
-        IOneWayToSourceBindableValue<Maybe<int>> handled)
-    {
-        this.Request = request;
-        this.Handled = handled;
-    }
-
-    /// <summary>
-    ///     Gets the position to show, or none. Bind it one way to the control.
-    /// </summary>
-    public IOneWayBindableValue<Maybe<int>> Request { get; }
-
-    /// <summary>
-    ///     Gets the position that the control handled. Bind it one way to the source.
-    /// </summary>
-    public IOneWayToSourceBindableValue<Maybe<int>> Handled { get; }
 }

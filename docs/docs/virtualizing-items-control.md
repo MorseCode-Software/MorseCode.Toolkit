@@ -12,9 +12,8 @@ It is not a replacement for an Avalonia control. Use it where you would use an `
 `ListBox` over a SodaFlow `ReactiveCollection`, and the rows are view models that cost something to
 make: they hold bindables, subscriptions, or a query of their own.
 
-The control has no reference to SodaFlow's collections. It talks in positions, so it works with any
-view model that can answer "give me the rows for positions *a* to *b*". The recipe below uses
-`Slice` and `Map`, which is the case it was made for.
+The control is made for SodaFlow. It has one property to bind, `Source`, and one helper that makes
+the object to bind it to. The sections below show both.
 
 ## How it works
 
@@ -23,72 +22,91 @@ right length, a scroll area of the right size, and a working `ScrollIntoView`, a
 
 Avalonia's `VirtualizingStackPanel` makes containers only for the positions that are on screen.
 The control watches those containers and reports their positions, widened by `Buffer` positions on
-each side, in `VisibleRange`.
-
-Your view model turns that range into rows and hands them back in `Rows`: the rows, and the
-position of the first one. The control shows each row at its position. A position that `Rows`
-does not cover yet shows the `PlaceholderTemplate` instead, until the rows arrive.
+each side. Your view model turns that range into rows and hands them back: the rows, and the
+position of the first one. The control shows each row at its position. A position that has no row
+yet shows the `PlaceholderTemplate` instead, until the rows arrive.
 
 ```text
- panel realizes containers ──► VisibleRange ──► view model: Slice, then Map
-          ▲                                                      │
-          └──────────────── Rows (offset + rows)   ◄─────────────┘
+ panel realizes containers ──► range ──► view model: Slice, then Map
+          ▲                                              │
+          └─────────────── rows (offset + rows)  ◄───────┘
 ```
+
+## The source
+
+The control reads and writes five values. They go in two pairs, and each pair only works when both
+halves are there:
+
+| Value | Direction | What it is |
+| --- | --- | --- |
+| `TotalCount` | view model to control | The number of positions in the whole list. |
+| `Rows` | view model to control | The rows for some of the positions, and the position of the first. |
+| `VisibleRange` | control to view model | The positions on screen, with `Buffer` more on each side. |
+| `ScrollRequest` | view model to control | The position that the view model wants to show, or none. |
+| `ScrollHandled` | control to view model | The position of the request that the control handled. |
+
+The values live together in one object, an `IVirtualItemsSource`. The view model gives that object
+to the view, and the view binds one property. The control attaches to all five values when you set
+`Source`, and detaches when you set it again or clear it.
 
 ## The view model
 
-Keep the range in a cell, slice the collection with it, and build the rows with `Map`:
+`CreateVirtualItemsSource` makes the source from a `ReactiveCollection`. It slices the collection
+with the range that the control reports, builds the rows with `Map`, and counts the keys for
+`TotalCount`. It is an extension method of the `IOutput` that `ViewModelBase` gives your constructor,
+in `MorseCode.Avalonia.Controls`:
 
 ```csharp
-CellSink<int> offset = Cell.CreateSink(0);
-CellSink<int> limit = Cell.CreateSink(0);
+StreamSink<int> scrollTo = Stream.CreateSink<int>();
 
-MappedItems<IRowViewModel> rows = collection
-    .Slice(offsetCell: offset, limitCell: limit)
-    .Map(
-        project: key => new RowViewModel(key, /* bindables built from collection.StateCell(key) */),
-        onEvicted: static row => row.Dispose());
+IVirtualItemsSource source = output.CreateVirtualItemsSource(
+    collection: collection,
+    project: key => new RowViewModel(key, /* bindables built from collection.StateCell(key) */),
+    scrollRequests: scrollTo,
+    onEvicted: static row => row.Dispose());
 
-// The offset and the rows come from the same transaction, so they always agree.
-Cell<VirtualRows> rowsAtOffset = offset.Lift(
-    rows.Items,
-    static (first, items) => new VirtualRows(first, items));
-
-// The view writes this property. It sends both values in one transaction.
-public ItemRange VisibleRange
-{
-    set => Transaction.RunVoid(() =>
-    {
-        offset.Send(value.First);
-        limit.Send(value.Count);
-    });
-}
+IBindableAction<int> scrollToAction = output.BindableFactory.CreateBindableAction(scrollTo);
 ```
+
+Expose `source` on your view model interface.
 
 `Map` builds a row for a key the first time the key is inside the slice. It keeps the row for a
 key that has left until more than `retainedBeyondTheView` keys have left (512 by default), and
 then it calls `onEvicted` for the oldest. Scrolling back over rows you have just seen is free, and
-the number of live view models stays bounded however long the list is. Dispose the `MappedItems`
-with the view model, so it releases the rows that are still in use.
+the number of live view models stays bounded however long the list is. The helper registers
+the `MappedItems` with the output, so disposing of the view model releases the rows that are still
+in use. You cannot forget it.
 
-Pass `items` to `VirtualRows` as it is. A list of rows is an `IReadOnlyList<IRowViewModel>`, and
-that is accepted where an `IReadOnlyList<object?>` is expected, so no copy is needed. The control
-reads the list when it needs a row, not when it receives the value, so the list must never change
-after you hand it over. The list that `Map` gives for each version is a new list that nothing else
-holds. If you build the list yourself, make a new one for each change.
+The offset and the rows come from one cell, so they always agree. The rows are the list that `Map`
+gives, passed on without a copy. The control reads that list when it needs a row, and not when it
+receives the value, so a list that you build yourself must never change after you hand it over.
+Make a new list for each change.
 
-Expose `rowsAtOffset` and the count of the collection through your usual bindables.
+### When the rows do not come from a collection
+
+Another overload takes the cells and the sink yourself. You supply the count, the rows, and a
+`CellSink<ItemRange>` that receives the range. Make the rows and their offset from one cell, so they
+agree:
+
+```csharp
+CellSink<ItemRange> range = Cell.CreateSink(ItemRange.Empty);
+
+IVirtualItemsSource source = output.CreateVirtualItemsSource(
+    totalCount: count,
+    rows: rowsAtOffset,
+    visibleRange: range,
+    scrollRequests: scrollTo);
+```
+
+Both overloads take an optional `Stream<Unit>` of clears. See
+[Scroll from the view model](#scroll-from-the-view-model).
 
 ## The view
 
 ```xml
 <UserControl xmlns:mc="clr-namespace:MorseCode.Avalonia.Controls;assembly=MorseCode.Avalonia.Controls">
 
-    <mc:VirtualizingItemsControl TotalCount="{Binding Count.Value}"
-                                 Rows="{Binding RowsAtOffset.Value}"
-                                 VisibleRange="{Binding VisibleRange, Mode=OneWayToSource}"
-                                 ScrollRequest="{Binding ScrollRequest.Value}"
-                                 ScrollHandled="{Binding ScrollHandled.Value, Mode=OneWayToSource}"
+    <mc:VirtualizingItemsControl Source="{Binding Source}"
                                  Buffer="10">
         <mc:VirtualizingItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:IRowViewModel">
@@ -108,44 +126,28 @@ Expose `rowsAtOffset` and the count of the collection through your usual bindabl
 
 | Property | What it does |
 | --- | --- |
-| `TotalCount` | The number of positions in the whole list. |
-| `Rows` | The rows for some of the positions, and the position of the first. |
-| `VisibleRange` | The positions on screen, with `Buffer` more on each side. The control sets it. Bind it one way to the source. |
-| `ScrollRequest` | The position that the view model wants to show, as a `Maybe<int>`. Binds one way from the view model. |
-| `ScrollHandled` | The position of the request that the control handled, as a `Maybe<int>`. The control sets it. Bind it one way to the source. |
-| `Buffer` | How many positions to add on each side of `VisibleRange`. The default is 10. |
+| `Source` | The one object that the control reads from and reports to. |
+| `Buffer` | How many positions to add on each side of the range that it reports. The default is 10. |
 | `PlaceholderTemplate` | What a position shows until its row arrives. |
 | `ItemTemplate` | What a row shows, as on any items control. |
 
 ### Scroll from the view model
 
-A view model asks for a scroll through `ScrollRequest`, and the view doesn't call `ScrollIntoView`
-itself. The request is a value and not an event, so it isn't lost when the view model asks before
-the view is bound, or before the list has laid out. The control keeps the request until it can use
-it, scrolls, and then reports the position it handled in `ScrollHandled`. The view model clears the
-request when it receives the report, and only if the request is still that position.
+A view model asks for a scroll through the `ScrollRequest` of its source, and the view doesn't call
+`ScrollIntoView` itself. The request is a value and not an event, so it isn't lost when the view
+model asks before the view is bound, or before the list has laid out. The control keeps the request
+until it can use it, scrolls, and then reports the position it handled in `ScrollHandled`. The
+view model clears the request when it receives the report, and only if the request is still that
+position.
 
-In the view model, an action takes the position, and `CreateScrollRequest` makes the two bindable
-values: the request, and the report. It is an extension method of `IBindableFactory` in
-`MorseCode.Mvvm`, from version 0.3.0:
+`CreateVirtualItemsSource` takes a `Stream<int>` of positions. The request starts as `None`, each
+position makes it `Some(position)`, and a report of that same position clears it. The graph behind
+it is an `Accum` over the positions, the clears, and the reports. You don't make
+the sink for the reports, because it is always the same.
 
-```csharp
-StreamSink<int> scrollTo = Stream.CreateSink<int>();
-
-IBindableAction<int> scrollToAction = output.BindableFactory.CreateBindableAction(scrollTo);
-ScrollRequestBindables scroll = output.BindableFactory.CreateScrollRequest(scrollTo);
-
-// Expose scroll.Request and scroll.Handled as ScrollRequest and ScrollHandled.
-```
-
-`CreateScrollRequest` takes a `Stream<int>` of positions. The request starts as `None`, each position
-makes it `Some(position)`, and a report of that same position clears it. The graph behind it is an
-`Accum` over the positions merged with the reports. You don't make the sink for the reports, because
-it is always the same.
-
-An overload also takes a `Stream<Unit>` of clears. Each firing of it sets the request to `None`, so the
-view model can withdraw a request that the control didn't use yet. When a request and a clear come in
-one transaction, the request wins.
+Both overloads take an optional `Stream<Unit>` of clears. Each firing of it sets the request to
+`None`, so the view model can withdraw a request that the control didn't use yet. When a request
+and a clear come in one transaction, the request wins.
 
 The control sets `ScrollHandled` to `Some(position)` and then straight back to `None`. The second
 write makes the same position a change again, so a second request for it is reported too. The view
@@ -161,7 +163,7 @@ that are on screen. The scroll brings the position into view, as `ScrollIntoView
 - A request for a position beyond `TotalCount` waits until the count grows, and it stays until then.
   If the list is reloaded later and is long enough by then, the control scrolls to the old position
   at that point, which can surprise the user. Withdraw a request that has gone stale with the
-  `clears` overload. A negative position can never apply, so the control reports it at once and does
+  `clears` stream. A negative position can never apply, so the control reports it at once and does
   not scroll.
 - A new request replaces one that is waiting. The last request wins.
 - A request that the view model makes while a report is on its way is kept. The report names the
@@ -170,8 +172,8 @@ that are on screen. The scroll brings the position into view, as `ScrollIntoView
   The position was just shown, so nothing is lost.
 - The control scrolls once for each request. A change of `TotalCount` before the view model has
   cleared the request does not scroll again.
-- The tests of the control use this method with a real SodaFlow graph, including a request made
-  before the view binds. The tests of `CreateScrollRequest` itself are in `MorseCode.Mvvm`.
+- The tests of the control use these methods with a real SodaFlow graph, including a request made
+  before the view binds. The graph of the request has tests of its own.
 
 ### Give the placeholder the height of a row
 
@@ -191,7 +193,7 @@ class or a name if you need to style it apart from your list boxes.
 ### Do not set `ItemsSource`
 
 The control gives Avalonia its own list, one position per item. Setting `ItemsSource` throws an
-`InvalidOperationException`. Bind `TotalCount` and `Rows` instead.
+`InvalidOperationException`. Set `Source` instead.
 
 ## What to expect
 
@@ -205,9 +207,12 @@ The control gives Avalonia its own list, one position per item. Setting `ItemsSo
 - **An insert above the visible rows moves rows.** The control shows each row at its new position, as
   a replacement of the rows, so Avalonia does not keep the scroll position on the row that was on
   screen.
+- **A change of the count by more than 512 positions resets the list.** Avalonia clears its
+  containers and makes them again, which is cheaper than an event for every position.
 
 ## Targets and dependencies
 
-The control is in `MorseCode.Avalonia.Controls`, which targets `net8.0` and `net10.0`. It adds no
-dependency. The recipe above needs `SodaFlow.Collections`, which your view model project already
-has if it uses a `ReactiveCollection`.
+The control is in `MorseCode.Avalonia.Controls`, which targets `net8.0` and `net10.0`. It depends on
+SodaFlow, `SodaFlow.Bindable.ObjectModel`, `SodaFlow.Collections`, and `MorseCode.Mvvm` 0.3.0 or
+later. The source is made of SodaFlow bindable values, and `CreateVirtualItemsSource` works with the
+`IOutput` of a `ViewModelBase`.

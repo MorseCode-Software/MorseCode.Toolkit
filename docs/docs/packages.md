@@ -10,7 +10,7 @@ The packages version independently, and all of them are pre-1.0.
 | --- | --- | --- |
 | `MorseCode.Mvvm` | You write view models on SodaFlow. | `SodaFlow.Bindable.ObjectModel`, `MorseCode.StagedConstruction` |
 | `MorseCode.StagedConstruction` | You want to build immutable objects in ordered stages. | Nothing |
-| `MorseCode.Avalonia.Controls` | Your views are Avalonia, and bind to view models on SodaFlow. | `Avalonia`, `SodaFlow.Functional` |
+| `MorseCode.Avalonia.Controls` | Your views are Avalonia, and bind to view models on SodaFlow. | `Avalonia`, `SodaFlow`, `SodaFlow.Bindable.ObjectModel`, `SodaFlow.Collections`, `MorseCode.Mvvm` |
 | `MorseCode.Analyzers` | You want the build to report code that breaks the conventions MorseCode writes C# with. | Nothing |
 
 ## MorseCode.Mvvm
@@ -25,9 +25,6 @@ Building blocks for view models. It holds:
   view model makes during construction, and one `Dispose` releases them. See
   [View models](view-models.md).
 - `IViewModel`, the interface a view model shows to its view.
-- `CreateScrollRequest`, an extension method of `IBindableFactory` that makes the bindable values
-  a view model uses to ask `VirtualizingItemsControl` to scroll, and to receive its report. See
-  [VirtualizingItemsControl](virtualizing-items-control.md).
 - The `Disposable` helpers that `ViewModelBase` uses: `Composite`, `FromAction`, and `Empty`. See
   [The Disposable helpers](disposable.md).
 
@@ -56,6 +53,9 @@ Avalonia controls for views that bind to view models on SodaFlow. It holds:
   [MaybeConverter](maybe-converter.md).
 - `VirtualizingItemsControl`, which shows a long list over a SodaFlow `ReactiveCollection` and
   builds the heavy view model of a row only when the row is on screen. See
+  [VirtualizingItemsControl](virtualizing-items-control.md).
+- `CreateVirtualItemsSource`, an extension method of the `IOutput` of a `ViewModelBase`. It makes the
+  object a view model gives to `VirtualizingItemsControl`. See
   [VirtualizingItemsControl](virtualizing-items-control.md).
 
 It targets `net8.0` and `net10.0`, as Avalonia 12 does, rather than the older targets of the other

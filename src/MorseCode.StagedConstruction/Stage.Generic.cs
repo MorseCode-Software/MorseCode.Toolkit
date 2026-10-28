@@ -82,10 +82,12 @@ public abstract class Stage<TInput, TOutput, TNext>
     {
         // The null check occurs before the claim. Thus, a null continuation does not use the stage. The input
         // is not checked: its type is the choice of the base, and null can be a valid input.
+#pragma warning disable CA1510 // ArgumentNullException.ThrowIfNull does not exist on netstandard2.0 and net472.
         if (continuation is null)
         {
             throw new ArgumentNullException(paramName: nameof(continuation));
         }
+#pragma warning restore CA1510
 
         SingleUse.Claim(usedBy: ref this.usedBy, member: nameof(this.Advance));
 

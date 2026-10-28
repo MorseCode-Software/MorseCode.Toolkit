@@ -4,39 +4,22 @@
   "metadata": [
     {
       "//": [
-        "These two packages are listed. Each sets GenerateDocumentationFile, so DocFX reads the XML",
+        "These three packages are listed. Each sets GenerateDocumentationFile, so DocFX reads the XML",
         "documentation comments and renders them.",
         "",
-        "TargetFramework is pinned because both projects multi-target net472, net6.0 and",
-        "netstandard2.0. Without pinning, DocFX builds all three and emits duplicate members."
+        "TargetFramework is pinned because the projects multi-target. Without pinning, DocFX builds every",
+        "target and emits duplicate members. It is net8.0, the one target that all three have:",
+        "MorseCode.Avalonia.Controls targets net8.0 and net10.0, as Avalonia 12 does, and references",
+        "MorseCode.Mvvm. DocFX must see the same target for a project and for the reference to it. When",
+        "the Controls entry was separate and pinned to net8.0 while Mvvm had no such target, DocFX",
+        "reported that it found a project reference without a matching metadata reference."
       ],
       "src": [
         {
           "src": "../src",
           "files": [
             "MorseCode.StagedConstruction/MorseCode.StagedConstruction.csproj",
-            "MorseCode.Mvvm/MorseCode.Mvvm.csproj"
-          ]
-        }
-      ],
-      "dest": "api",
-      "properties": {
-        "TargetFramework": "net6.0",
-        "Configuration": "Release"
-      },
-      "memberLayout": "separatePages",
-      "namespaceLayout": "nested"
-    },
-    {
-      "//": [
-        "MorseCode.Avalonia.Controls has an entry of its own, because it targets net8.0",
-        "and net10.0, as Avalonia 12 does, and has no net6.0 target. It is pinned to net8.0 for the",
-        "same cause as above."
-      ],
-      "src": [
-        {
-          "src": "../src",
-          "files": [
+            "MorseCode.Mvvm/MorseCode.Mvvm.csproj",
             "MorseCode.Avalonia.Controls/MorseCode.Avalonia.Controls.csproj"
           ]
         }

@@ -1,3 +1,11 @@
+0.2.2
+
+New: the package has a net8.0 build, next to net472, net6.0, and netstandard2.0. It is the same
+code, compiled for net8.0. A project that targets net8.0 or later now takes the net8.0 build and
+not the netstandard2.0 build. No signature or behavior changed. The reason is that
+MorseCode.Avalonia.Controls targets net8.0 and references MorseCode.Mvvm, which references this
+package, and the documentation build needs one target that all three have.
+
 0.2.1
 
 No signature or behavior changed. This release reformats the code and the

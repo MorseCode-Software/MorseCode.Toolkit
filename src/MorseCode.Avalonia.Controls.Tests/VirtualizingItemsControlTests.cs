@@ -221,7 +221,7 @@ public sealed class VirtualizingItemsControlTests
                 using ShownVirtual shown = new(model: model, buffer: 0);
 
                 await Assert.That(Texts(shown: shown).Any(predicate: static text => text == "Row 700")).IsTrue();
-                await Assert.That(model.ScrollRequest).IsEqualTo(expected: Maybe<int>.None);
+                await Assert.That(model.CurrentRequest).IsEqualTo(expected: Maybe<int>.None);
 
                 await Assert.That(model.ScrollWrites)
                     .IsEquivalentTo(
@@ -241,7 +241,7 @@ public sealed class VirtualizingItemsControlTests
                 shown.Settle();
 
                 await Assert.That(Texts(shown: shown).Any(predicate: static text => text == "Row 700")).IsTrue();
-                await Assert.That(model.ScrollRequest).IsEqualTo(expected: Maybe<int>.None);
+                await Assert.That(model.CurrentRequest).IsEqualTo(expected: Maybe<int>.None);
 
                 await Assert.That(model.ScrollWrites)
                     .IsEquivalentTo(
@@ -264,14 +264,14 @@ public sealed class VirtualizingItemsControlTests
                 shown.Settle();
 
                 await Assert.That(Texts(shown: shown)[0]).IsEqualTo(expected: "Row 0");
-                await Assert.That(model.ScrollRequest).IsEqualTo(expected: Maybe<int>.Some(value: 500));
+                await Assert.That(model.CurrentRequest).IsEqualTo(expected: Maybe<int>.Some(value: 500));
                 await Assert.That(model.ScrollWrites).IsEmpty();
 
                 model.Resize(total: 1000);
                 shown.Settle();
 
                 await Assert.That(Texts(shown: shown).Any(predicate: static text => text == "Row 500")).IsTrue();
-                await Assert.That(model.ScrollRequest).IsEqualTo(expected: Maybe<int>.None);
+                await Assert.That(model.CurrentRequest).IsEqualTo(expected: Maybe<int>.None);
             });
 
     // The request and the count change in one turn of the dispatcher, before the posted scroll runs. The
@@ -289,7 +289,7 @@ public sealed class VirtualizingItemsControlTests
                 shown.Settle();
 
                 await Assert.That(Texts(shown: shown).Any(predicate: static text => text == "Row 500")).IsTrue();
-                await Assert.That(model.ScrollRequest).IsEqualTo(expected: Maybe<int>.None);
+                await Assert.That(model.CurrentRequest).IsEqualTo(expected: Maybe<int>.None);
 
                 await Assert.That(model.ScrollWrites)
                     .IsEquivalentTo(
@@ -310,7 +310,7 @@ public sealed class VirtualizingItemsControlTests
                 shown.Settle();
 
                 await Assert.That(Texts(shown: shown)[0]).IsEqualTo(expected: "Row 0");
-                await Assert.That(model.ScrollRequest).IsEqualTo(expected: Maybe<int>.None);
+                await Assert.That(model.CurrentRequest).IsEqualTo(expected: Maybe<int>.None);
             });
 
     // The view model keeps the last request. Two requests before the dispatcher runs give one scroll,
@@ -329,7 +329,7 @@ public sealed class VirtualizingItemsControlTests
 
                 await Assert.That(Texts(shown: shown).Any(predicate: static text => text == "Row 700")).IsTrue();
                 await Assert.That(model.Built.Any(predicate: static position => position is > 9 and < 690)).IsFalse();
-                await Assert.That(model.ScrollRequest).IsEqualTo(expected: Maybe<int>.None);
+                await Assert.That(model.CurrentRequest).IsEqualTo(expected: Maybe<int>.None);
             });
 
     // The reset makes the same request possible again.
@@ -407,23 +407,36 @@ public sealed class VirtualizingItemsControlTests
                         ordering: CollectionOrdering.Matching);
             });
 
-    // The control only reads ScrollRequest and only writes ScrollHandled, so a test that uses the CLR
-    // properties on their own shows that each one reads back what it holds.
+    // The control reads the count from its source. A new source replaces the old one, and the old one
+    // no longer reaches the control. A control with no source shows nothing.
     [Test]
-    public Task TheScrollPropertiesHoldTheirValuesAndStartAsNone() =>
+    public Task ANewSourceReplacesTheOldOneAndNoSourceShowsNothing() =>
         TestApplication.Run(
             test: static async () =>
             {
-                VirtualizingItemsControl list = new();
+                VirtualModel first = new(total: 1000);
+                VirtualModel second = new(total: 50);
+                VirtualizingItemsControl list = new() { Source = first };
 
+                await Assert.That(list.TotalCount).IsEqualTo(expected: 1000);
+
+                list.Source = second;
+
+                await Assert.That(list.TotalCount).IsEqualTo(expected: 50);
+
+                first.Resize(total: 2000);
+
+                await Assert.That(list.TotalCount).IsEqualTo(expected: 50);
+
+                second.Resize(total: 60);
+
+                await Assert.That(list.TotalCount).IsEqualTo(expected: 60);
+
+                list.Source = null;
+                second.Resize(total: 70);
+
+                await Assert.That(list.TotalCount).IsEqualTo(expected: 0);
                 await Assert.That(list.ScrollRequest).IsEqualTo(expected: Maybe<int>.None);
-                await Assert.That(list.ScrollHandled).IsEqualTo(expected: Maybe<int>.None);
-
-                list.ScrollRequest = Maybe<int>.Some(value: 3);
-                list.ScrollHandled = Maybe<int>.Some(value: 4);
-
-                await Assert.That(list.ScrollRequest).IsEqualTo(expected: Maybe<int>.Some(value: 3));
-                await Assert.That(list.ScrollHandled).IsEqualTo(expected: Maybe<int>.Some(value: 4));
             });
 
     private static List<string> Texts(ShownVirtual shown) =>
