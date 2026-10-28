@@ -1,7 +1,5 @@
 using System;
-using System.Collections.Generic;
 using System.ComponentModel;
-using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Presenters;
@@ -403,14 +401,26 @@ public class VirtualizingItemsControl : ItemsControl
     // Finds the positions of the containers that Avalonia shows now, and adds the buffer on each side.
     private ItemRange Measure()
     {
-        List<int> realized =
-        [
-            .. this.GetRealizedContainers()
-                .Select(selector: this.IndexFromContainer)
-                .Where(predicate: static index => index >= 0)
-        ];
+        // One pass over the containers, and no list. The control measures after each change of the
+        // containers, which is at each scroll.
+        int first = int.MaxValue;
+        int last = -1;
 
-        if (realized.Count == 0)
+        // ReSharper disable once LoopCanBePartlyConvertedToQuery - The query allocates its iterators at each report, and this method exists to allocate nothing.
+        foreach (Control container in this.GetRealizedContainers())
+        {
+            int index = this.IndexFromContainer(container: container);
+
+            if (index < 0)
+            {
+                continue;
+            }
+
+            first = Math.Min(val1: first, val2: index);
+            last = Math.Max(val1: last, val2: index);
+        }
+
+        if (last < 0)
         {
             // No container, with positions to show, means that the control is not laid out. This is also
             // the case after a change of the items. The panel clears its containers then, and makes them
@@ -420,8 +430,8 @@ public class VirtualizingItemsControl : ItemsControl
         }
 
         int buffer = Math.Max(val1: 0, val2: this.Buffer);
-        int start = Math.Max(val1: 0, val2: realized.Min() - buffer);
-        int end = Math.Min(val1: this.items.Count, val2: realized.Max() + 1 + buffer);
+        int start = Math.Max(val1: 0, val2: first - buffer);
+        int end = Math.Min(val1: this.items.Count, val2: last + 1 + buffer);
 
         return new ItemRange(First: start, Count: Math.Max(val1: 0, val2: end - start));
     }
