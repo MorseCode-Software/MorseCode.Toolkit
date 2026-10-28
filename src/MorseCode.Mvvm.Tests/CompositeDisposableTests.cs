@@ -247,7 +247,7 @@ public sealed class CompositeDisposableTests
         throw new InvalidOperationException(message: "The action did not throw an exception.");
     }
 
-    private sealed class Recording(ICollection<string> log, string name) : IDisposable
+    private sealed class Recording(in ICollection<string> log, in string name) : IDisposable
     {
         private ICollection<string> Log { get; } = log;
 
@@ -256,7 +256,7 @@ public sealed class CompositeDisposableTests
         public void Dispose() => this.Log.Add(this.Name);
     }
 
-    private sealed class Throwing(Exception exception) : IDisposable
+    private sealed class Throwing(in Exception exception) : IDisposable
     {
         private Exception Exception { get; } = exception;
 

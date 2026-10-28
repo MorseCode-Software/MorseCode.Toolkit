@@ -1,3 +1,22 @@
+0.1.4
+
+New rule: MC0003 reports a primary constructor parameter of a class or a struct that is not
+written as in, such as class Holder(int value). A parameter without a modifier is a variable
+that every member of the type can read and write, and a member that captures it turns it into
+hidden mutable state. The in modifier makes it readonly, and the compiler refuses a member that
+captures it, so the value can go only into an initializer or a base call. A member that needs
+the value reads it from a field. The warning marks the name of the parameter. The rule does not
+report a record, whose positional parameters make properties and cannot be in, or a params
+parameter, which cannot be in either.
+
+MC0003 is a warning, so a build with -warnaserror fails on it. The documentation is at
+https://morsecode-software.github.io/MorseCode.Toolkit/docs/primary-constructor-parameter.html
+
+MC0001 and MC0002 did not change. This is a patch version because no API changed and the
+package adds a rule, as 0.1.1 did. A project that builds with -warnaserror and updates from
+0.1.3 fails on each primary constructor parameter without in. Set
+dotnet_diagnostic.MC0003.severity in .editorconfig to change that.
+
 0.1.3
 
 Changed: MC0002 now marks only the type in parentheses, such as (int), and not the whole cast

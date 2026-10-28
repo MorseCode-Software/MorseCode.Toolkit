@@ -39,3 +39,5 @@
       href: named-argument-order.md
     - name: Explicit cast (MC0002)
       href: explicit-cast.md
+    - name: Primary constructor parameter (MC0003)
+      href: primary-constructor-parameter.md
