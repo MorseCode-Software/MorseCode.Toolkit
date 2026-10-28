@@ -66,7 +66,11 @@ jobs:
 
       - uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: 10.0.x
+          # 10.0 builds everything. 8.0 runs the net8.0 build of each test project, which is the
+          # one check that the net8.0 builds of the libraries get.
+          dotnet-version: |
+            8.0.x
+            10.0.x
           # The NuGet packages folder holds both the local tools and every restored package, so the
           # key covers both the lock files and the tool manifest. See SodaFlow's build.yml.
           cache: true
