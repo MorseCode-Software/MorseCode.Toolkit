@@ -162,6 +162,94 @@ public sealed class VirtualItemsSourceExtensionsTests
             .IsEquivalentTo(expected: [10, 11, 12, 13, 14, 15, 16], ordering: CollectionOrdering.Matching);
     }
 
+    // The position of a key comes from the collection at the instant of the request. The keys here are not
+    // the positions, thus the test can tell the two apart.
+    [Test]
+    public async Task ARequestByKeyBecomesARequestForThePositionOfTheKey()
+    {
+        StreamSink<int> requests = Stream.CreateSink<int>();
+
+        (IVirtualItemsSource source, ViewModelBase viewModel) =
+            Make(
+                make: output =>
+                    output.CreateVirtualItemsSourceByKey(
+                        collection: Collection(keys: [10, 20, 30, 40]),
+                        project: static key => new VirtualRow(Position: key),
+                        scrollRequests: requests));
+
+        using ViewModelBase owner = viewModel;
+
+        requests.Send(a: 30);
+
+        await Assert.That(source.ScrollRequest.Value).IsEqualTo(expected: Maybe<int>.Some(value: 2));
+
+        source.ScrollHandled.Value = Maybe<int>.Some(value: 2);
+        requests.Send(a: 10);
+
+        await Assert.That(source.ScrollRequest.Value).IsEqualTo(expected: Maybe<int>.Some(value: 0));
+    }
+
+    [Test]
+    public async Task ARequestByAKeyThatTheCollectionDoesNotHaveMakesNoRequest()
+    {
+        StreamSink<int> requests = Stream.CreateSink<int>();
+
+        (IVirtualItemsSource source, ViewModelBase viewModel) =
+            Make(
+                make: output =>
+                    output.CreateVirtualItemsSourceByKey(
+                        collection: Collection(keys: [10, 20, 30]),
+                        project: static key => new VirtualRow(Position: key),
+                        scrollRequests: requests));
+
+        using ViewModelBase owner = viewModel;
+
+        requests.Send(a: 25);
+
+        await Assert.That(source.ScrollRequest.Value).IsEqualTo(expected: Maybe<int>.None);
+    }
+
+    [Test]
+    public async Task ANullArgumentOfTheMethodByKeyIsRefusedAndNamed()
+    {
+        StreamSink<int> requests = Stream.CreateSink<int>();
+        ReactiveCollection<int, int, int> collection = Collection(total: 1);
+
+        // ReSharper disable NullableWarningSuppressionIsUsed - The null is the input under test.
+        Func<int, VirtualRow> noProject = null!;
+        ReactiveCollection<int, int, int> noCollection = null!;
+        Stream<int> noRequests = null!;
+        ViewModelBase.IOutput noOutput = null!;
+
+        // ReSharper restore NullableWarningSuppressionIsUsed
+
+        Exception[] refused =
+        [
+            Catch(
+                action: () => noOutput.CreateVirtualItemsSourceByKey(
+                    collection: collection,
+                    project: static key => new VirtualRow(Position: key),
+                    scrollRequests: requests)),
+            Catch(action: () => MakeAndRefuse(make: output => output.CreateVirtualItemsSourceByKey(
+                collection: noCollection,
+                project: static key => new VirtualRow(Position: key),
+                scrollRequests: requests))),
+            Catch(action: () => MakeAndRefuse(make: output => output.CreateVirtualItemsSourceByKey(
+                collection: collection,
+                project: noProject,
+                scrollRequests: requests))),
+            Catch(action: () => MakeAndRefuse(make: output => output.CreateVirtualItemsSourceByKey(
+                collection: collection,
+                project: static key => new VirtualRow(Position: key),
+                scrollRequests: noRequests)))
+        ];
+
+        await Assert.That(refused.Select(selector: static exception => (exception as ArgumentNullException)?.ParamName ?? string.Empty))
+            .IsEquivalentTo(
+                expected: ["output", "collection", "project", "scrollRequests"],
+                ordering: CollectionOrdering.Matching);
+    }
+
     // The caller does not dispose of the rows. The output of the view model does it.
     [Test]
     public async Task DisposingOfTheViewModelReleasesTheRowsThatTheSourceHolds()
@@ -263,13 +351,12 @@ public sealed class VirtualItemsSourceExtensionsTests
         Make(make: make).ViewModel.Dispose();
 
     private static ReactiveCollection<int, int, int> Collection(int total) =>
+        Collection(keys: Enumerable.Range(start: 0, count: total));
+
+    private static ReactiveCollection<int, int, int> Collection(IEnumerable<int> keys) =>
         ReactiveCollection<int, int, int>.Create(
             keySelector: static identity => identity,
-            initialItems:
-            [
-                .. Enumerable.Range(start: 0, count: total)
-                    .Select(selector: static key => new Item<int, int>(identity: key, state: 0))
-            ],
+            initialItems: [.. keys.Select(selector: static key => new Item<int, int>(identity: key, state: 0))],
             Stream.CreateSink<CollectionEdit<int, int, int>>());
 
     private static Exception Catch(Action action)

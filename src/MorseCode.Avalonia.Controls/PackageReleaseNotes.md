@@ -21,6 +21,12 @@ still that position. A request that the view model made while the report was on 
 cleared with the old one before. The control also scrolls once for each request, so a change of
 the count before the view model clears the request does not scroll again.
 
+New: CreateVirtualItemsSourceByKey, which takes a Stream of keys instead of a Stream of positions.
+It finds the position of a key in the collection in the transaction of the request, so a view
+model does not keep positions, which move when the collection changes. A key that the collection
+does not have at that instant makes no request. It has its own name because a collection with int
+keys would make an overload by key the same as the overload by position.
+
 Moved: the helper CreateScrollRequest of MorseCode.Mvvm 0.2.4 is now inside this package and is
 not public. CreateVirtualItemsSource uses it to make the request and the report.
 
