@@ -12,8 +12,13 @@ parameter, which cannot be in either.
 MC0003 is a warning, so a build with -warnaserror fails on it. The documentation is at
 https://morsecode-software.github.io/MorseCode.Toolkit/docs/primary-constructor-parameter.html
 
-MC0001 and MC0002 did not change. This is a patch version because no API changed and the
-package adds a rule, as 0.1.1 did. A project that builds with -warnaserror and updates from
+Changed: MC0001 now marks only the argument list of a call, such as (second: 2, first: 1), and
+not the whole call. A call on a long receiver, or a new with an initializer, used to underline
+all of it. The rule reports the same calls, the same message, and the same id, as MC0002 did in
+0.1.3. A suppression with a pragma or an attribute works as before.
+
+MC0002 did not change. This is a patch version because no API changed, the package adds a rule,
+as 0.1.1 did, and no rule changed its id. A project that builds with -warnaserror and updates from
 0.1.3 fails on each primary constructor parameter without in. Set
 dotnet_diagnostic.MC0003.severity in .editorconfig to change that.
 
