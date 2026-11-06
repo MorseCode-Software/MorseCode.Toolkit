@@ -23,6 +23,11 @@ The rule reports each of them. A conversion from dynamic is implicit for the com
 message says the cast is not needed. That is true of the code, because a variable of the type
 takes the value, and the value is still checked only when the code runs.
 
+Changed: MC0001 now marks only the argument list of a call, such as (second: 2, first: 1), and
+not the whole call. A call on a long receiver, or a new with an initializer, used to underline
+all of it. The rule reports the same calls, the same message, and the same id, as MC0002 does
+in this version. A suppression with a pragma or an attribute works as before.
+
 Fix: MC0001 no longer reports a call whose named arguments are in order when an argument is
 written with the null-forgiving operator, such as
 Create(collection: collection, project: null!, scrollRequests: requests). The compiler gives

@@ -141,6 +141,35 @@ internal sealed class NamedArgumentOrderAnalyzerTests
             .IsEquivalentTo(expected: ["MC0001"], ordering: CollectionOrdering.Matching);
     }
 
+    // The report covers the argument list and not the whole call. The receiver of a call and the initializer
+    // of a new are not what the rule is about, and a mark on them is noise.
+    [Test]
+    public async Task TheReportCoversOnlyTheArgumentList()
+    {
+        IReadOnlyList<Diagnostic> found =
+            await Analyze(
+                    body: """
+                          Three(c: 3, a: 1, b: 2);
+                          _ = Math.Abs(value: -1).Add(b: 3, a: 2);
+                          _ = new Pair(b: 2, a: 1) { };
+                          """,
+                    baseArguments: "b: 2, a: 1")
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        await Assert.That(
+                found.Select(
+                    selector: static diagnostic =>
+                        diagnostic.Location.SourceTree?.GetText().ToString(span: diagnostic.Location.SourceSpan)
+                        ?? string.Empty))
+            .IsEquivalentTo(
+                expected:
+                [
+                    "(b: 2, a: 1)", "(b: 2, a: 1)", "(b: 2, a: 1)", "(c: 3, a: 1, b: 2)", "(b: 3, a: 2)",
+                    "(b: 2, a: 1)"
+                ],
+                ordering: CollectionOrdering.Matching);
+    }
+
     // The message names the method and the order of its parameters, thus the user can correct the call.
     [Test]
     public async Task TheReportNamesTheMethodAndTheOrderOfItsParameters()
