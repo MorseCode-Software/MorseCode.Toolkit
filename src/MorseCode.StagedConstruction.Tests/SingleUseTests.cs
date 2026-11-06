@@ -45,10 +45,12 @@ public sealed class SingleUseTests
         Stage<int, int, int> stage =
             Stage.From(body: (int input) => (Output: bodyCalls.Pass(value: input), Next: input));
 
-        _ = stage.Advance(input: 1, continuation: static (output, _) => output);
+        _ = stage.Advance(input: 1, continuation: static (output, _) => Done.Of(value: output));
 
         Exception caught =
-            Catching.Catch(action: () => _ = stage.Advance(input: 1, continuation: static (output, _) => output));
+            Catching.Catch(
+                action: () =>
+                    _ = stage.Advance(input: 1, continuation: static (output, _) => Done.Of(value: output)));
 
         await Assert.That(caught).IsTypeOf<InvalidOperationException>();
         await Assert.That(caught.Message).Contains(expected: "Advance was already called");
@@ -89,10 +91,14 @@ public sealed class SingleUseTests
         Stage<int, int, int> stage = Stage.From<int, int, int>(body: Fail);
 
         Exception first =
-            Catching.Catch(action: () => _ = stage.Advance(input: 1, continuation: static (output, _) => output));
+            Catching.Catch(
+                action: () =>
+                    _ = stage.Advance(input: 1, continuation: static (output, _) => Done.Of(value: output)));
 
         Exception second =
-            Catching.Catch(action: () => _ = stage.Advance(input: 1, continuation: static (output, _) => output));
+            Catching.Catch(
+                action: () =>
+                    _ = stage.Advance(input: 1, continuation: static (output, _) => Done.Of(value: output)));
 
         await Assert.That(first).IsSameReferenceAs(expected: failure);
         await Assert.That(second.Message).Contains(expected: "Advance was already called");
@@ -136,7 +142,7 @@ public sealed class SingleUseTests
 
         int[] results =
             await Concurrency.RunTogether(
-                call: () => _ = stage.Advance(input: 1, continuation: static (output, _) => output));
+                call: () => _ = stage.Advance(input: 1, continuation: static (output, _) => Done.Of(value: output)));
 
         await Assert.That(results.Count(predicate: static result => result == Concurrency.Succeeded))
             .IsEqualTo(expected: 1);

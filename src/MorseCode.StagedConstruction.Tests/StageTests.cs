@@ -33,7 +33,7 @@ public sealed class StageTests
                 {
                     log.Add(item: $"continuation got {output} and {next}");
 
-                    return output;
+                    return Done.Of(value: output);
                 });
 
         await Assert.That(logCountBeforeAdvance).IsEqualTo(expected: 0);
@@ -52,7 +52,8 @@ public sealed class StageTests
 
         Stage<int, object, object> stage = Stage.From(body: (int _) => (Output: output, Next: next));
 
-        (object receivedOutput, object receivedNext) = stage.Advance(input: 0, continuation: static (o, n) => (o, n));
+        (object receivedOutput, object receivedNext) =
+            stage.Advance(input: 0, continuation: static (o, n) => Done.Of(value: (o, n))).Value;
 
         await Assert.That(receivedOutput).IsSameReferenceAs(expected: output);
         await Assert.That(receivedNext).IsSameReferenceAs(expected: next);
@@ -65,7 +66,7 @@ public sealed class StageTests
 
         Stage<int, int, int> stage = Stage.From(body: static (int input) => (Output: input, Next: input));
 
-        object returned = stage.Advance(input: 0, continuation: (_, _) => result);
+        object returned = stage.Advance(input: 0, continuation: (_, _) => Done.Of(value: result)).Value;
 
         await Assert.That(returned).IsSameReferenceAs(expected: result);
     }

@@ -69,8 +69,9 @@ public abstract class Stage<TInput, TOutput, TNext>
     ///     handle.
     /// </param>
     /// <typeparam name="TResult">
-    ///     The type that <paramref name="continuation" /> returns. The compiler gets
-    ///     it from the lambda, thus the caller does not write it.
+    ///     The type of the value in the <see cref="Constructed{TResult}" /> that
+    ///     <paramref name="continuation" /> returns. The compiler gets it from the
+    ///     lambda, thus the caller does not write it.
     /// </typeparam>
     /// <returns>The value that <paramref name="continuation" /> returns.</returns>
     /// <exception cref="ArgumentNullException">
@@ -78,7 +79,9 @@ public abstract class Stage<TInput, TOutput, TNext>
     ///     null.
     /// </exception>
     /// <exception cref="InvalidOperationException">A caller used this stage before.</exception>
-    public TResult Advance<TResult>(TInput input, StageContinuation<TOutput, TNext, TResult> continuation)
+    public Constructed<TResult> Advance<TResult>(
+        TInput input,
+        StageContinuation<TOutput, TNext, TResult> continuation)
     {
         // The null check occurs before the claim. Thus, a null continuation does not use the stage. The input
         // is not checked: its type is the choice of the base, and null can be a valid input.
@@ -109,11 +112,11 @@ public abstract class Stage<TInput, TOutput, TNext>
     ///     handle.
     /// </param>
     /// <typeparam name="TResult">
-    ///     The type that <paramref name="continuation" />
-    ///     returns.
+    ///     The type of the value in the <see cref="Constructed{TResult}" /> that
+    ///     <paramref name="continuation" /> returns.
     /// </typeparam>
     /// <returns>The value that <paramref name="continuation" /> returns.</returns>
-    protected abstract TResult AdvanceCore<TResult>(
+    protected abstract Constructed<TResult> AdvanceCore<TResult>(
         TInput input,
         StageContinuation<TOutput, TNext, TResult> continuation);
 }

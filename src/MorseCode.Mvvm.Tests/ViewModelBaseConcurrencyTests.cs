@@ -5,6 +5,7 @@ using System.Linq;
 using System.Runtime;
 using System.Threading;
 using System.Threading.Tasks;
+using MorseCode.StagedConstruction;
 using SodaFlow;
 using SodaFlow.Bindable.ObjectModel;
 using SodaFlow.Functional;
@@ -165,7 +166,7 @@ public sealed class ViewModelBaseConcurrencyTests
                             bindingScheduler: scheduler,
                             continuation: (output, construct) =>
                             {
-                                List<ViewModelBase> constructed = [];
+                                List<Constructed<ViewModelBase>> constructed = [];
 
                                 Cell<int> sealsWhenSampled =
                                     source.Map(
