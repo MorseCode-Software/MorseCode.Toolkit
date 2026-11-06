@@ -421,24 +421,24 @@ public sealed class VirtualizingItemsControlTests
                 using ShownVirtual shown = new(model: first, buffer: 0);
                 VirtualizingItemsControl list = shown.List;
 
-                await Assert.That(list.TotalCount).IsEqualTo(expected: 1000);
+                await Assert.That(list.Rows.TotalCount).IsEqualTo(expected: 1000);
 
                 list.Source = second;
 
-                await Assert.That(list.TotalCount).IsEqualTo(expected: 50);
+                await Assert.That(list.Rows.TotalCount).IsEqualTo(expected: 50);
 
                 first.Resize(total: 2000);
 
-                await Assert.That(list.TotalCount).IsEqualTo(expected: 50);
+                await Assert.That(list.Rows.TotalCount).IsEqualTo(expected: 50);
 
                 second.Resize(total: 60);
 
-                await Assert.That(list.TotalCount).IsEqualTo(expected: 60);
+                await Assert.That(list.Rows.TotalCount).IsEqualTo(expected: 60);
 
                 list.Source = null;
                 second.Resize(total: 70);
 
-                await Assert.That(list.TotalCount).IsEqualTo(expected: 0);
+                await Assert.That(list.Rows.TotalCount).IsEqualTo(expected: 0);
                 await Assert.That(list.ScrollRequest).IsEqualTo(expected: Maybe<int>.None);
             });
 
@@ -458,13 +458,13 @@ public sealed class VirtualizingItemsControlTests
                 model.Request(position: 700);
                 shown.Settle();
 
-                await Assert.That(shown.List.TotalCount).IsEqualTo(expected: 1000);
+                await Assert.That(shown.List.Rows.TotalCount).IsEqualTo(expected: 1000);
                 await Assert.That(shown.List.ScrollRequest).IsEqualTo(expected: Maybe<int>.None);
                 await Assert.That(model.ScrollWrites).IsEmpty();
 
                 shown.Return();
 
-                await Assert.That(shown.List.TotalCount).IsEqualTo(expected: 2000);
+                await Assert.That(shown.List.Rows.TotalCount).IsEqualTo(expected: 2000);
                 await Assert.That(Texts(shown: shown).Any(predicate: static text => text == "Row 700")).IsTrue();
                 await Assert.That(model.CurrentRequest).IsEqualTo(expected: Maybe<int>.None);
             });

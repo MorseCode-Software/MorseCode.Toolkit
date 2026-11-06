@@ -11,21 +11,16 @@ namespace MorseCode.Avalonia.Controls;
 internal sealed class VirtualItemsSource : IVirtualItemsSource
 {
     internal VirtualItemsSource(
-        IOneWayBindableValue<int> totalCount,
         IOneWayBindableValue<VirtualRows> rows,
         IOneWayToSourceBindableValue<ItemRange> visibleRange,
         IOneWayBindableValue<Maybe<int>> scrollRequest,
         IOneWayToSourceBindableValue<Maybe<int>> scrollHandled)
     {
-        this.TotalCount = totalCount;
         this.Rows = rows;
         this.VisibleRange = visibleRange;
         this.ScrollRequest = scrollRequest;
         this.ScrollHandled = scrollHandled;
     }
-
-    /// <inheritdoc />
-    public IOneWayBindableValue<int> TotalCount { get; }
 
     /// <inheritdoc />
     public IOneWayBindableValue<VirtualRows> Rows { get; }

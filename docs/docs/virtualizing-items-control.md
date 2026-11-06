@@ -34,20 +34,23 @@ yet shows the `PlaceholderTemplate` instead, until the rows arrive.
 
 ## The source
 
-The control reads and writes five values. They go in two pairs, and each pair only works when both
+The control reads and writes these values. They go in two pairs, and each pair only works when both
 halves are there:
 
 | Value | Direction | What it is |
 | --- | --- | --- |
-| `TotalCount` | view model to control | The number of positions in the whole list. |
-| `Rows` | view model to control | The rows for some of the positions, and the position of the first. |
+| `Rows` | view model to control | The rows for some of the positions, the position of the first, and the number of positions in the whole list. |
 | `VisibleRange` | control to view model | The positions on screen, with `Buffer` more on each side. |
 | `ScrollRequest` | view model to control | The position that the view model wants to show, or none. |
 | `ScrollHandled` | control to view model | The position of the request that the control handled. |
 
 The values live together in one object, an `IVirtualItemsSource`. The view model gives that object
-to the view, and the view binds one property. The control attaches to all five values when you set
+to the view, and the view binds one property. The control attaches to all of the values when you set
 `Source`, and detaches when you set it again or clear it.
+
+The count of the whole list travels inside `Rows` rather than as a value of its own, so a change of
+both reaches the control as one update and the control never shows a count with the rows of a
+different instant.
 
 The control follows the source only while it is in a visual tree. When the view leaves the tree, as
 it does when a tab closes or a page navigates away, the control removes its handlers from the
@@ -57,8 +60,7 @@ returns to a tree, the control reads the source again and catches up with whatev
 ## The view model
 
 `CreateVirtualItemsSource` makes the source from a `ReactiveCollection`. It slices the collection
-with the range that the control reports, builds the rows with `Map`, and counts the keys for
-`TotalCount`. It is an extension method of the `IOutput` that `ViewModelBase` gives your constructor,
+with the range that the control reports, builds the rows with `Map`, and counts the keys. It is an extension method of the `IOutput` that `ViewModelBase` gives your constructor,
 in `MorseCode.Avalonia.Controls`:
 
 ```csharp
@@ -82,23 +84,22 @@ the number of live view models stays bounded however long the list is. The helpe
 the `MappedItems` with the output, so disposing of the view model releases the rows that are still
 in use. You cannot forget it.
 
-The offset and the rows come from one cell, so they always agree. The rows are the list that `Map`
-gives, passed on without a copy. The control reads that list when it needs a row, and not when it
+The count, the offset, and the rows come from one cell, so they always agree. The rows are the list
+that `Map` gives, passed on without a copy. The control reads that list when it needs a row, and not when it
 receives the value, so a list that you build yourself must never change after you hand it over.
 Make a new list for each change.
 
 ### When the rows do not come from a collection
 
-Another overload takes the cells and the sink yourself. You supply the count, the rows, and a
-`CellSink<ItemRange>` that receives the range. Make the rows and their offset from one cell, so they
-agree:
+Another overload takes the cell and the sink yourself. You supply one `Cell<VirtualRows>` that
+holds the count, the offset, and the rows, and a `CellSink<ItemRange>` that receives the range.
+Make that cell from one lift, so the three always agree:
 
 ```csharp
 CellSink<ItemRange> range = Cell.CreateSink(ItemRange.Empty);
 
 IVirtualItemsSource source = output.CreateVirtualItemsSource(
-    totalCount: count,
-    rows: rowsAtOffset,
+    rows: rows,
     visibleRange: range,
     scrollRequests: scrollTo);
 ```

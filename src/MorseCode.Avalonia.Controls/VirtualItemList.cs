@@ -61,10 +61,12 @@ internal sealed class VirtualItemList : IList, IReadOnlyList<object?>, INotifyCo
     ///     Changes the length of the list and the rows, and tells the listeners
     ///     which positions changed.
     /// </summary>
-    /// <param name="newCount">The number of positions in the whole list.</param>
-    /// <param name="newRows">The rows.</param>
-    public void Update(int newCount, VirtualRows newRows)
+    /// <param name="newRows">
+    ///     The rows, with the number of positions in the whole list. A negative number counts as zero.
+    /// </param>
+    public void Update(VirtualRows newRows)
     {
+        int newCount = Math.Max(val1: 0, val2: newRows.TotalCount);
         int oldCount = this.Count;
         VirtualRows oldRows = this.rows;
 
