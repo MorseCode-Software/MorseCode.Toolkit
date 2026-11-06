@@ -5,6 +5,13 @@ BindableFactoryExtensions is gone. It served only VirtualizingItemsControl, so i
 MorseCode.Avalonia.Controls 0.3.0, where it is not public. Use CreateVirtualItemsSource there to
 make the scroll request with the rest of the source.
 
+Changed: CreateBase now releases the registrations when its continuation returns without a call to
+Construct, and fails with an InvalidOperationException that says so. It also releases them when the
+continuation throws, before or after Construct, and lets the exception through. Before, a
+continuation that registered a disposable or a bindable and then returned another value, or threw,
+left those registrations attached to the graph with nothing to release them. A continuation that
+calls Construct one time, as every view model does, sees no change.
+
 New: the package has a net8.0 build, next to net472, net6.0, and netstandard2.0. It is the same
 code, compiled for net8.0. A project that targets net8.0 or later now takes the net8.0 build and
 not the netstandard2.0 build. MorseCode.Avalonia.Controls references this package, and it targets

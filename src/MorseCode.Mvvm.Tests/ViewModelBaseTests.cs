@@ -390,6 +390,85 @@ public sealed class ViewModelBaseTests
         await Assert.That(log).IsEmpty();
     }
 
+    // No view model owns the registrations of a continuation that did not call Construct. Thus, the
+    // base releases them, and the caller learns that the continuation is wrong.
+    [Test]
+    public async Task AContinuationThatReturnsWithoutConstructFailsAndReleasesTheRegistrations()
+    {
+        List<string> log = [];
+        List<ViewModelBase.IOutput> kept = [];
+
+        Exception caught =
+            Catch(
+                action: () =>
+                    ViewModelBase.CreateBase(
+                        bindingScheduler: BindingScheduler.Immediate,
+                        continuation: (output, _) =>
+                        {
+                            kept.Add(output);
+                            output.AddDisposable(disposable: new Recording(log: log, name: "registered"));
+
+                            return new object();
+                        }));
+
+        Exception late =
+            Catch(action: () => kept[0].AddDisposable(disposable: new Recording(log: log, name: "late")));
+
+        await Assert.That(caught).IsTypeOf<InvalidOperationException>();
+        await Assert.That(caught.Message).Contains(expected: "without a call to Construct");
+        await Assert.That(log).IsEquivalentTo(expected: ["registered"]);
+        await Assert.That(late).IsTypeOf<InvalidOperationException>();
+    }
+
+    // The exception leaves the continuation before Construct. Nothing else can release what the
+    // continuation registered.
+    [Test]
+    public async Task AContinuationThatThrowsBeforeConstructReleasesTheRegistrationsAndRethrows()
+    {
+        List<string> log = [];
+        InvalidOperationException failure = new(message: "The continuation failed.");
+
+        Exception caught =
+            Catch(
+                action: () =>
+                    ViewModelBase.CreateBase<ViewModelBase>(
+                        bindingScheduler: BindingScheduler.Immediate,
+                        continuation: (output, _) =>
+                        {
+                            output.AddDisposable(disposable: new Recording(log: log, name: "registered"));
+
+                            throw failure;
+                        }));
+
+        await Assert.That(caught).IsSameReferenceAs(expected: failure);
+        await Assert.That(log).IsEquivalentTo(expected: ["registered"]);
+    }
+
+    // The view model exists, but the continuation lost it when it threw. The caller never receives it,
+    // thus the base releases its registrations.
+    [Test]
+    public async Task AContinuationThatThrowsAfterConstructReleasesTheRegistrationsAndRethrows()
+    {
+        List<string> log = [];
+        InvalidOperationException failure = new(message: "The continuation failed.");
+
+        Exception caught =
+            Catch(
+                action: () =>
+                    ViewModelBase.CreateBase<ViewModelBase>(
+                        bindingScheduler: BindingScheduler.Immediate,
+                        continuation: (output, construct) =>
+                        {
+                            output.AddDisposable(disposable: new Recording(log: log, name: "registered"));
+                            _ = construct.Construct(constructor: static viewModelBase => viewModelBase);
+
+                            throw failure;
+                        }));
+
+        await Assert.That(caught).IsSameReferenceAs(expected: failure);
+        await Assert.That(log).IsEquivalentTo(expected: ["registered"]);
+    }
+
     // A second Construct call cannot make a second owner of the same entries. The handle that Select
     // makes refuses the call, and the base does not seal the output a second time.
     [Test]
