@@ -296,28 +296,28 @@ public sealed class StagedConstructionTests
 
     private sealed record MachineValues(int Seed, int Adjusted, string Label);
 
-    private sealed class Dog(AnimalValues animal, string bark)
+    private sealed class Dog(in AnimalValues animal, in string bark)
     {
         public AnimalValues Animal { get; } = animal;
 
         public string Bark { get; } = bark;
     }
 
-    private sealed class Cat(MammalValues mammal, string greeting)
+    private sealed class Cat(in MammalValues mammal, in string greeting)
     {
         public MammalValues Mammal { get; } = mammal;
 
         public string Greeting { get; } = greeting;
     }
 
-    private sealed class Robot(MachineValues machine, string summary)
+    private sealed class Robot(in MachineValues machine, in string summary)
     {
         public MachineValues Machine { get; } = machine;
 
         public string Summary { get; } = summary;
     }
 
-    private sealed class NamedByStages(string nameSeenByBase)
+    private sealed class NamedByStages(in string nameSeenByBase)
     {
         public string NameSeenByBase { get; } = nameSeenByBase;
     }

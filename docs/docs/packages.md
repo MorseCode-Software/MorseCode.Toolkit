@@ -74,6 +74,8 @@ rules:
   when at least one argument has a name. See [Named argument order](named-argument-order.md).
 - MC0002, which reports an explicit cast, such as `(int)value`, so the few that are needed stand
   out. See [Explicit cast](explicit-cast.md).
+- MC0003, which reports a primary constructor parameter of a class or a struct that isn't `in`.
+  See [Primary constructor parameter](primary-constructor-parameter.md).
 
 It's a development dependency: NuGet adds it with `PrivateAssets="all"`, and it doesn't flow to
 the packages of a project that uses it. It needs the .NET 7 SDK or later, or Visual Studio 2022

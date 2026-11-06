@@ -536,10 +536,10 @@ public sealed class ViewModelBaseTests
         throw new InvalidOperationException(message: "The action did not throw an exception.");
     }
 
-    private sealed class Derived(ViewModelBase viewModelBase)
+    private sealed class Derived(in ViewModelBase viewModelBase)
         : ViewModelBase(viewModelBase: viewModelBase);
 
-    private sealed class Recording(ICollection<string> log, string name) : IDisposable
+    private sealed class Recording(in ICollection<string> log, in string name) : IDisposable
     {
         private ICollection<string> Log { get; } = log;
 
@@ -556,7 +556,7 @@ public sealed class ViewModelBaseTests
         }
     }
 
-    private sealed class RecordingListener(ICollection<string> log, string name) : IWeakListener
+    private sealed class RecordingListener(in ICollection<string> log, in string name) : IWeakListener
     {
         private ICollection<string> Log { get; } = log;
 
