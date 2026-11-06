@@ -41,7 +41,8 @@ public static TResult CreateBase<TResult>(
                     body: (string label) =>
                     (
                         Output: label.ToUpperInvariant(),
-                        Next: Constructor.From(new MachineValues(seed, adjusted, label)))))));
+                        Next: Constructor.From(new MachineValues(seed, adjusted, label)))))))
+        .Value;
 }
 ```
 
@@ -55,6 +56,9 @@ public static Robot Create(int seed) =>
             third.Advance($"label {secondOutput}", (thirdOutput, construct) =>
                 construct.Construct(machine => new Robot(machine, summary: thirdOutput)))));
 ```
+
+Each `Advance` returns the `Constructed<Robot>` that the innermost `Construct` made, so the whole
+chain has that type, and `CreateBase` reads `.Value` once at the top.
 
 `Stage.From(body)` makes a stage from a function. The function gets the input of the subclass and
 returns the output and the next handle in a tuple. It gets the values of the previous stages from
