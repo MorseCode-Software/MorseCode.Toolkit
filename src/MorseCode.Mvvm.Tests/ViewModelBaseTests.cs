@@ -391,7 +391,8 @@ public sealed class ViewModelBaseTests
     }
 
     // No view model owns the registrations of a continuation that did not call Construct. Thus, the
-    // base releases them, and the caller learns that the continuation is wrong.
+    // base releases them, and the caller learns that the continuation is wrong. Only a null return gets
+    // past the compiler, because only Construct makes the value that the continuation returns.
     [Test]
     public async Task AContinuationThatReturnsWithoutConstructFailsAndReleasesTheRegistrations()
     {
@@ -401,14 +402,15 @@ public sealed class ViewModelBaseTests
         Exception caught =
             Catch(
                 action: () =>
-                    ViewModelBase.CreateBase(
+                    ViewModelBase.CreateBase<ViewModelBase>(
                         bindingScheduler: BindingScheduler.Immediate,
                         continuation: (output, _) =>
                         {
                             kept.Add(output);
                             output.AddDisposable(disposable: new Recording(log: log, name: "registered"));
 
-                            return new object();
+                            // ReSharper disable once NullableWarningSuppressionIsUsed - A null is the only value that a continuation can return without a call to Construct, because only Construct makes the value that the continuation returns.
+                            return null!;
                         }));
 
         Exception late =
@@ -481,7 +483,7 @@ public sealed class ViewModelBaseTests
                         bindingScheduler: BindingScheduler.Immediate,
                         continuation: static (_, construct) =>
                         {
-                            construct.Construct(constructor: static viewModelBase => viewModelBase).Dispose();
+                            construct.Construct(constructor: static viewModelBase => viewModelBase).Value.Dispose();
 
                             return construct.Construct(constructor: static viewModelBase => viewModelBase);
                         }));

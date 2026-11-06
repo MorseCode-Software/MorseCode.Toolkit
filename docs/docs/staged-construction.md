@@ -39,7 +39,7 @@ public class Animal(AnimalValues values)
     public static TResult CreateBase<TResult>(
         string name,
         StageContinuation<string, Constructor<AnimalValues>, TResult> continuation) =>
-        continuation(name.ToUpperInvariant(), Constructor.From(new AnimalValues(name)));
+        continuation(name.ToUpperInvariant(), Constructor.From(new AnimalValues(name))).Value;
 }
 
 public sealed class Dog : Animal
@@ -61,6 +61,11 @@ the base to that function.
 
 The compiler infers `TResult` from the lambdas, so a `Create` method writes no type arguments.
 
+`construct.Construct` returns a `Constructed<TResult>`, and the continuation must return one. Only
+`Construct` makes that type, so a continuation that returns without calling `Construct` does not
+compile. `Animal.CreateBase` reads `.Value` on what the continuation returns and gives the finished
+`Dog` to its caller.
+
 ## What it guarantees
 
 - **Nothing reads a partly built object.** Every value is a local variable until the last step.
@@ -68,6 +73,10 @@ The compiler infers `TResult` from the lambdas, so a `Create` method writes no t
 - **The order of the work is set by the types.** A subclass cannot reach the constructor before the
   base finishes, when the base keeps the constructor of its values private. The handle is then the
   only source of the values.
+- **A continuation cannot skip the constructor.** The only value a continuation can return is the
+  one `Construct` gives it, so a `Create` method that forgets the call does not compile. The
+  runtime check in a base such as `ViewModelBase` still covers a continuation that throws, which
+  the compiler cannot see.
 - **A base can wrap the work of its subclass.** The base calls the continuation. It can do work
   before the call, and after it, for example inside a transaction:
 
@@ -78,7 +87,7 @@ The compiler infers `TResult` from the lambdas, so a `Create` method writes no t
       // open a scope
       try
       {
-          return continuation(output, Constructor.From(values));
+          return continuation(output, Constructor.From(values)).Value;
       }
       finally
       {
@@ -115,7 +124,7 @@ A `Constructor<Dog>` is not a `Constructor<Animal>`, even when `Dog` derives fro
 helper must accept a handle for any kind of animal, make the helper generic in the values type:
 
 ```csharp
-public static Pet MakePet<T>(string output, Constructor<T> animal)
+public static Constructed<Pet> MakePet<T>(string output, Constructor<T> animal)
     where T : AnimalValues =>
     animal.Construct(values => new Pet(values.Name, output));
 ```
@@ -129,6 +138,7 @@ values type. To change the values type of a handle, call `Select`.
 | Type | What it is |
 | --- | --- |
 | @MorseCode.StagedConstruction.StageContinuation`3 | The callback a subclass gives to a stage of its base. It gets the output of the stage and the handle for the next step. |
+| @MorseCode.StagedConstruction.Constructed`1 | The value a continuation returns. Only `Construct` makes one, so a continuation has to reach `Construct` to compile. A `CreateBase` method reads its `Value`. |
 | @MorseCode.StagedConstruction.Constructor`1 | The handle for the step after the last stage. It gives the values of the base to the constructor of the subclass. Derive from it for a handle of your own. |
 | @MorseCode.StagedConstruction.Stage`3 | The handle for a stage after the first. The subclass gives input to it. Derive from it for a stage of your own. |
 | @MorseCode.StagedConstruction.Constructor | `Constructor.From(values)` makes the usual final handle. |

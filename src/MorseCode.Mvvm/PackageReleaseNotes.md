@@ -12,6 +12,12 @@ continuation that registered a disposable or a bindable and then returned anothe
 left those registrations attached to the graph with nothing to release them. A continuation that
 calls Construct one time, as every view model does, sees no change.
 
+Changed: the continuation of CreateBase returns the Constructed<TResult> that Construct gives, from
+MorseCode.StagedConstruction 0.3.0, and CreateBase returns the value inside it. A continuation that
+ends with return construct.Construct(...) compiles as it is. One that returns without a call to
+Construct no longer compiles, so the InvalidOperationException above is reached only by a null
+return. This version needs MorseCode.StagedConstruction 0.3.0.
+
 New: the package has a net8.0 build, next to net472, net6.0, and netstandard2.0. It is the same
 code, compiled for net8.0. A project that targets net8.0 or later now takes the net8.0 build and
 not the netstandard2.0 build. MorseCode.Avalonia.Controls references this package, and it targets

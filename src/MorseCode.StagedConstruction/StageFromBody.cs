@@ -11,7 +11,7 @@ internal sealed class StageFromBody<TInput, TOutput, TNext>(in Func<TInput, (TOu
 {
     private Func<TInput, (TOutput Output, TNext Next)> Body { get; } = body;
 
-    protected override TResult AdvanceCore<TResult>(
+    protected override Constructed<TResult> AdvanceCore<TResult>(
         TInput input,
         StageContinuation<TOutput, TNext, TResult> continuation)
     {

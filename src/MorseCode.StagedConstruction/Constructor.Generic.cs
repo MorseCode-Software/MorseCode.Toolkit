@@ -31,6 +31,12 @@ namespace MorseCode.StagedConstruction;
 ///         subclass cannot call its own constructor before the base completes all
 ///         of its stages.
 ///     </para>
+///     <para>
+///         <see cref="Construct{TResult}" /> returns a
+///         <see cref="Constructed{TResult}" />, and only it makes one. The
+///         continuation of the subclass must return one. Thus, the compiler
+///         checks that the continuation calls this method.
+///     </para>
 /// </remarks>
 /// <typeparam name="TBaseValues">
 ///     The type of the values of the base. The subclass keeps them for delegation,
@@ -59,13 +65,16 @@ public abstract class Constructor<TBaseValues>
     ///     The type that <paramref name="constructor" /> returns. The compiler gets it
     ///     from the lambda, thus the caller does not write it.
     /// </typeparam>
-    /// <returns>The value that <paramref name="constructor" /> returns.</returns>
+    /// <returns>
+    ///     The value that <paramref name="constructor" /> returns, in a
+    ///     <see cref="Constructed{TResult}" />.
+    /// </returns>
     /// <exception cref="ArgumentNullException">
     ///     <paramref name="constructor" /> is
     ///     null.
     /// </exception>
     /// <exception cref="InvalidOperationException">A caller used this handle before.</exception>
-    public TResult Construct<TResult>(Func<TBaseValues, TResult> constructor)
+    public Constructed<TResult> Construct<TResult>(Func<TBaseValues, TResult> constructor)
     {
         // The null check occurs before the claim. Thus, a null constructor does not use the handle.
 #pragma warning disable CA1510 // ArgumentNullException.ThrowIfNull does not exist on netstandard2.0 and net472.
@@ -77,7 +86,7 @@ public abstract class Constructor<TBaseValues>
 
         SingleUse.Claim(usedBy: ref this.usedBy, member: nameof(this.Construct));
 
-        return this.ConstructCore(constructor: constructor);
+        return new Constructed<TResult>(value: this.ConstructCore(constructor: constructor));
     }
 
     /// <summary>

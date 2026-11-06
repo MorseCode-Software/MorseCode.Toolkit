@@ -127,17 +127,22 @@ public class ViewModelBase : IViewModel
     /// </param>
     /// <param name="continuation">The remaining construction of the subclass.</param>
     /// <typeparam name="TResult">
-    ///     The type that <paramref name="continuation" /> returns. Usually, it is the
-    ///     subclass.
+    ///     The type of the value in the <see cref="Constructed{TResult}" /> that
+    ///     <paramref name="continuation" /> returns. Usually, it is the subclass.
     /// </typeparam>
-    /// <returns>The value that <paramref name="continuation" /> returns.</returns>
+    /// <returns>
+    ///     The value in the <see cref="Constructed{TResult}" /> that
+    ///     <paramref name="continuation" /> returns.
+    /// </returns>
     /// <exception cref="ArgumentNullException">
     ///     <paramref name="bindingScheduler" /> or <paramref name="continuation" /> is
     ///     null.
     /// </exception>
     /// <exception cref="InvalidOperationException">
     ///     <paramref name="continuation" /> returned without a call to
-    ///     <see cref="Constructor{TBaseValues}.Construct{TResult}" />.
+    ///     <see cref="Constructor{TBaseValues}.Construct{TResult}" />. Only a null
+    ///     return can do this, because only <c>Construct</c> makes the
+    ///     <see cref="Constructed{TResult}" /> that the continuation returns.
     /// </exception>
     public static TResult CreateBase<TResult>(
         IBindingScheduler bindingScheduler,
@@ -160,7 +165,7 @@ public class ViewModelBase : IViewModel
 
         Output output = new(bindingScheduler: bindingScheduler);
         ViewModelBaseConstructor constructor = new(output: output);
-        TResult result;
+        Constructed<TResult> result;
 
         try
         {
@@ -178,10 +183,11 @@ public class ViewModelBase : IViewModel
 
         if (constructor.IsConstructed)
         {
-            return result;
+            return result.Value;
         }
 
-        // The continuation returned a value without a call to Construct. No view model owns the
+        // The continuation returned without a call to Construct, which only a null return can do, because
+        // only Construct makes the value that the continuation returns. No view model owns the
         // registrations, thus the base releases them.
         InvalidOperationException notConstructed =
             new(

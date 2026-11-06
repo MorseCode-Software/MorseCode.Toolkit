@@ -1,4 +1,5 @@
 using System;
+using System.Reflection;
 using System.Threading.Tasks;
 using TUnit.Assertions;
 using TUnit.Assertions.Extensions;
@@ -13,7 +14,7 @@ public sealed class ConstructorTests
     {
         object values = new();
 
-        object received = Constructor.From(values: values).Construct(constructor: static v => v);
+        object received = Constructor.From(values: values).Construct(constructor: static v => v).Value;
 
         await Assert.That(received).IsSameReferenceAs(expected: values);
     }
@@ -23,9 +24,19 @@ public sealed class ConstructorTests
     {
         object result = new();
 
-        object returned = Constructor.From(values: 1).Construct(constructor: _ => result);
+        object returned = Constructor.From(values: 1).Construct(constructor: _ => result).Value;
 
         await Assert.That(returned).IsSameReferenceAs(expected: result);
+    }
+
+    // The compiler can check that a continuation calls Construct only while Construct is the one way to
+    // make the value that the continuation returns. A public constructor is a second way.
+    [Test]
+    public async Task ConstructedHasNoPublicConstructor()
+    {
+        ConstructorInfo[] constructors = typeof(Constructed<object>).GetConstructors();
+
+        await Assert.That(constructors).IsEmpty();
     }
 
     [Test]
@@ -44,7 +55,7 @@ public sealed class ConstructorTests
                     });
 
         int callsBeforeConstruct = calls;
-        int received = selected.Construct(constructor: static v => v);
+        int received = selected.Construct(constructor: static v => v).Value;
 
         await Assert.That(callsBeforeConstruct).IsEqualTo(expected: 0);
         await Assert.That(calls).IsEqualTo(expected: 1);
@@ -64,7 +75,8 @@ public sealed class ConstructorTests
                 .From(values: values)
                 .Select(selector: Double)
                 .Select(selector: Describe)
-                .Construct(constructor: Enclose);
+                .Construct(constructor: Enclose)
+                .Value;
 
         string byComposition = Enclose(text: Describe(number: Double(number: values)));
 
@@ -106,7 +118,7 @@ public sealed class ConstructorTests
 
         static string Describe<T>(Constructor<T> handle)
             where T : Base =>
-            handle.Construct(constructor: static values => values.Name);
+            handle.Construct(constructor: static values => values.Name).Value;
     }
 
     private class Base(in string name)

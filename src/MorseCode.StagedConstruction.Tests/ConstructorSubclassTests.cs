@@ -28,7 +28,7 @@ public sealed class ConstructorSubclassTests
     {
         Recording construct = new(values: 41);
 
-        int result = construct.Construct(constructor: static values => values + 1);
+        int result = construct.Construct(constructor: static values => values + 1).Value;
 
         await Assert.That(result).IsEqualTo(expected: 42);
     }
@@ -82,7 +82,7 @@ public sealed class ConstructorSubclassTests
 
         await Assert.That(selectorCalls).IsEqualTo(expected: 0);
 
-        int result = selected.Construct(constructor: static values => values + 2);
+        int result = selected.Construct(constructor: static values => values + 2).Value;
 
         await Assert.That(result).IsEqualTo(expected: 42);
         await Assert.That(selectorCalls).IsEqualTo(expected: 1);
@@ -178,7 +178,7 @@ public sealed class ConstructorSubclassTests
 
         await Assert.That(caught).IsTypeOf<ArgumentNullException>();
         await Assert.That((caught as ArgumentNullException)?.ParamName).IsEqualTo(expected: "selector");
-        await Assert.That(source.Construct(constructor: static values => values)).IsEqualTo(expected: 1);
+        await Assert.That(source.Construct(constructor: static values => values).Value).IsEqualTo(expected: 1);
     }
 
     // The override selects at once, and the default selects when the subclass constructs. Thus, the
@@ -191,7 +191,7 @@ public sealed class ConstructorSubclassTests
         Constructor<int> selected = source.Select(selector: static values => values + 1);
 
         await Assert.That(source.SelectCoreCalls).IsEqualTo(expected: 1);
-        await Assert.That(selected.Construct(constructor: static values => values)).IsEqualTo(expected: 2);
+        await Assert.That(selected.Construct(constructor: static values => values).Value).IsEqualTo(expected: 2);
     }
 
     // The override does not use the source itself: it reads the values from a field. Select uses the
@@ -231,7 +231,7 @@ public sealed class ConstructorSubclassTests
         await Assert.That(caught).IsTypeOf<ArgumentNullException>();
         await Assert.That((caught as ArgumentNullException)?.ParamName).IsEqualTo(expected: "constructor");
         await Assert.That(construct.CoreCalls).IsEqualTo(expected: 0);
-        await Assert.That(construct.Construct(constructor: static values => values)).IsEqualTo(expected: 1);
+        await Assert.That(construct.Construct(constructor: static values => values).Value).IsEqualTo(expected: 1);
     }
 
     private sealed class Recording(in int values, in Exception? failure = null) : Constructor<int>

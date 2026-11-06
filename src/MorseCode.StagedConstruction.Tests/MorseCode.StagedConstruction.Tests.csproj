@@ -35,6 +35,7 @@
         <Compile Include="Catching.cs"/>
         <Compile Include="Concurrency.cs"/>
         <Compile Include="ConstructorSubclassTests.cs"/>
+        <Compile Include="Done.cs"/>
         <Compile Include="ConstructorTests.cs"/>
         <Compile Include="SingleUseTests.cs"/>
         <Compile Include="StagedConstructionTests.cs"/>
