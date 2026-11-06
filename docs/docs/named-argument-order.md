@@ -53,6 +53,9 @@ argument goes to. So an optional parameter that a call leaves out, and an empty 
 never cause a report, and neither does a call that the compiler makes for an interpolated string. A
 value that goes into a `params` array counts as the `params` parameter, which is always the last.
 
+The warning marks the argument list, such as `(second: 2, first: 1)`, and not the whole call. A
+call on a long receiver doesn't underline the receiver.
+
 It doesn't check the arguments of attributes.
 
 ## Changing its severity
