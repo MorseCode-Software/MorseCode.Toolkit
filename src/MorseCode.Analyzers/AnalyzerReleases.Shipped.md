@@ -16,3 +16,11 @@ MC0001  | Style    | Warning  | NamedArgumentOrderAnalyzer
 Rule ID | Category | Severity | Notes
 --------|----------|----------|-------
 MC0002  | Style    | Warning  | ExplicitCastAnalyzer
+
+## Release 0.1.2
+
+### New Rules
+
+Rule ID | Category | Severity | Notes
+--------|----------|----------|-------
+MC0003  | Style    | Warning  | PrimaryConstructorParameterAnalyzer
