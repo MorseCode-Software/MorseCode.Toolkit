@@ -58,6 +58,21 @@ internal sealed class ShownVirtual : IDisposable
     public ScrollViewer Scroller => this.List.GetVisualDescendants().OfType<ScrollViewer>().First();
 
     /// <summary>
+    ///     Takes the control out of the window. Thus, the control leaves the visual tree, as a view
+    ///     does when the user closes a tab.
+    /// </summary>
+    public void Remove() => this.window.Content = null;
+
+    /// <summary>
+    ///     Puts the control back into the window, and runs the layout.
+    /// </summary>
+    public void Return()
+    {
+        this.window.Content = this.List;
+        this.Settle();
+    }
+
+    /// <summary>
     ///     Runs the work of the dispatcher and the layout until nothing is left. Thus,
     ///     a report, an answer, and the layout that follows it all happen.
     /// </summary>
