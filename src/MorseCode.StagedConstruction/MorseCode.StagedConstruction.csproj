@@ -19,6 +19,7 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <Compile Include="Constructed.cs"/>
         <Compile Include="Constructor.cs"/>
         <Compile Include="Constructor.Generic.cs"/>
         <Compile Include="SelectedConstruct.cs"/>

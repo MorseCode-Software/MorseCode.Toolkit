@@ -23,13 +23,13 @@ namespace MorseCode.Avalonia.Controls;
 public interface IVirtualItemsSource
 {
     /// <summary>
-    ///     Gets the number of positions in the whole list.
+    ///     Gets the rows for some of the positions, with the position of the first and the number of
+    ///     positions in the whole list.
     /// </summary>
-    IOneWayBindableValue<int> TotalCount { get; }
-
-    /// <summary>
-    ///     Gets the rows for some of the positions, with the position of the first.
-    /// </summary>
+    /// <remarks>
+    ///     The count travels with the rows. Thus, the control applies a change of both in one update,
+    ///     and it never shows a count with the rows of a different instant.
+    /// </remarks>
     IOneWayBindableValue<VirtualRows> Rows { get; }
 
     /// <summary>

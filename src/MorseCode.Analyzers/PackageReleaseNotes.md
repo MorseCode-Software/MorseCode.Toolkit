@@ -1,4 +1,16 @@
-0.1.3
+0.1.2
+
+New rule: MC0003 reports a primary constructor parameter of a class or a struct that is not
+written as in, such as class Holder(int value). A parameter without a modifier is a variable
+that every member of the type can read and write, and a member that captures it turns it into
+hidden mutable state. The in modifier makes it readonly, and the compiler refuses a member that
+captures it, so the value can go only into an initializer or a base call. A member that needs
+the value reads it from a field. The warning marks the name of the parameter. The rule does not
+report a record, whose positional parameters make properties and cannot be in, or a params
+parameter, which cannot be in either.
+
+MC0003 is a warning, so a build with -warnaserror fails on it. The documentation is at
+https://morsecode-software.github.io/MorseCode.Toolkit/docs/primary-constructor-parameter.html
 
 Changed: MC0002 now marks only the type in parentheses, such as (int), and not the whole cast
 expression. A cast on a long expression, such as (int)Math.Abs(value: (long)obj), used to
@@ -6,26 +18,29 @@ underline all of it, and a cast inside the value had a mark inside the first one
 reports the same casts, the same message, and the same id. Only the span of the mark changed.
 A suppression with a pragma or an attribute works as before.
 
-The tests now cover a cast to a tuple type, a pointer cast, and a cast from dynamic. The rule
-reports each of them. A conversion from dynamic is implicit for the compiler, so its message
-says the cast is not needed. That is true of the code, because a variable of the type takes
-the value, and the value is still checked only when the code runs. This is a patch version
-because no API changed and no rule changed its id.
+The tests of MC0002 now cover a cast to a tuple type, a pointer cast, and a cast from dynamic.
+The rule reports each of them. A conversion from dynamic is implicit for the compiler, so its
+message says the cast is not needed. That is true of the code, because a variable of the type
+takes the value, and the value is still checked only when the code runs.
 
-0.1.2
+Changed: MC0001 now marks only the argument list of a call, such as (second: 2, first: 1), and
+not the whole call. A call on a long receiver, or a new with an initializer, used to underline
+all of it. The rule reports the same calls, the same message, and the same id, as MC0002 does
+in this version. A suppression with a pragma or an attribute works as before.
 
-Fix: MC0001 no longer reports a call whose named arguments are in order when
-an argument is written with the null-forgiving operator, such as
-Create(collection: collection, project: null!, scrollRequests: requests). The
-compiler gives such an argument a different syntax node, and the rule did not
-find its parameter. It took the last parameter instead, so a suppressed
-argument before the last one looked out of order. The rule now finds the
-parameter of an argument with the operator, in any position. A call that is
-really out of order is still reported, with or without the operator.
+Fix: MC0001 no longer reports a call whose named arguments are in order when an argument is
+written with the null-forgiving operator, such as
+Create(collection: collection, project: null!, scrollRequests: requests). The compiler gives
+such an argument a different syntax node, and the rule did not find its parameter. It took the
+last parameter instead, so a suppressed argument before the last one looked out of order. The
+rule now finds the parameter of an argument with the operator, in any position. A call that is
+really out of order is still reported, with or without the operator. A project that put a
+suppression of MC0001 on such a call can remove it.
 
-MC0002 did not change. This is a patch version because no API changed and no
-rule changed its id. A project that put a suppression of MC0001 on such a call
-can remove it.
+This is a patch version because no API changed, no rule changed its id, and the package adds a
+rule, as 0.1.1 did. A project that builds with -warnaserror and updates from 0.1.1 fails on each
+primary constructor parameter without in. Set dotnet_diagnostic.MC0003.severity in .editorconfig
+to change that.
 
 0.1.1
 

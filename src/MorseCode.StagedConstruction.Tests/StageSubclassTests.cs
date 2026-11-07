@@ -15,10 +15,12 @@ public sealed class StageSubclassTests
     {
         Recording stage = new();
 
-        _ = stage.Advance(input: 1, continuation: static (output, _) => output);
+        _ = stage.Advance(input: 1, continuation: static (output, _) => Done.Of(value: output));
 
         Exception caught =
-            Catching.Catch(action: () => _ = stage.Advance(input: 1, continuation: static (output, _) => output));
+            Catching.Catch(
+                action: () =>
+                    _ = stage.Advance(input: 1, continuation: static (output, _) => Done.Of(value: output)));
 
         await Assert.That(caught).IsTypeOf<InvalidOperationException>();
         await Assert.That(caught.Message).Contains(expected: "Advance was already called");
@@ -30,7 +32,8 @@ public sealed class StageSubclassTests
     {
         Recording stage = new();
 
-        int result = stage.Advance(input: 20, continuation: static (output, next) => output + next);
+        int result =
+            stage.Advance(input: 20, continuation: static (output, next) => Done.Of(value: output + next)).Value;
 
         // The core gives the input plus one as the output, and the input as the next handle.
         await Assert.That(result).IsEqualTo(expected: 41);
@@ -45,10 +48,14 @@ public sealed class StageSubclassTests
         Recording stage = new(failure: failure);
 
         Exception first =
-            Catching.Catch(action: () => _ = stage.Advance(input: 1, continuation: static (output, _) => output));
+            Catching.Catch(
+                action: () =>
+                    _ = stage.Advance(input: 1, continuation: static (output, _) => Done.Of(value: output)));
 
         Exception second =
-            Catching.Catch(action: () => _ = stage.Advance(input: 1, continuation: static (output, _) => output));
+            Catching.Catch(
+                action: () =>
+                    _ = stage.Advance(input: 1, continuation: static (output, _) => Done.Of(value: output)));
 
         await Assert.That(first).IsSameReferenceAs(expected: failure);
         await Assert.That(second.Message).Contains(expected: "Advance was already called");
@@ -62,7 +69,7 @@ public sealed class StageSubclassTests
 
         int[] results =
             await Concurrency.RunTogether(
-                call: () => _ = stage.Advance(input: 1, continuation: static (output, _) => output));
+                call: () => _ = stage.Advance(input: 1, continuation: static (output, _) => Done.Of(value: output)));
 
         int succeeded = results.Count(predicate: static result => result == Concurrency.Succeeded);
         int refused = results.Count(predicate: static result => result == Concurrency.Refused);
@@ -83,7 +90,9 @@ public sealed class StageSubclassTests
         await Assert.That(caught).IsTypeOf<ArgumentNullException>();
         await Assert.That((caught as ArgumentNullException)?.ParamName).IsEqualTo(expected: "continuation");
         await Assert.That(stage.CoreCalls).IsEqualTo(expected: 0);
-        await Assert.That(stage.Advance(input: 1, continuation: static (output, _) => output)).IsEqualTo(expected: 2);
+
+        await Assert.That(stage.Advance(input: 1, continuation: static (output, _) => Done.Of(value: output)).Value)
+            .IsEqualTo(expected: 2);
     }
 
     private sealed class Recording(in Exception? failure = null) : Stage<int, int, int>
@@ -94,7 +103,9 @@ public sealed class StageSubclassTests
 
         public int CoreCalls => Volatile.Read(location: ref this.coreCalls);
 
-        protected override TResult AdvanceCore<TResult>(int input, StageContinuation<int, int, TResult> continuation)
+        protected override Constructed<TResult> AdvanceCore<TResult>(
+            int input,
+            StageContinuation<int, int, TResult> continuation)
         {
             Interlocked.Increment(location: ref this.coreCalls);
 

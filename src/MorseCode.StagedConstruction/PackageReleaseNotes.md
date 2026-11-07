@@ -1,4 +1,16 @@
-0.2.2
+0.3.0
+
+Breaking: Constructor<T>.Construct and Stage<,,>.Advance return a Constructed<TResult>, and a
+StageContinuation returns one, so the continuation of a subclass must return what Construct gives
+it. Only Construct makes a Constructed<TResult>. A continuation that returns without a call to
+Construct therefore no longer compiles; before, a base found the mistake at run time, or not at
+all. A CreateBase method reads Value on what the continuation returns and gives that to its
+caller. A continuation that ends with return construct.Construct(...), or with return
+next.Advance(...), compiles as it is; code that wrote the return type of such a lambda, or a
+CreateBase that returned the continuation's result directly, changes to the new type. ConstructCore
+is unchanged and still returns TResult; AdvanceCore returns the Constructed<TResult> that its
+continuation returns. StageContinuation loses out on TResult, because a sealed class cannot be
+covariant; no caller in this repository used that variance.
 
 New: the package has a net8.0 build, next to net472, net6.0, and netstandard2.0. It is the same
 code, compiled for net8.0. A project that targets net8.0 or later now takes the net8.0 build and

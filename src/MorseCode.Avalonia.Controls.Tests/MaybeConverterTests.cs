@@ -26,6 +26,12 @@ public sealed class MaybeConverterTests
     public async Task AValueThatIsNotAMaybeGoesToTheControlAsAnError() =>
         await Assert.That(ErrorMessage(result: Convert(value: "B"))).IsNotNull();
 
+    // Avalonia does not call a converter while the data context is null or the path does not resolve.
+    // Thus, a null comes only from a property whose value is null, and such a property is not a Maybe.
+    [Test]
+    public async Task ANullGoesToTheControlAsAnError() =>
+        await Assert.That(ErrorMessage(result: Convert(value: null))).Contains(expected: "null");
+
     [Test]
     public async Task AConversionBackIsAnErrorThatNamesTheConverterForATwoWayBinding() =>
         await Assert.That(

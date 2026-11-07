@@ -71,6 +71,10 @@ That happens when:
 - the control gives a value that isn't a `T`;
 - `MaybeConverter` is asked to convert back.
 
+A `null` from the view model is an error too. Avalonia doesn't call a converter while the
+`DataContext` is `null` or the binding path doesn't resolve, so a binding to a `Maybe<T>` never
+hands the converter `null`. When it does arrive, the bound property isn't a `Maybe<T>`.
+
 ## What they don't do
 
 The converters only add and remove the `Maybe`. A control that needs a different type, such as a

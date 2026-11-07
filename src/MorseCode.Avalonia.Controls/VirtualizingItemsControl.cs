@@ -6,6 +6,7 @@ using Avalonia.Controls.Presenters;
 using Avalonia.Controls.Templates;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using JetBrains.Annotations;
 using SodaFlow.Functional;
 
@@ -57,10 +58,7 @@ public class VirtualizingItemsControl : ItemsControl
     public static readonly StyledProperty<IVirtualItemsSource?> SourceProperty =
         AvaloniaProperty.Register<VirtualizingItemsControl, IVirtualItemsSource?>(name: nameof(Source));
 
-    // The source feeds these three properties, and the tests of the control read them.
-    internal static readonly StyledProperty<int> TotalCountProperty =
-        AvaloniaProperty.Register<VirtualizingItemsControl, int>(name: nameof(TotalCount), defaultValue: 0);
-
+    // The source feeds these two properties, and the tests of the control read them.
     internal static readonly StyledProperty<VirtualRows> RowsProperty =
         AvaloniaProperty.Register<VirtualizingItemsControl, VirtualRows>(
             name: nameof(Rows),
@@ -98,9 +96,12 @@ public class VirtualizingItemsControl : ItemsControl
     // The view model clears the request after it receives the report, and that can take a moment.
     private bool isRequestHandled;
 
-    // The source that the control reads and reports to, with the handlers on its values.
+    // The source that the control reads and reports to.
     private IVirtualItemsSource? source;
-    private PropertyChangedEventHandler? onTotalCountChanged;
+
+    // The handlers on the values of the source. They are set only while the control follows the source,
+    // which is while it is in a visual tree. A handler is a reference from the source to the control, and
+    // a view model can outlive its view. Thus, a control that left the tree holds none.
     private PropertyChangedEventHandler? onRowsChanged;
     private PropertyChangedEventHandler? onScrollRequestChanged;
 
@@ -125,21 +126,22 @@ public class VirtualizingItemsControl : ItemsControl
     ///     range that shows, and the scroll request.
     /// </summary>
     /// <remarks>
-    ///     The control reads the count, the rows, and the scroll request from the source, and writes
-    ///     the range that shows and the position that it scrolled to. Make the source with
-    ///     <c>CreateVirtualItemsSource</c>. A change of this property detaches the control from the
-    ///     old source and attaches it to the new one.
+    ///     <para>
+    ///         The control reads the rows, with their count, and the scroll request from the source, and
+    ///         writes the range that shows and the position that it scrolled to. Make the source with
+    ///         <c>CreateVirtualItemsSource</c>. A change of this property detaches the control from the
+    ///         old source and attaches it to the new one.
+    ///     </para>
+    ///     <para>
+    ///         The control follows the source only while it is in a visual tree. A control that left the
+    ///         tree keeps no reference in the source. Thus, a view model that outlives its view does not
+    ///         keep the view alive. The control reads the source again when it returns to a tree.
+    ///     </para>
     /// </remarks>
     public IVirtualItemsSource? Source
     {
         get => this.GetValue(property: SourceProperty);
         set => this.SetValue(property: SourceProperty, value: value);
-    }
-
-    internal int TotalCount
-    {
-        get => this.GetValue(property: TotalCountProperty);
-        set => this.SetValue(property: TotalCountProperty, value: value);
     }
 
     internal VirtualRows Rows
@@ -204,9 +206,9 @@ public class VirtualizingItemsControl : ItemsControl
                 message: "VirtualizingItemsControl sets ItemsSource itself. Set Source instead.");
         }
 
-        if (change.Property == TotalCountProperty || change.Property == RowsProperty)
+        if (change.Property == RowsProperty)
         {
-            this.items.Update(newCount: Math.Max(val1: 0, val2: this.TotalCount), newRows: this.Rows);
+            this.items.Update(newRows: this.Rows);
         }
         else if (change.Property == BufferProperty)
         {
@@ -223,8 +225,11 @@ public class VirtualizingItemsControl : ItemsControl
             this.isRequestHandled = false;
         }
 
-        // A request can wait for the count, and the count can arrive after the request.
-        if (change.Property == ScrollRequestProperty || change.Property == TotalCountProperty)
+        // A request can wait for the count, and the count can arrive after the request. New rows with the
+        // same count cannot make a request possible.
+        if (change.Property == ScrollRequestProperty
+            || (change.Property == RowsProperty
+                && change.GetOldValue<VirtualRows>().TotalCount != change.GetNewValue<VirtualRows>().TotalCount))
         {
             this.RequestScroll();
         }
@@ -237,6 +242,30 @@ public class VirtualizingItemsControl : ItemsControl
 
         // A request that came before the Loaded event can scroll now.
         this.RequestScroll();
+    }
+
+    /// <inheritdoc />
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e: e);
+
+        // The source can change while the control is out of the tree. The range that the control
+        // reported last stays, thus the view model keeps the rows for it and the return shows no
+        // placeholders.
+        if (this.source is not null)
+        {
+            this.Follow(source: this.source);
+            this.ReadSource(source: this.source);
+            this.RequestReport();
+        }
+    }
+
+    /// <inheritdoc />
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        this.StopFollowing();
+
+        base.OnDetachedFromVisualTree(e: e);
     }
 
     /// <inheritdoc />
@@ -259,6 +288,28 @@ public class VirtualizingItemsControl : ItemsControl
 
                 break;
         }
+    }
+
+    /// <inheritdoc />
+    protected override void ClearContainerForItemOverride(Control container)
+    {
+        // The base clears the content before the template. A presenter in a tree builds its child again
+        // at each of the two changes. The ContentPresenter of Avalonia 12 builds an explicit template
+        // also for no content. Thus, the row template builds a row view for null, and the second change
+        // removes it. The template goes first here, so that the build for no content does not occur.
+        switch (container)
+        {
+            case ContentPresenter presenter:
+                presenter.ClearValue(property: ContentPresenter.ContentTemplateProperty);
+
+                break;
+            case ContentControl control:
+                control.ClearValue(property: ContentControl.ContentTemplateProperty);
+
+                break;
+        }
+
+        base.ClearContainerForItemOverride(container: container);
     }
 
     private void RequestScroll()
@@ -315,43 +366,45 @@ public class VirtualizingItemsControl : ItemsControl
 
     private void AttachSource(IVirtualItemsSource? newSource)
     {
-        this.DetachSource();
+        this.StopFollowing();
 
         this.source = newSource;
 
         if (newSource is null)
         {
+            // A control with no source shows nothing and has no request.
+            this.ScrollRequest = Maybe<int>.None;
+            this.Rows = VirtualRows.Empty;
+
             return;
         }
 
-        this.onTotalCountChanged = (_, _) => this.TotalCount = newSource.TotalCount.Value;
-        this.onRowsChanged = (_, _) => this.Rows = newSource.Rows.Value;
-        this.onScrollRequestChanged = (_, _) => this.ScrollRequest = newSource.ScrollRequest.Value;
+        if (this.IsAttachedToVisualTree())
+        {
+            this.Follow(source: newSource);
+        }
 
-        newSource.TotalCount.PropertyChanged += this.onTotalCountChanged;
-        newSource.Rows.PropertyChanged += this.onRowsChanged;
-        newSource.ScrollRequest.PropertyChanged += this.onScrollRequestChanged;
-
-        // The source can hold values already. The rows go after the count, as a change of both does.
-        this.TotalCount = newSource.TotalCount.Value;
-        this.Rows = newSource.Rows.Value;
-        this.ScrollRequest = newSource.ScrollRequest.Value;
+        this.ReadSource(source: newSource);
 
         // The new source has no range yet.
         this.VisibleRange = ItemRange.Empty;
         this.RequestReport();
     }
 
-    private void DetachSource()
+    private void Follow(IVirtualItemsSource source)
+    {
+        this.onRowsChanged = (_, _) => this.Rows = source.Rows.Value;
+        this.onScrollRequestChanged = (_, _) => this.ScrollRequest = source.ScrollRequest.Value;
+
+        source.Rows.PropertyChanged += this.onRowsChanged;
+        source.ScrollRequest.PropertyChanged += this.onScrollRequestChanged;
+    }
+
+    private void StopFollowing()
     {
         if (this.source is null)
         {
             return;
-        }
-
-        if (this.onTotalCountChanged is not null)
-        {
-            this.source.TotalCount.PropertyChanged -= this.onTotalCountChanged;
         }
 
         if (this.onRowsChanged is not null)
@@ -364,15 +417,15 @@ public class VirtualizingItemsControl : ItemsControl
             this.source.ScrollRequest.PropertyChanged -= this.onScrollRequestChanged;
         }
 
-        this.source = null;
-        this.onTotalCountChanged = null;
         this.onRowsChanged = null;
         this.onScrollRequestChanged = null;
+    }
 
-        // A control with no source shows nothing and has no request.
-        this.ScrollRequest = Maybe<int>.None;
-        this.TotalCount = 0;
-        this.Rows = VirtualRows.Empty;
+    // The source can hold values already.
+    private void ReadSource(IVirtualItemsSource source)
+    {
+        this.Rows = source.Rows.Value;
+        this.ScrollRequest = source.ScrollRequest.Value;
     }
 
     private void RequestReport()

@@ -112,10 +112,12 @@ public sealed class NamedArgumentOrderAnalyzer : DiagnosticAnalyzer
 
         if (!inOrder)
         {
+            // The argument list, and not the whole call. A call on a long receiver, or a new with an
+            // initializer, would mark text that the rule is not about.
             context.ReportDiagnostic(
                 diagnostic: Diagnostic.Create(
                     descriptor: Rule,
-                    location: context.Operation.Syntax.GetLocation(),
+                    location: list.GetLocation(),
                     messageArgs:
                     [
                         method.ToDisplayString(format: SymbolDisplayFormat.CSharpShortErrorMessageFormat),

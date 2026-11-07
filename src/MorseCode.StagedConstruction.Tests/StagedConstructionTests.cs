@@ -50,7 +50,7 @@ public sealed class StagedConstructionTests
             AnimalValues values = new(Name: name);
             made.Add(item: values);
 
-            return continuation(output: name.ToUpperInvariant(), next: Constructor.From(values: values));
+            return continuation(output: name.ToUpperInvariant(), next: Constructor.From(values: values)).Value;
         }
     }
 
@@ -120,7 +120,7 @@ public sealed class StagedConstructionTests
         {
             log.Add(item: $"base 1 got {seed}");
 
-            return continuation(
+            Constructed<TResult> constructed = continuation(
                 output: seed * 2,
                 next: Stage.From(
                     body: (int adjusted) =>
@@ -140,6 +140,8 @@ public sealed class StagedConstructionTests
                                             values: new MachineValues(Seed: seed, Adjusted: adjusted, Label: label)));
                                 }));
                     }));
+
+            return constructed.Value;
         }
     }
 
@@ -185,7 +187,7 @@ public sealed class StagedConstructionTests
 
             return continuation(
                 output: name.ToUpperInvariant(),
-                next: Constructor.From(values: new AnimalValues(Name: name)));
+                next: Constructor.From(values: new AnimalValues(Name: name))).Value;
         }
 
         TResult CreateMammal<TResult>(
@@ -249,7 +251,7 @@ public sealed class StagedConstructionTests
 
             try
             {
-                return continuation(output: name, next: Constructor.From(values: new AnimalValues(Name: name)));
+                return continuation(output: name, next: Constructor.From(values: new AnimalValues(Name: name))).Value;
             }
             finally
             {
@@ -287,7 +289,7 @@ public sealed class StagedConstructionTests
         static TResult CreateNamedBase<TResult>(
             string name,
             StageContinuation<string, Constructor<string>, TResult> continuation) =>
-            continuation(output: name, next: Constructor.From(values: name));
+            continuation(output: name, next: Constructor.From(values: name)).Value;
     }
 
     private sealed record AnimalValues(string Name);
@@ -296,28 +298,28 @@ public sealed class StagedConstructionTests
 
     private sealed record MachineValues(int Seed, int Adjusted, string Label);
 
-    private sealed class Dog(AnimalValues animal, string bark)
+    private sealed class Dog(in AnimalValues animal, in string bark)
     {
         public AnimalValues Animal { get; } = animal;
 
         public string Bark { get; } = bark;
     }
 
-    private sealed class Cat(MammalValues mammal, string greeting)
+    private sealed class Cat(in MammalValues mammal, in string greeting)
     {
         public MammalValues Mammal { get; } = mammal;
 
         public string Greeting { get; } = greeting;
     }
 
-    private sealed class Robot(MachineValues machine, string summary)
+    private sealed class Robot(in MachineValues machine, in string summary)
     {
         public MachineValues Machine { get; } = machine;
 
         public string Summary { get; } = summary;
     }
 
-    private sealed class NamedByStages(string nameSeenByBase)
+    private sealed class NamedByStages(in string nameSeenByBase)
     {
         public string NameSeenByBase { get; } = nameSeenByBase;
     }

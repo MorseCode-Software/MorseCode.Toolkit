@@ -57,6 +57,7 @@
     <ItemGroup>
         <Compile Include="ExplicitCastAnalyzer.cs"/>
         <Compile Include="NamedArgumentOrderAnalyzer.cs"/>
+        <Compile Include="PrimaryConstructorParameterAnalyzer.cs"/>
     </ItemGroup>
 
     <ItemGroup>
