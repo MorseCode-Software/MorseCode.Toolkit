@@ -53,12 +53,15 @@ jobs:
       - name: Restore tools
         run: dotnet tool restore
 
-      # Only the projects DocFX extracts. The test projects are not part of the site. Mvvm restores
-      # StagedConstruction with it, through the project reference.
+      # Only the projects DocFX extracts: the ones that the metadata entry of docfx.json lists. The
+      # test projects are not part of the site. A restore of Controls restores Mvvm and
+      # StagedConstruction with it, through the project references, but each one is named here so
+      # that the list matches docfx.json without knowledge of the references.
       - name: Restore projects
         run: |
           dotnet restore src/MorseCode.StagedConstruction/MorseCode.StagedConstruction.csproj
           dotnet restore src/MorseCode.Mvvm/MorseCode.Mvvm.csproj
+          dotnet restore src/MorseCode.Avalonia.Controls/MorseCode.Avalonia.Controls.csproj
 
       # Directory.Build.props gives every library MorseCode.Analyzers as an analyzer. DocFX loads the
       # libraries without a build, thus it needs the analyzer already built. Without it, DocFX
