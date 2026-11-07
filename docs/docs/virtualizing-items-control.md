@@ -91,7 +91,7 @@ Make a new list for each change.
 
 ### When the rows do not come from a collection
 
-Another overload takes the cell and the sink yourself. You supply one `Cell<VirtualRows>` that
+Another overload leaves the rows to you. You supply one `Cell<VirtualRows>` that
 holds the count, the offset, and the rows, and a `CellSink<ItemRange>` that receives the range.
 Make that cell from one lift, so the three always agree:
 
