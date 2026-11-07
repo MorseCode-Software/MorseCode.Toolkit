@@ -17,8 +17,9 @@ MorseCode.Mvvm. One overload takes a ReactiveCollection, a function that builds 
 and a Stream of scroll positions. It slices the collection with the range that the control reports,
 maps each key in the slice to a row, and counts the keys. It returns an IVirtualItemsSource, and it
 registers the rows with the output, so disposing of the view model releases them. The other
-overload takes the rows, with their count, and the range sink yourself. Both take an optional
-Stream of clears that withdraw a scroll request.
+overload is for a view model that makes its own rows. It takes a Cell of VirtualRows, which carries
+their count, a CellSink that receives the range that the control reports, and a Stream of scroll
+positions. Both take an optional Stream of clears that withdraw a scroll request.
 
 The scroll protocol is also new. The control no longer writes none to ScrollRequest. It reports
 the position that it handled in ScrollHandled, and the view model clears a request only if it is
