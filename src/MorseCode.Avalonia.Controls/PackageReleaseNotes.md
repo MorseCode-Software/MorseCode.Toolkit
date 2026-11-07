@@ -13,12 +13,12 @@ one value, so the control applies both in one update and never shows a count wit
 different instant. Before, the two arrived one after the other, and the list was updated twice.
 
 New: CreateVirtualItemsSource, an extension method of the IOutput of a ViewModelBase from
-MorseCode.Mvvm. One overload takes a
-ReactiveCollection, a function that builds the row for a key, and a Stream of scroll positions.
-It slices the collection with the range that the control reports, maps each key in the slice to a
-row, and counts the keys. It returns an IVirtualItemsSource, and it registers the rows with the
-output, so disposing of the view model releases them. The other overload takes the rows, with
-their count, and the range sink yourself. Both take an optional Stream of clears that withdraw a scroll request.
+MorseCode.Mvvm. One overload takes a ReactiveCollection, a function that builds the row for a key,
+and a Stream of scroll positions. It slices the collection with the range that the control reports,
+maps each key in the slice to a row, and counts the keys. It returns an IVirtualItemsSource, and it
+registers the rows with the output, so disposing of the view model releases them. The other
+overload takes the rows, with their count, and the range sink yourself. Both take an optional
+Stream of clears that withdraw a scroll request.
 
 The scroll protocol is also new. The control no longer writes none to ScrollRequest. It reports
 the position that it handled in ScrollHandled, and the view model clears a request only if it is
@@ -51,9 +51,8 @@ about 4.1 microseconds and 392 bytes before, both measured through reflection in
 The reported ranges do not change.
 
 The package now depends on SodaFlow, SodaFlow.Bindable.ObjectModel, SodaFlow.Collections, and
-MorseCode.Mvvm 0.3.0 or later. To
-move from 0.2.x: build the source in the view model, expose it as an IVirtualItemsSource, and
-replace the bindings in the view with Source="{Binding Source}".
+MorseCode.Mvvm 0.3.0 or later. To move from 0.2.x: build the source in the view model, expose it as
+an IVirtualItemsSource, and replace the bindings in the view with Source="{Binding Source}".
 
 0.2.2
 
