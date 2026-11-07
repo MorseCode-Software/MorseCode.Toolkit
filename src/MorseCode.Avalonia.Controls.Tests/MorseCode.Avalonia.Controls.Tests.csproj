@@ -2,10 +2,11 @@
 
     <!--
         Avalonia.Headless runs the control with no screen. Avalonia 12 has no net472 target, thus
-        this test project, unlike the others here, runs on net10.0 only.
+        this test project, unlike the others here, does not run on net472. It runs on net8.0 and
+        net10.0, which are the targets of the control.
     -->
     <PropertyGroup>
-        <TargetFramework>net10.0</TargetFramework>
+        <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
         <OutputType>Exe</OutputType>
         <LangVersion>14</LangVersion>
         <Nullable>enable</Nullable>
