@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
+using MorseCode.StagedConstruction;
 using SodaFlow;
 using SodaFlow.Bindable.ObjectModel;
 using TUnit.Assertions;
@@ -391,8 +392,8 @@ public sealed class ViewModelBaseTests
     }
 
     // No view model owns the registrations of a continuation that did not call Construct. Thus, the
-    // base releases them, and the caller learns that the continuation is wrong. Only a null return gets
-    // past the compiler, because only Construct makes the value that the continuation returns.
+    // base releases them, and the caller learns that the continuation is wrong. The compiler accepts a
+    // null return. It also accepts the result of a different handle, and the subsequent test is for it.
     [Test]
     public async Task AContinuationThatReturnsWithoutConstructFailsAndReleasesTheRegistrations()
     {
@@ -420,6 +421,31 @@ public sealed class ViewModelBaseTests
         await Assert.That(caught.Message).Contains(expected: "without a call to Construct");
         await Assert.That(log).IsEquivalentTo(expected: ["registered"]);
         await Assert.That(late).IsTypeOf<InvalidOperationException>();
+    }
+
+    // A different handle can also make the value that the continuation returns. The continuation did
+    // not call Construct on the handle of the base, thus no view model owns the registrations.
+    [Test]
+    public async Task AContinuationThatUsesOnlyADifferentHandleFailsAndReleasesTheRegistrations()
+    {
+        List<string> log = [];
+
+        Exception caught =
+            Catch(
+                action: () =>
+                    ViewModelBase.CreateBase(
+                        bindingScheduler: BindingScheduler.Immediate,
+                        continuation: (output, _) =>
+                        {
+                            output.AddDisposable(disposable: new Recording(log: log, name: "registered"));
+
+                            return Constructor.From(values: "something else")
+                                .Construct(constructor: static values => values);
+                        }));
+
+        await Assert.That(caught).IsTypeOf<InvalidOperationException>();
+        await Assert.That(caught.Message).Contains(expected: "without a call to Construct");
+        await Assert.That(log).IsEquivalentTo(expected: ["registered"]);
     }
 
     // The exception leaves the continuation before Construct. Nothing else can release what the
@@ -468,6 +494,301 @@ public sealed class ViewModelBaseTests
                         }));
 
         await Assert.That(caught).IsSameReferenceAs(expected: failure);
+        await Assert.That(log).IsEquivalentTo(expected: ["registered"]);
+    }
+
+    // The continuation called Construct, and then returned the value of a different handle. The view
+    // model that Construct made goes to nobody, thus the base releases its registrations.
+    [Test]
+    public async Task AContinuationThatDropsTheResultOfConstructFailsAndReleasesTheRegistrations()
+    {
+        List<string> log = [];
+        List<ViewModelBase.IOutput> kept = [];
+
+        Exception caught =
+            Catch(
+                action: () =>
+                    ViewModelBase.CreateBase(
+                        bindingScheduler: BindingScheduler.Immediate,
+                        continuation: (output, construct) =>
+                        {
+                            kept.Add(output);
+                            output.AddDisposable(disposable: new Recording(log: log, name: "registered"));
+                            _ = construct.Construct(constructor: static viewModelBase => viewModelBase);
+
+                            return Constructor.From(values: "something else")
+                                .Construct(constructor: static values => values);
+                        }));
+
+        Exception late =
+            Catch(action: () => kept[0].AddDisposable(disposable: new Recording(log: log, name: "late")));
+
+        await Assert.That(caught).IsTypeOf<InvalidOperationException>();
+        await Assert.That(caught.Message).Contains(expected: "did not return the result of Construct");
+        await Assert.That(log).IsEquivalentTo(expected: ["registered"]);
+        await Assert.That(late).IsTypeOf<InvalidOperationException>();
+    }
+
+    // The two values have the same type. Thus, only the instance shows that the continuation returned
+    // a view model that this construction did not make.
+    [Test]
+    public async Task AContinuationThatReturnsADifferentViewModelFailsAndReleasesTheRegistrations()
+    {
+        List<string> log = [];
+
+        ViewModelBase other =
+            Create(
+                register: static _ =>
+                {
+                });
+
+        Exception caught =
+            Catch(
+                action: () =>
+                    ViewModelBase.CreateBase(
+                        bindingScheduler: BindingScheduler.Immediate,
+                        continuation: (output, construct) =>
+                        {
+                            output.AddDisposable(disposable: new Recording(log: log, name: "registered"));
+                            _ = construct.Construct(constructor: static viewModelBase => viewModelBase);
+
+                            return Constructor.From(values: other).Construct(constructor: static values => values);
+                        }));
+
+        await Assert.That(caught).IsTypeOf<InvalidOperationException>();
+        await Assert.That(caught.Message).Contains(expected: "did not return the result of Construct");
+        await Assert.That(log).IsEquivalentTo(expected: ["registered"]);
+    }
+
+    // Before, CreateBase read the value of a null result, and the caller got a NullReferenceException
+    // with the registrations not released.
+    [Test]
+    public async Task AContinuationThatReturnsNullAfterConstructFailsAndReleasesTheRegistrations()
+    {
+        List<string> log = [];
+
+        Exception caught =
+            Catch(
+                action: () =>
+                    ViewModelBase.CreateBase<ViewModelBase>(
+                        bindingScheduler: BindingScheduler.Immediate,
+                        continuation: (output, construct) =>
+                        {
+                            output.AddDisposable(disposable: new Recording(log: log, name: "registered"));
+                            _ = construct.Construct(constructor: static viewModelBase => viewModelBase);
+
+                            // ReSharper disable once NullableWarningSuppressionIsUsed - The null return is the input under test: CreateBase must refuse it at run time.
+                            return null!;
+                        }));
+
+        await Assert.That(caught).IsTypeOf<InvalidOperationException>();
+        await Assert.That(caught.Message).Contains(expected: "did not return the result of Construct");
+        await Assert.That(log).IsEquivalentTo(expected: ["registered"]);
+    }
+
+    // The constructor failed, and the base released the registrations then. The continuation caught
+    // the exception and returned a different value. No view model exists, thus CreateBase must not
+    // return as if one did. The log shows that the base released the registration one time only.
+    [Test]
+    public async Task AContinuationThatCatchesAFailedConstructorAndReturnsADifferentValueFails()
+    {
+        List<string> log = [];
+
+        Exception caught =
+            Catch(
+                action: () =>
+                    ViewModelBase.CreateBase(
+                        bindingScheduler: BindingScheduler.Immediate,
+                        continuation: (output, construct) =>
+                        {
+                            output.AddDisposable(disposable: new Recording(log: log, name: "registered"));
+
+                            try
+                            {
+                                return construct.Construct<string>(
+                                    constructor: static _ =>
+                                        throw new NotSupportedException(message: "The constructor failed."));
+                            }
+                            catch (NotSupportedException)
+                            {
+                                return Constructor.From(values: "something else")
+                                    .Construct(constructor: static values => values);
+                            }
+                        }));
+
+        await Assert.That(caught).IsTypeOf<InvalidOperationException>();
+        await Assert.That(caught.Message).Contains(expected: "did not return the result of Construct");
+        await Assert.That(log).IsEquivalentTo(expected: ["registered"]);
+    }
+
+    // The caller must see both errors, and the exception of the base is the first.
+    [Test]
+    public async Task ADroppedResultOfConstructWithAFailingRegistrationThrowsBothExceptions()
+    {
+        Exception releaseFailure = new InvalidOperationException(message: "The release failed.");
+
+        Exception caught =
+            Catch(
+                action: () =>
+                    ViewModelBase.CreateBase(
+                        bindingScheduler: BindingScheduler.Immediate,
+                        continuation: (output, construct) =>
+                        {
+                            output.AddDisposable(
+                                disposable: Disposable.FromAction(onDispose: () => throw releaseFailure));
+
+                            _ = construct.Construct(constructor: static viewModelBase => viewModelBase);
+
+                            return Constructor.From(values: "something else")
+                                .Construct(constructor: static values => values);
+                        }));
+
+        Exception[] both = caught is AggregateException aggregate ? [.. aggregate.InnerExceptions] : [];
+
+        await Assert.That(caught).IsTypeOf<AggregateException>();
+        await Assert.That(both.Length).IsEqualTo(expected: 2);
+        await Assert.That(both[0]).IsTypeOf<InvalidOperationException>();
+        await Assert.That(both[0].Message).Contains(expected: "did not return the result of Construct");
+        await Assert.That(both[1]).IsSameReferenceAs(expected: releaseFailure);
+    }
+
+    // CreateBase compares the value, and not the Constructed that holds it. The caller gets the view
+    // model that owns the registrations, thus the result is correct.
+    [Test]
+    public async Task AContinuationThatReturnsTheSameViewModelFromADifferentHandleGetsIt()
+    {
+        List<string> log = [];
+
+        ViewModelBase viewModel =
+            ViewModelBase.CreateBase(
+                bindingScheduler: BindingScheduler.Immediate,
+                continuation: (output, construct) =>
+                {
+                    output.AddDisposable(disposable: new Recording(log: log, name: "registered"));
+
+                    ViewModelBase made =
+                        construct.Construct(constructor: static viewModelBase => viewModelBase).Value;
+
+                    return Constructor.From(values: made).Construct(constructor: static values => values);
+                });
+
+        await Assert.That(log).IsEmpty();
+
+        viewModel.Dispose();
+
+        await Assert.That(log).IsEquivalentTo(expected: ["registered"]);
+    }
+
+    // The handle that Select makes calls the constructor of the subclass in the Construct call of the
+    // base. Thus, the value of that handle is the value that the base made.
+    [Test]
+    public async Task AContinuationThatConstructsThroughSelectGetsItsViewModel()
+    {
+        List<string> log = [];
+
+        Derived viewModel =
+            ViewModelBase.CreateBase(
+                bindingScheduler: BindingScheduler.Immediate,
+                continuation: (output, construct) =>
+                {
+                    output.AddDisposable(disposable: new Recording(log: log, name: "registered"));
+
+                    return construct
+                        .Select(selector: static viewModelBase => (Base: viewModelBase, Name: "selected"))
+                        .Construct(constructor: static values => new Derived(viewModelBase: values.Base));
+                });
+
+        await Assert.That(log).IsEmpty();
+
+        viewModel.Dispose();
+
+        await Assert.That(log).IsEquivalentTo(expected: ["registered"]);
+    }
+
+    // A struct has no instance to compare. The handle keeps the value in a box, and an equal value is
+    // the same value.
+    [Test]
+    public async Task AContinuationThatReturnsAStructGetsIt()
+    {
+        List<string> log = [];
+
+        (ViewModelBase Base, int Count) made =
+            ViewModelBase.CreateBase(
+                bindingScheduler: BindingScheduler.Immediate,
+                continuation: (output, construct) =>
+                {
+                    output.AddDisposable(disposable: new Recording(log: log, name: "registered"));
+
+                    return construct.Construct(constructor: static viewModelBase => (Base: viewModelBase, Count: 3));
+                });
+
+        await Assert.That(made.Count).IsEqualTo(expected: 3);
+        await Assert.That(log).IsEmpty();
+
+        made.Base.Dispose();
+
+        await Assert.That(log).IsEquivalentTo(expected: ["registered"]);
+    }
+
+    [Test]
+    public async Task AContinuationThatReturnsADifferentStructFailsAndReleasesTheRegistrations()
+    {
+        List<string> log = [];
+
+        ViewModelBase other =
+            Create(
+                register: static _ =>
+                {
+                });
+
+        Exception caught =
+            Catch(
+                action: () =>
+                    ViewModelBase.CreateBase(
+                        bindingScheduler: BindingScheduler.Immediate,
+                        continuation: (output, construct) =>
+                        {
+                            output.AddDisposable(disposable: new Recording(log: log, name: "registered"));
+
+                            _ =
+                                construct.Construct(
+                                    constructor: static viewModelBase => (Base: viewModelBase, Count: 3));
+
+                            return Constructor.From(values: (Base: other, Count: 3))
+                                .Construct(constructor: static values => values);
+                        }));
+
+        await Assert.That(caught).IsTypeOf<InvalidOperationException>();
+        await Assert.That(caught.Message).Contains(expected: "did not return the result of Construct");
+        await Assert.That(log).IsEquivalentTo(expected: ["registered"]);
+    }
+
+    // The continuation gets the base from Construct, and a different handle gives it to the view
+    // model. CreateBase then gets a value that the base did not make, and it cannot know that this
+    // value owns the base. Select adds values to the base and keeps the two values the same.
+    [Test]
+    public async Task ABaseThatADifferentHandleGivesToTheViewModelFails()
+    {
+        List<string> log = [];
+
+        Exception caught =
+            Catch(
+                action: () =>
+                    ViewModelBase.CreateBase(
+                        bindingScheduler: BindingScheduler.Immediate,
+                        continuation: (output, construct) =>
+                        {
+                            output.AddDisposable(disposable: new Recording(log: log, name: "registered"));
+
+                            ViewModelBase taken =
+                                construct.Construct(constructor: static viewModelBase => viewModelBase).Value;
+
+                            return Constructor.From(values: taken)
+                                .Construct(constructor: static values => new Derived(viewModelBase: values));
+                        }));
+
+        await Assert.That(caught).IsTypeOf<InvalidOperationException>();
+        await Assert.That(caught.Message).Contains(expected: "did not return the result of Construct");
         await Assert.That(log).IsEquivalentTo(expected: ["registered"]);
     }
 

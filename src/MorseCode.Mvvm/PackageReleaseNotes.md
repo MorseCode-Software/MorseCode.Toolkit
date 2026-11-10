@@ -14,9 +14,20 @@ calls Construct one time, as every view model does, sees no change.
 
 Changed: the continuation of CreateBase returns the Constructed<TResult> that Construct gives, from
 MorseCode.StagedConstruction 0.3.0, and CreateBase returns the value inside it. A continuation that
-ends with return construct.Construct(...) compiles as it is. One that returns without a call to
+ends with return construct.Construct(...) compiles as it is. One that returns without a call to any
 Construct no longer compiles, so the InvalidOperationException above is reached only by a null
-return. This version needs MorseCode.StagedConstruction 0.3.0.
+return, or by the result of a handle that CreateBase did not give. This version needs
+MorseCode.StagedConstruction 0.3.0.
+
+Changed: CreateBase now checks that the value it returns is the value that the constructor
+returned, which is the same instance for a class and an equal value for a struct. A continuation
+that calls Construct and then returns null, or the result of a different handle, fails with an
+InvalidOperationException, and CreateBase releases the registrations. Before, CreateBase returned
+the other value, the view model that was constructed went to nobody, and nothing released its
+registrations. A null return after the call failed with a NullReferenceException. A continuation
+that returns what Construct gives, directly or through Select, sees no change. One that takes the
+ViewModelBase out with one Construct call and gives it to the view model through a second handle
+now fails; use Select to add values to the base.
 
 New: the package has a net8.0 build, next to net472, net6.0, and netstandard2.0. It is the same
 code, compiled for net8.0. A project that targets net8.0 or later now takes the net8.0 build and
