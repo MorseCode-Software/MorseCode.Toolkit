@@ -451,26 +451,39 @@ public class VirtualizingItemsControl : ItemsControl
         this.source?.VisibleRange.Value = range;
     }
 
-    // Finds the positions of the containers that Avalonia shows now, and adds the buffer on each side.
+    // Finds the positions that Avalonia shows now, and adds the buffer on each side.
     private ItemRange Measure()
     {
-        // One pass over the containers, and no list. The control measures after each change of the
-        // containers, which is at each scroll.
         int first = int.MaxValue;
         int last = -1;
 
-        // ReSharper disable once LoopCanBePartlyConvertedToQuery - The query allocates its iterators at each report, and this method exists to allocate nothing.
-        foreach (Control container in this.GetRealizedContainers())
+        if (this.ItemsPanelRoot is VirtualizingStackPanel { FirstRealizedIndex: >= 0 } panel)
         {
-            int index = this.IndexFromContainer(container: container);
-
-            if (index < 0)
+            // The panel recycles the container of a replaced item at once, and makes it again only at
+            // the next layout. Until then, the containers are fewer than the positions that show, and a
+            // range from them is too small. The view model then drops rows that show, and the control
+            // asks for them again without end. The panel keeps the position of a recycled container in
+            // its own range.
+            first = panel.FirstRealizedIndex;
+            last = panel.LastRealizedIndex;
+        }
+        else
+        {
+            // One pass over the containers, and no list. The control measures after each change of the
+            // containers, which is at each scroll.
+            // ReSharper disable once LoopCanBePartlyConvertedToQuery - The query allocates its iterators at each report, and this method exists to allocate nothing.
+            foreach (Control container in this.GetRealizedContainers())
             {
-                continue;
-            }
+                int index = this.IndexFromContainer(container: container);
 
-            first = Math.Min(val1: first, val2: index);
-            last = Math.Max(val1: last, val2: index);
+                if (index < 0)
+                {
+                    continue;
+                }
+
+                first = Math.Min(val1: first, val2: index);
+                last = Math.Max(val1: last, val2: index);
+            }
         }
 
         if (last < 0)
