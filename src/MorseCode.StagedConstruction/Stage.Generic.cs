@@ -81,7 +81,7 @@ public abstract class Stage<TInput, TOutput, TNext>
     /// <exception cref="InvalidOperationException">A caller used this stage before.</exception>
     public Constructed<TResult> Advance<TResult>(
         TInput input,
-        StageContinuation<TOutput, TNext, TResult> continuation)
+        [InstantHandle] StageContinuation<TOutput, TNext, TResult> continuation)
     {
         // The null check occurs before the claim. Thus, a null continuation does not use the stage. The input
         // is not checked: its type is the choice of the base, and null can be a valid input.
@@ -104,7 +104,8 @@ public abstract class Stage<TInput, TOutput, TNext>
     /// </summary>
     /// <remarks>
     ///     <see cref="Advance{TResult}" /> calls this method one time only, with a
-    ///     <paramref name="continuation" /> that is not null.
+    ///     <paramref name="continuation" /> that is not null. An override must call
+    ///     <paramref name="continuation" /> before it returns, and must not keep it.
     /// </remarks>
     /// <param name="input">The values that the subclass gives to the stage.</param>
     /// <param name="continuation">
@@ -118,5 +119,5 @@ public abstract class Stage<TInput, TOutput, TNext>
     /// <returns>The value that <paramref name="continuation" /> returns.</returns>
     protected abstract Constructed<TResult> AdvanceCore<TResult>(
         TInput input,
-        StageContinuation<TOutput, TNext, TResult> continuation);
+        [InstantHandle] StageContinuation<TOutput, TNext, TResult> continuation);
 }

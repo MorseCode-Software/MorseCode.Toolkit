@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.ExceptionServices;
 using System.Threading;
+using JetBrains.Annotations;
 
 namespace MorseCode.Mvvm;
 
@@ -32,7 +33,7 @@ public static partial class Disposable
     /// </param>
     /// <returns>The composite.</returns>
     /// <exception cref="ArgumentException">An entry is null.</exception>
-    public static IDisposable Composite(params IEnumerable<IDisposable> disposables) =>
+    public static IDisposable Composite([InstantHandle] params IEnumerable<IDisposable> disposables) =>
         new CompositeDisposable(disposables);
 
     // ReSharper disable once InheritdocConsiderUsage - The summary of IDisposable does not say what this type disposes or in which order.
@@ -50,7 +51,7 @@ public static partial class Disposable
         ///     thus a subsequent change to the argument has no effect.
         /// </param>
         /// <exception cref="ArgumentException">An entry is null.</exception>
-        public CompositeDisposable(IEnumerable<IDisposable> disposables)
+        public CompositeDisposable([InstantHandle] IEnumerable<IDisposable> disposables)
         {
             IDisposable[] copy = [.. disposables];
 

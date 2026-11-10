@@ -74,7 +74,7 @@ public abstract class Constructor<TBaseValues>
     ///     null.
     /// </exception>
     /// <exception cref="InvalidOperationException">A caller used this handle before.</exception>
-    public Constructed<TResult> Construct<TResult>(Func<TBaseValues, TResult> constructor)
+    public Constructed<TResult> Construct<TResult>([InstantHandle] Func<TBaseValues, TResult> constructor)
     {
         // The null check occurs before the claim. Thus, a null constructor does not use the handle.
 #pragma warning disable CA1510 // ArgumentNullException.ThrowIfNull does not exist on netstandard2.0 and net472.
@@ -95,7 +95,8 @@ public abstract class Constructor<TBaseValues>
     /// </summary>
     /// <remarks>
     ///     <see cref="Construct{TResult}" /> calls this method one time only, with a
-    ///     <paramref name="constructor" /> that is not null.
+    ///     <paramref name="constructor" /> that is not null. An override must call
+    ///     <paramref name="constructor" /> before it returns, and must not keep it.
     /// </remarks>
     /// <param name="constructor">
     ///     The constructor of the subclass, or a function that
@@ -106,7 +107,7 @@ public abstract class Constructor<TBaseValues>
     ///     returns.
     /// </typeparam>
     /// <returns>The value that <paramref name="constructor" /> returns.</returns>
-    protected abstract TResult ConstructCore<TResult>(Func<TBaseValues, TResult> constructor);
+    protected abstract TResult ConstructCore<TResult>([InstantHandle] Func<TBaseValues, TResult> constructor);
 
     /// <summary>
     ///     Makes a handle that gives the result of <paramref name="selector" /> to the
@@ -177,6 +178,6 @@ public abstract class Constructor<TBaseValues>
     // The handle that the default SelectCore makes calls this. Select claimed this handle, so Construct
     // refuses it, and the protected ConstructCore cannot be called through a handle of a different
     // values type.
-    internal TResult ConstructAfterSelect<TResult>(Func<TBaseValues, TResult> constructor) =>
+    internal TResult ConstructAfterSelect<TResult>([InstantHandle] Func<TBaseValues, TResult> constructor) =>
         this.ConstructCore(constructor: constructor);
 }

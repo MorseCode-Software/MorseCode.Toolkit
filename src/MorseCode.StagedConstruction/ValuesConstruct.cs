@@ -1,4 +1,5 @@
 using System;
+using JetBrains.Annotations;
 
 namespace MorseCode.StagedConstruction;
 
@@ -11,6 +12,6 @@ internal sealed class ValuesConstruct<TBaseValues>(in TBaseValues values) : Cons
 {
     private readonly TBaseValues values = values;
 
-    protected override TResult ConstructCore<TResult>(Func<TBaseValues, TResult> constructor) =>
+    protected override TResult ConstructCore<TResult>([InstantHandle] Func<TBaseValues, TResult> constructor) =>
         constructor(arg: this.values);
 }
