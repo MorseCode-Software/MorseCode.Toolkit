@@ -1,8 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <!--
-        Avalonia 12 ships for net8.0 and net10.0 only, so this package cannot take the net472,
-        net6.0, and netstandard2.0 targets of the other packages here. It follows Avalonia instead.
+        Avalonia 12 ships for net8.0 and net10.0 only, so this package cannot take the net472 and
+        netstandard2.0 targets of the other packages here. It follows Avalonia instead.
     -->
     <PropertyGroup>
         <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
