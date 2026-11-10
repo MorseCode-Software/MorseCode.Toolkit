@@ -108,14 +108,22 @@ public class ViewModelBase : IViewModel
     ///         because two view models cannot own the same registrations.
     ///     </para>
     ///     <para>
-    ///         A continuation that returns without a call to
-    ///         <see cref="Constructor{TBaseValues}.Construct{TResult}" /> fails with an
-    ///         <see cref="InvalidOperationException" />, and a continuation that throws
-    ///         lets its exception through. In both cases, the base releases the
-    ///         registrations that the continuation made, because no view model owns
-    ///         them. If a registration also throws when the base releases it, the
-    ///         caller gets an <see cref="AggregateException" /> with the first
-    ///         exception first.
+    ///         The continuation must return the result of that call. A continuation
+    ///         that returns without the call, or that returns a different value after
+    ///         it, fails with an <see cref="InvalidOperationException" />. A
+    ///         continuation that throws lets its exception through. In each case, the
+    ///         base releases the registrations that the continuation made, because the
+    ///         caller gets no view model that owns them. If a registration also throws
+    ///         when the base releases it, the caller gets an
+    ///         <see cref="AggregateException" /> with the first exception first.
+    ///     </para>
+    ///     <para>
+    ///         The base compares the value that it returns with the value that the
+    ///         constructor returned. A class must be the same instance, and a struct
+    ///         must be an equal value. The handle that
+    ///         <see cref="Constructor{TBaseValues}.Select{TSelectedValues}" /> makes
+    ///         gives the value of the constructor back without a change. A handle that
+    ///         changes the value makes the continuation fail.
     ///     </para>
     /// </remarks>
     /// <param name="bindingScheduler">
@@ -132,7 +140,8 @@ public class ViewModelBase : IViewModel
     /// </typeparam>
     /// <returns>
     ///     The value in the <see cref="Constructed{TResult}" /> that
-    ///     <paramref name="continuation" /> returns.
+    ///     <paramref name="continuation" /> returns. It is the value that the
+    ///     constructor returned.
     /// </returns>
     /// <exception cref="ArgumentNullException">
     ///     <paramref name="bindingScheduler" /> or <paramref name="continuation" /> is
@@ -140,9 +149,9 @@ public class ViewModelBase : IViewModel
     /// </exception>
     /// <exception cref="InvalidOperationException">
     ///     <paramref name="continuation" /> returned without a call to
-    ///     <see cref="Constructor{TBaseValues}.Construct{TResult}" />. Only a null
-    ///     return can do this, because only <c>Construct</c> makes the
-    ///     <see cref="Constructed{TResult}" /> that the continuation returns.
+    ///     <see cref="Constructor{TBaseValues}.Construct{TResult}" />, or it returned
+    ///     a value that is not the result of that call. A null return does this, and
+    ///     so does the result of a handle that the base did not make.
     /// </exception>
     public static TResult CreateBase<TResult>(
         IBindingScheduler bindingScheduler,
@@ -181,23 +190,42 @@ public class ViewModelBase : IViewModel
             throw;
         }
 
-        if (constructor.IsConstructed)
+        if (!constructor.IsConstructed)
+        {
+            // The continuation returned without a call to Construct on the handle of the base. A null
+            // return does this, and so does the result of a different handle. No view model owns the
+            // registrations, thus the base releases them.
+            throw Refused(
+                output: output,
+                message: "The continuation of CreateBase returned without a call to Construct. The base "
+                         + "released the registrations that the continuation made, because no view model "
+                         + "owns them.");
+        }
+
+        if (constructor.Returned(result: result))
         {
             return result.Value;
         }
 
-        // The continuation returned without a call to Construct, which only a null return can do, because
-        // only Construct makes the value that the continuation returns. No view model owns the
-        // registrations, thus the base releases them.
-        InvalidOperationException notConstructed =
-            new(
-                message: "The continuation of CreateBase returned without a call to Construct. The base "
-                         + "released the registrations that the continuation made, because no view model "
-                         + "owns them.");
+        // The continuation called Construct, and then returned null or a different value. The caller does
+        // not get the view model that the constructor returned, thus only the base can release its
+        // registrations. If the constructor failed, the handle released them then, and a second release
+        // does nothing.
+        throw Refused(
+            output: output,
+            message: "The continuation of CreateBase did not return the result of Construct. The base "
+                     + "released the registrations, because the caller does not get the view model that "
+                     + "owns them.");
+    }
 
-        Release(output: output, failure: notConstructed);
+    // Releases the registrations, and then makes the exception for a continuation that the base refuses.
+    private static InvalidOperationException Refused(Output output, string message)
+    {
+        InvalidOperationException refusal = new(message: message);
 
-        throw notConstructed;
+        Release(output: output, failure: refusal);
+
+        return refusal;
     }
 
     // Releases the registrations after a failure. If a registration also fails to stop, the caller gets
@@ -221,8 +249,34 @@ public class ViewModelBase : IViewModel
     {
         private readonly Output output = output;
 
+        // The value that the constructor returned, in a box if it is a struct. It has no value until the
+        // constructor returns.
+        private Maybe<object?> returned = Maybe<object?>.None;
+
         // True from the first call of ConstructCore. CreateBase reads it when the continuation returns.
         public bool IsConstructed { get; private set; }
+
+        // True if result holds the value that the constructor returned. A class must be the same
+        // instance. A struct has no instance to compare, thus an equal value is the same value.
+        //
+        // The type of a continuation says that its result is not null, but a continuation can return null
+        // with the ! operator. Thus, the parameter is nullable, and a null result is not the value.
+        public bool Returned<TResult>(Constructed<TResult>? result)
+        {
+            if (result is null)
+            {
+                return false;
+            }
+
+            TResult value = result.Value;
+
+            return this.returned.Match(
+                onSome: made =>
+                    typeof(TResult).IsValueType
+                        ? Equals(objA: made, objB: value)
+                        : ReferenceEquals(objA: made, objB: value),
+                onNone: static () => false);
+        }
 
         /// <inheritdoc />
         protected override TResult ConstructCore<TResult>(Func<ViewModelBase, TResult> constructor)
@@ -244,6 +298,7 @@ public class ViewModelBase : IViewModel
             }
 
             this.output.Seal();
+            this.returned = Maybe<object?>.Some(value: result);
 
             return result;
         }
