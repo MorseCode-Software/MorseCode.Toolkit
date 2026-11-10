@@ -82,6 +82,14 @@ jobs:
       - name: Restore tools
         run: dotnet tool restore
 
+      # A tag build stops here when its package compiles against a package of this repository that
+      # changed after its last tag, because that release would depend on a version without the
+      # change. It runs here and not in the publish job, which has no history to read tags from. A
+      # failure skips the publish job. See Verify-Release-Order in build.cake.
+      - name: Verify release order
+        if: startsWith(github.ref, 'refs/tags/')
+        run: dotnet cake --target=Verify-Release-Order --exclusive --configuration=${{ env.CONFIGURATION }}
+
       # One step per phase, so a failure is attributed to its phase. --exclusive skips the
       # dependencies an earlier step already ran.
       - name: Build
