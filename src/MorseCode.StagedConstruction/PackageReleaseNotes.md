@@ -32,6 +32,14 @@ not the net6.0 build. No signature or behavior changed. The reason is that
 MorseCode.Avalonia.Controls targets net8.0 and references MorseCode.Mvvm, which references this
 package, and the documentation build needs one target that all three have.
 
+New: the net8.0 build is marked as compatible with trimming and native AOT. The build of the
+package runs the trim, AOT, and single-file analyzers on it and fails on a report, so code that
+needs reflection cannot be released by mistake. The assembly carries the metadata IsTrimmable and
+IsAotCompatible, so an app that trims only the assemblies so marked, with TrimMode partial, now
+trims this one too. The net472, net6.0, and netstandard2.0 builds are not marked, because the SDK
+has no such analyzers for them. A native AOT publish that roots the assembly reports nothing in its
+code.
+
 0.2.1
 
 No signature or behavior changed. This release reformats the code and the

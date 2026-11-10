@@ -19,6 +19,9 @@ details.
 
 Both packages target .NET Framework 4.7.2, .NET 6, .NET 8, and .NET Standard 2.0.
 
+From 0.3.0, their .NET 8 builds are marked as compatible with trimming and native AOT. See [Trimming
+and native AOT](packages.md#trimming-and-native-aot).
+
 ## Your first view model
 
 A view model built on `MorseCode.Mvvm` has a private constructor that only assigns, and a

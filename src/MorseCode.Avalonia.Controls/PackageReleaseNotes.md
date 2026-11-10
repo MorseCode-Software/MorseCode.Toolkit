@@ -75,6 +75,15 @@ still a floor. A project that asks for a SodaFlow major past the ceiling now get
 NU1608 at restore, where before it got nothing and could fail at run time. A SodaFlow major
 therefore needs a release of this package, even when nothing here changes.
 
+New: the net8.0 and net10.0 builds are marked as compatible with trimming and native AOT. The build
+of the package runs the trim, AOT, and single-file analyzers on them and fails on a report, so code
+that needs reflection cannot be released by mistake. The assembly carries the metadata IsTrimmable
+and IsAotCompatible, so an app that trims only the assemblies so marked, with TrimMode partial, now
+trims this one too. A native AOT publish that roots the assembly reports nothing in its code or in
+Avalonia. It reports IL2091 inside SodaFlow.Core 5, which this package depends on, where
+SodaFlow.Core gives a value factory to Lazy<T>. That is SodaFlow code, which the mark of this
+package does not cover.
+
 0.2.2
 
 Changed: a large change of TotalCount now raises one reset of the list, where it raised an

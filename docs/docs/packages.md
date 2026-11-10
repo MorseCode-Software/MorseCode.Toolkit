@@ -86,6 +86,18 @@ It's a development dependency: NuGet adds it with `PrivateAssets="all"`, and it 
 the packages of a project that uses it. It needs the .NET 7 SDK or later, or Visual Studio 2022
 17.4 or later.
 
+## Trimming and native AOT
+
+From 0.3.0, the .NET 8 builds of `MorseCode.StagedConstruction` and `MorseCode.Mvvm`, and both
+builds of `MorseCode.Avalonia.Controls`, are marked as compatible with trimming and native AOT. The
+build of each package runs the .NET trim, AOT, and single-file analyzers and fails on any warning,
+so code that needs reflection can't reach a release unnoticed. The .NET Framework, .NET 6, and .NET
+Standard builds aren't marked, because those analyzers don't exist for them.
+
+The mark covers the code of these packages, not SodaFlow's. A native AOT publish of an app that uses
+them reports a few warnings from inside `SodaFlow.Core` 5, where it passes a value factory to
+`Lazy<T>`. They come from SodaFlow, and this repository can't fix them.
+
 ## Version ranges
 
 A package of this repository states its dependency on another package of this repository, and from
