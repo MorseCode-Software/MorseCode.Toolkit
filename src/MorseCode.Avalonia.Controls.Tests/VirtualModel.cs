@@ -105,6 +105,12 @@ internal sealed class VirtualModel : IVirtualItemsSource
     public bool KeepsHandledRequest { get; init; }
 
     /// <summary>
+    ///     Gets or sets whether the model makes a new row object for each position at each answer. The
+    ///     docs do not tell a view model to keep its row objects.
+    /// </summary>
+    public bool MakesNewRows { get; init; }
+
+    /// <summary>
     ///     Gets each value that the view wrote as the position that it handled, in sequence.
     /// </summary>
     public List<Maybe<int>> ScrollWrites { get; } = [];
@@ -177,10 +183,10 @@ internal sealed class VirtualModel : IVirtualItemsSource
 
         for (int position = first; position < end; position++)
         {
-            if (!this.rows.TryGetValue(key: position, value: out VirtualRow? row))
+            if (this.MakesNewRows || !this.rows.TryGetValue(key: position, value: out VirtualRow? row))
             {
                 row = new VirtualRow(Position: position);
-                this.rows.Add(key: position, value: row);
+                this.rows[key: position] = row;
                 this.Built.Add(item: position);
             }
 

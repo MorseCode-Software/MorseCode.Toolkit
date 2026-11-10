@@ -35,7 +35,8 @@ public sealed class VirtualizingItemsControlPanelTests
                     .IsEquivalentTo(expected: Rows(first: 0, count: 10), ordering: CollectionOrdering.Matching);
             });
 
-    // The panel replaces each container, thus no container is there when the control reports.
+    // Each container gets a different row. The control changes the containers of this panel as it
+    // changes those of the default panel.
     [Test]
     [Arguments(0)]
     [Arguments(10)]
@@ -57,8 +58,7 @@ public sealed class VirtualizingItemsControlPanelTests
                     .IsEquivalentTo(expected: Rows(first: 1, count: 10), ordering: CollectionOrdering.Matching);
             });
 
-    // The panel replaces only the containers from the key down. Thus, some containers are there when
-    // the control reports, and they are fewer than the positions that show.
+    // Only the containers from the key down get a different row.
     [Test]
     [Arguments(0)]
     [Arguments(10)]

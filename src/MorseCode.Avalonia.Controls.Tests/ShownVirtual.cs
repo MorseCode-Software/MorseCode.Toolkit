@@ -123,6 +123,11 @@ internal sealed class ShownVirtual : IDisposable
     public int PlaceholdersInRowViews { get; private set; }
 
     /// <summary>
+    ///     Gets the texts that showed at each layout after the call of <see cref="WatchLayouts" />.
+    /// </summary>
+    public List<string> TextsAtLayouts { get; } = [];
+
+    /// <summary>
     ///     Gets the scroll viewer of the control.
     /// </summary>
     public ScrollViewer Scroller => this.List.GetVisualDescendants().OfType<ScrollViewer>().First();
@@ -154,6 +159,14 @@ internal sealed class ShownVirtual : IDisposable
             this.window.UpdateLayout();
         }
     }
+
+    /// <summary>
+    ///     Starts to record the texts that show at each layout, in <see cref="TextsAtLayouts" />. Thus,
+    ///     a test can find a text that shows only between two changes.
+    /// </summary>
+    public void WatchLayouts() =>
+        this.List.LayoutUpdated +=
+            (_, _) => this.TextsAtLayouts.AddRange(collection: this.Shown().Select(selector: static pair => pair.Text));
 
     /// <summary>
     ///     Gets the text that each realized container shows, by position. A position
