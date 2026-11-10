@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using JetBrains.Annotations;
 using MorseCode.Mvvm;
 using SodaFlow;
@@ -215,6 +216,53 @@ public static class VirtualItemsSourceExtensions
                     rows: rows,
                     visibleRange: visibleRange,
                     scrollRequests: scrollRequests,
+                    clears: clears));
+    }
+
+    /// <summary>
+    ///     Makes the source of a list that has all of its rows. Use this when the view model holds each row,
+    ///     and wants only the virtualization of the row views.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The count of the control is the count of the list, and the rows start at position zero. The
+    ///         source keeps the range that the control reports, and nothing reads it, because the list has
+    ///         each row. A view model that makes its rows for the range uses the overload that takes a sink of
+    ///         the range.
+    ///     </para>
+    ///     <para>
+    ///         The range is not optional on that overload, because there a range that goes nowhere is a
+    ///         list whose rows never load. Here no range is correct, thus this is an overload of its own.
+    ///     </para>
+    /// </remarks>
+    /// <typeparam name="TRow">
+    ///     The type of a row. It is a class so that the list fits <see cref="VirtualRows" /> without a copy.
+    /// </typeparam>
+    /// <param name="output">The output of the view model. The source makes its values with the factory of the output.</param>
+    /// <param name="rows">All the rows of the list, in their order.</param>
+    /// <param name="scrollRequests">The positions to scroll to. None by default.</param>
+    /// <param name="clears">The events that withdraw a request that the control did not use yet. None by default.</param>
+    /// <returns>The source. Expose it on the view model, and bind <see cref="VirtualizingItemsControl.Source" /> to it.</returns>
+    /// <exception cref="ArgumentNullException">
+    ///     <paramref name="output" /> or <paramref name="rows" /> is null.
+    /// </exception>
+    public static IVirtualItemsSource CreateVirtualItemsSource<TRow>(
+        this ViewModelBase.IOutput output,
+        Cell<IReadOnlyList<TRow>> rows,
+        Stream<int>? scrollRequests = null,
+        Stream<Unit>? clears = null)
+        where TRow : class
+    {
+        ArgumentNullException.ThrowIfNull(argument: output);
+        ArgumentNullException.ThrowIfNull(argument: rows);
+
+        return Transaction.Run(
+            f: () =>
+                Build(
+                    bindableFactory: output.BindableFactory,
+                    rows: rows.Map(f: static list => new VirtualRows(TotalCount: list.Count, Offset: 0, Items: list)),
+                    visibleRange: Cell.CreateSink(initialValue: ItemRange.Empty),
+                    scrollRequests: scrollRequests ?? Stream.Never<int>(),
                     clears: clears));
     }
 

@@ -96,6 +96,63 @@ public sealed class VirtualItemsSourceExtensionsTests
         await Assert.That(source.ScrollRequest.Value).IsEqualTo(expected: Maybe<int>.None);
     }
 
+    // A list that has all of its rows. The count is the count of the list, and the rows start at position zero.
+    // The list goes into the rows without a copy. A range from the control goes into the sink of the source,
+    // and changes nothing.
+    [Test]
+    public async Task AWholeListGivesItsRowsFromPositionZeroWithItsCount()
+    {
+        IReadOnlyList<VirtualRow> first =
+            [new(Position: 0), new(Position: 1), new(Position: 2)];
+
+        CellSink<IReadOnlyList<VirtualRow>> rows = Cell.CreateSink(initialValue: first);
+
+        (IVirtualItemsSource source, ViewModelBase viewModel) =
+            Make(make: output => output.CreateVirtualItemsSource(rows: rows));
+
+        using ViewModelBase owner = viewModel;
+
+        await Assert.That(source.Rows.Value.TotalCount).IsEqualTo(expected: 3);
+        await Assert.That(source.Rows.Value.Offset).IsEqualTo(expected: 0);
+        await Assert.That(source.Rows.Value.Items).IsSameReferenceAs(expected: first);
+
+        IReadOnlyList<VirtualRow> second =
+        [
+            .. Enumerable.Range(start: 0, count: 5)
+                .Select(selector: static position => new VirtualRow(Position: position))
+        ];
+
+        rows.Send(a: second);
+        source.VisibleRange.Value = new ItemRange(First: 1, Count: 2);
+
+        await Assert.That(source.Rows.Value.TotalCount).IsEqualTo(expected: 5);
+        await Assert.That(source.Rows.Value.Offset).IsEqualTo(expected: 0);
+        await Assert.That(source.Rows.Value.Items).IsSameReferenceAs(expected: second);
+    }
+
+    // The stream of scroll positions is optional for a list that has all of its rows. Without one, the source
+    // never asks for a scroll.
+    [Test]
+    public async Task AWholeListAsksForAScrollOnlyWithAStreamOfPositions()
+    {
+        StreamSink<int> requests = Stream.CreateSink<int>();
+        Cell<IReadOnlyList<VirtualRow>> rows = Cell.Constant<IReadOnlyList<VirtualRow>>([new VirtualRow(Position: 0)]);
+
+        (IVirtualItemsSource withRequests, ViewModelBase first) =
+            Make(make: output => output.CreateVirtualItemsSource(rows: rows, scrollRequests: requests));
+
+        (IVirtualItemsSource withoutRequests, ViewModelBase second) =
+            Make(make: output => output.CreateVirtualItemsSource(rows: rows));
+
+        using ViewModelBase firstOwner = first;
+        using ViewModelBase secondOwner = second;
+
+        requests.Send(a: 0);
+
+        await Assert.That(withRequests.ScrollRequest.Value).IsEqualTo(expected: Maybe<int>.Some(value: 0));
+        await Assert.That(withoutRequests.ScrollRequest.Value).IsEqualTo(expected: Maybe<int>.None);
+    }
+
     [Test]
     public async Task ACollectionGivesItsCountAndOnlyTheRowsOfTheRangeAtTheirOffset()
     {
@@ -277,6 +334,7 @@ public sealed class VirtualItemsSourceExtensionsTests
         StreamSink<int> requests = Stream.CreateSink<int>();
         ReactiveCollection<int, int, int> collection = Collection(total: 1);
         CellSink<ItemRange> range = Cell.CreateSink(initialValue: ItemRange.Empty);
+        Cell<IReadOnlyList<VirtualRow>> wholeList = Cell.Constant<IReadOnlyList<VirtualRow>>([]);
 
         // The nulls are typed variables and not arguments with a null-forgiving operator, which the
         // named argument order check of MorseCode.Analyzers cannot place in the middle of a call.
@@ -287,6 +345,7 @@ public sealed class VirtualItemsSourceExtensionsTests
         CellSink<ItemRange> noRange = null!;
         Stream<int> noRequests = null!;
         ViewModelBase.IOutput noOutput = null!;
+        Cell<IReadOnlyList<VirtualRow>> noWholeList = null!;
 
         // ReSharper restore NullableWarningSuppressionIsUsed
 
@@ -318,12 +377,17 @@ public sealed class VirtualItemsSourceExtensionsTests
             Catch(action: () => MakeAndRefuse(make: output => output.CreateVirtualItemsSource(
                 rows: Cell.Constant(VirtualRows.Empty),
                 visibleRange: noRange,
-                scrollRequests: requests)))
+                scrollRequests: requests))),
+            Catch(action: () => noOutput.CreateVirtualItemsSource(rows: wholeList)),
+            Catch(action: () => MakeAndRefuse(make: output => output.CreateVirtualItemsSource(rows: noWholeList)))
         ];
 
         await Assert.That(refused.Select(selector: static exception => (exception as ArgumentNullException)?.ParamName ?? string.Empty))
             .IsEquivalentTo(
-                expected: ["output", "collection", "project", "scrollRequests", "rows", "visibleRange"],
+                expected:
+                [
+                    "output", "collection", "project", "scrollRequests", "rows", "visibleRange", "output", "rows"
+                ],
                 ordering: CollectionOrdering.Matching);
     }
 
