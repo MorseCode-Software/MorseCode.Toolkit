@@ -38,6 +38,15 @@ The continuation returns the `Constructed<TResult>` that `construct.Construct` g
 `CreateBase` returns the value inside it. Only `Construct` makes a `Constructed<TResult>`, so a
 continuation that does not call it does not compile.
 
+`CreateBase` also checks, at run time, that the value it returns is the value the constructor
+returned: the same instance for a class, and an equal value for a struct. A continuation that calls
+`Construct` and then returns something else fails with an `InvalidOperationException`. That is why a
+base of your own that sits between `ViewModelBase` and a view model adds its values with
+`construct.Select`, as [Multi-stage construction](multi-stage.md) shows. `Select` hands the
+constructor's value back unchanged. A continuation that takes the `ViewModelBase` out with one
+`Construct` call, and gives it to the view model through a second handle, returns a value the base
+never saw, so it fails.
+
 `bindingScheduler` is the scheduler for the bindable values that the output's `BindableFactory`
 makes. Capture it on the UI thread with `SynchronizationContextBindingScheduler.Capture()`. A test
 passes `BindingScheduler.Immediate`. A null scheduler fails at the call to `CreateBase` with an
@@ -91,10 +100,11 @@ The registrations close in one of these ways:
   `AggregateException` that holds the exception of the constructor first.
 - `Dispose` runs, including a call from inside the constructor. It releases the registrations made
   so far.
-- The continuation throws, or returns `null` without calling `Construct`, which is the only return
-  the compiler allows without one. No view model owns the registrations then, so the base
-  releases them. The null return fails with an `InvalidOperationException`; an exception goes to
-  the caller unchanged, with the same `AggregateException` rule as above.
+- The continuation throws, or returns something that is not the result of its `Construct` call:
+  `null`, or the result of a handle the base did not give it. The caller gets no view model that
+  owns the registrations then, so the base releases them. Such a return fails with an
+  `InvalidOperationException`; an exception goes to the caller unchanged, with the same
+  `AggregateException` rule as above.
 
 After that, each member of `IOutput` fails with an `InvalidOperationException`. The
 `BindableFactory` methods check this before they make the object, so a refused call attaches
