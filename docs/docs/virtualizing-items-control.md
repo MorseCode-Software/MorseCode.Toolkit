@@ -201,6 +201,31 @@ by `int` would make the two overloads indistinguishable.
 - The tests of the control use these methods with a real SodaFlow graph, including a request made
   before the view binds. The graph of the request has tests of its own.
 
+### Bind the row view to its row
+
+When the rows change, the control keeps the container at each position and hands it the new row.
+It does not ask Avalonia for a new container. A XAML `DataTemplate` keeps the view it already
+built and gives it the new row as its `DataContext`, so everything the view shows has to come from
+a binding. That is how a XAML view normally works, so most views need no change.
+
+The control does this to keep the list where it is. A panel that loses every container on screen
+has to estimate its position from an average row height, and after a jump that estimate can be a
+different part of the list.
+
+It has these consequences:
+
+- A `FuncDataTemplate` created with `supportsRecycling: true` reuses its view in the same way, so
+  it must also read from the data context. One that sets values while it builds the view goes on
+  showing the old row. With the default, `supportsRecycling: false`, the template builds a new view
+  for every row, and values set while building are correct.
+- State that lives in the view and is not bound stays with the position, not with the row. Focus is
+  the common case: after a row is removed above it, the focused container shows the next row.
+- `ContainerPrepared` fires when Avalonia makes a container for a position. It does not fire when
+  the row at a position changes.
+
+An item that is itself a `Control` is its own container, so the control cannot hand it a different
+item. Avalonia replaces the container of such a position, as it does in any `ItemsControl`.
+
 ### Give the placeholder the height of a row
 
 Avalonia fills the screen with whatever height the rows have. A placeholder with no height looks
@@ -230,9 +255,9 @@ The control gives Avalonia its own list, one position per item. Setting `ItemsSo
   `Map` runs inside the transaction, so a row that is heavy to build holds up that one transaction.
 - **Selection is not part of the control.** It is an `ItemsControl` with no selected item. If you
   need selection, keep it in the view model, by key, and show it from the row.
-- **An insert above the visible rows moves rows.** The control shows each row at its new position, as
-  a replacement of the rows, so Avalonia does not keep the scroll position on the row that was on
-  screen.
+- **An insert above the visible rows moves rows.** The control shows each row at its new position,
+  in the container that is already there. The scroll position stays, and the rows on screen shift
+  by one. Avalonia does not keep the scroll position on the row that was on screen.
 - **A change of the count by more than 512 positions resets the list.** Avalonia clears its
   containers and makes them again, which is cheaper than an event for every position.
 
