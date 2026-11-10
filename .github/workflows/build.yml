@@ -66,9 +66,10 @@ jobs:
 
       - uses: actions/setup-dotnet@v6
         with:
-          # 10.0 builds everything. 8.0 runs the net8.0 build of each test project, which is the
-          # one check that the net8.0 builds of the libraries get.
+          # 10.0 builds everything. 6.0 and 8.0 run the net6.0 and net8.0 builds of the test
+          # projects, which are the one check that the net6.0 and net8.0 builds of the libraries get.
           dotnet-version: |
+            6.0.x
             8.0.x
             10.0.x
           # The NuGet packages folder holds both the local tools and every restored package, so the
