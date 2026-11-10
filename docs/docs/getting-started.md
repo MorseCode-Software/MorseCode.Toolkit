@@ -17,7 +17,7 @@ If you want only the construction pattern, without view models or SodaFlow, inst
 `MorseCode.StagedConstruction` alone. [Which package do I install?](packages.md) has the
 details.
 
-Both packages target .NET Framework 4.7.2, .NET 6, and .NET Standard 2.0.
+Both packages target .NET Framework 4.7.2, .NET 6, .NET 8, and .NET Standard 2.0.
 
 ## Your first view model
 
@@ -63,7 +63,7 @@ public sealed class CounterViewModel : ViewModelBase
 }
 ```
 
-Three things to see in it:
+What to see in it:
 
 - The graph is built in local variables inside `Create`. Nothing reads a field of a
   `CounterViewModel` that does not exist yet, because none does.
