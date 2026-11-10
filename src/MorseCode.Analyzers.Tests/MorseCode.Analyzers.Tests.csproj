@@ -35,6 +35,7 @@
     <ItemGroup>
         <Compile Include="AnalyzerHarness.cs"/>
         <Compile Include="CodeFixHarness.cs"/>
+        <Compile Include="NamedArgumentOrderCodeFixTests.cs"/>
         <Compile Include="PrimaryConstructorParameterCodeFixTests.cs"/>
         <Compile Include="ExplicitCastAnalyzerTests.cs"/>
         <Compile Include="NamedArgumentOrderAnalyzerTests.cs"/>

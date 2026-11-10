@@ -32,6 +32,7 @@
     </ItemGroup>
 
     <ItemGroup>
+        <Compile Include="NamedArgumentOrderCodeFixProvider.cs"/>
         <Compile Include="PrimaryConstructorParameterCodeFixProvider.cs"/>
     </ItemGroup>
 

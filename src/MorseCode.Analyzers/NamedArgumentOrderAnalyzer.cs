@@ -56,6 +56,12 @@ public sealed class NamedArgumentOrderAnalyzer : DiagnosticAnalyzer
                          + "the arguments have names.",
             helpLinkUri: "https://morsecode-software.github.io/MorseCode.Toolkit/docs/named-argument-order.html");
 
+    /// <summary>
+    ///     The name of the property of a report that holds the order of the
+    ///     parameters. MorseCode.Analyzers.CodeFixes reads it by this name.
+    /// </summary>
+    private const string OrderProperty = "Order";
+
     /// <inheritdoc />
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => ImmutableArray.Create(item: Rule);
 
@@ -224,12 +230,21 @@ public sealed class NamedArgumentOrderAnalyzer : DiagnosticAnalyzer
             return;
         }
 
+        // The position of each argument in the order of the parameters, as the index of the argument that goes
+        // there. The sort is stable, thus the values of a params array keep their order. The code fix reads the
+        // order from the report, thus it maps the arguments to the parameters as the rule does.
+        string order = string.Join(
+            separator: ",",
+            values: Enumerable.Range(start: 0, count: ordinals.Count).OrderBy(keySelector: index => ordinals[index]));
+
         // The argument list, and not the whole call. A call on a long receiver, or a new with an initializer,
         // would mark text that the rule is not about.
         report(
             obj: Diagnostic.Create(
                 descriptor: Rule,
                 location: list.GetLocation(),
+                properties: ImmutableDictionary.CreateRange(
+                    items: [new KeyValuePair<string, string?>(key: OrderProperty, value: order)]),
                 messageArgs:
                 [
                     target.ToDisplayString(format: SymbolDisplayFormat.CSharpShortErrorMessageFormat),
