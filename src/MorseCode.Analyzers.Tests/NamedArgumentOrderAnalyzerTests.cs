@@ -265,6 +265,131 @@ internal sealed class NamedArgumentOrderAnalyzerTests
         await Assert.That(found).IsEmpty();
     }
 
+    // The constructor arguments of an attribute, in order and out of order. A name with an equals sign sets a
+    // property, which is not a parameter, thus it does not count. A value past the last parameter goes into
+    // the params array. Each report covers the argument list of the attribute.
+    [Test]
+    public async Task TheConstructorArgumentsOfAnAttributeAreChecked()
+    {
+        IReadOnlyList<Diagnostic> found =
+            await AnalyzerHarness.Analyze(
+                    analyzer: new NamedArgumentOrderAnalyzer(),
+                    source: """
+                            using System;
+
+                            [AttributeUsage(AttributeTargets.All, AllowMultiple = true)]
+                            public sealed class MarkAttribute(int a, int b) : Attribute
+                            {
+                                public int A { get; } = a;
+
+                                public int B { get; } = b;
+
+                                public int Extra { get; set; }
+                            }
+
+                            [AttributeUsage(AttributeTargets.All, AllowMultiple = true)]
+                            public sealed class TagsAttribute(int first, params int[] rest) : Attribute
+                            {
+                                public int First { get; } = first;
+
+                                public int[] Rest { get; } = rest;
+                            }
+
+                            [Mark(a: 1, b: 2)]
+                            [Mark(1, b: 2)]
+                            [Mark(a: 1, b: 2, Extra = 3)]
+                            [Tags(1, 2, 3)]
+                            [Mark(b: 2, a: 1)]
+                            [Mark(b: 2, a: 1, Extra = 3)]
+                            [Tags(rest: [2], first: 1)]
+                            public sealed class Marked;
+                            """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        await Assert.That(Covered(found: found))
+            .IsEquivalentTo(
+                expected: ["(b: 2, a: 1)", "(b: 2, a: 1, Extra = 3)", "(rest: [2], first: 1)"],
+                ordering: CollectionOrdering.Matching);
+
+        await Assert.That(found[0].GetMessage())
+            .IsEqualTo(
+                expected:
+                "The arguments of MarkAttribute.MarkAttribute(int, int) are not in the order of its parameters: a, b");
+    }
+
+    // An attribute that a different assembly declares, as a package does. The compiler reads its constructor
+    // from metadata.
+    [Test]
+    public async Task AnAttributeFromADifferentAssemblyIsChecked()
+    {
+        IReadOnlyList<Diagnostic> found =
+            await AnalyzerHarness.Analyze(
+                    analyzer: new NamedArgumentOrderAnalyzer(),
+                    source: """
+                            [Range(maximum: 9, minimum: 1)]
+                            public sealed class Bounded;
+                            """,
+                    library: """
+                             public sealed class RangeAttribute(int minimum, int maximum) : System.Attribute
+                             {
+                                 public int Minimum { get; } = minimum;
+
+                                 public int Maximum { get; } = maximum;
+                             }
+                             """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        await Assert.That(Covered(found: found))
+            .IsEquivalentTo(expected: ["(maximum: 9, minimum: 1)"], ordering: CollectionOrdering.Matching);
+    }
+
+    // The arguments of an indexer, in order and out of order, and through a conditional access. A property
+    // without parameters has no argument list. Each report covers the brackets.
+    [Test]
+    public async Task TheArgumentsOfAnIndexerAreChecked()
+    {
+        IReadOnlyList<Diagnostic> found =
+            await AnalyzerHarness.Analyze(
+                    analyzer: new NamedArgumentOrderAnalyzer(),
+                    source: """
+                            public sealed class Grid
+                            {
+                                public int this[int row, int column] => (row * 10) + column;
+
+                                public int Count => 1;
+                            }
+
+                            public static class Use
+                            {
+                                public static int Read(Grid grid, Grid? maybe) =>
+                                    grid[row: 1, column: 2]
+                                    + grid[1, column: 2]
+                                    + grid.Count
+                                    + grid[column: 2, row: 1]
+                                    + (maybe?[column: 2, row: 1] ?? 0);
+                            }
+                            """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        await Assert.That(Covered(found: found))
+            .IsEquivalentTo(
+                expected: ["[column: 2, row: 1]", "[column: 2, row: 1]"],
+                ordering: CollectionOrdering.Matching);
+
+        await Assert.That(found[0].GetMessage())
+            .IsEqualTo(
+                expected: "The arguments of Grid.this[int, int] are not in the order of its parameters: row, column");
+    }
+
+    // The text that each report covers, in the order of the source.
+    private static List<string> Covered(IEnumerable<Diagnostic> found) =>
+    [
+        .. found.Select(
+            selector: static diagnostic =>
+                diagnostic.Location.SourceTree?.GetText().ToString(span: diagnostic.Location.SourceSpan)
+                ?? string.Empty)
+    ];
+
     // Compiles the declarations and the body, and gives what the analyzer reports. The sample must compile,
     // because the analyzer does not examine a call that does not bind.
     private static Task<IReadOnlyList<Diagnostic>> Analyze(string body, string baseArguments)

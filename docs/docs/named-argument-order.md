@@ -47,16 +47,17 @@ compiler doesn't run it.
 - Calls of methods, extension methods, local functions, and delegates.
 - Calls of constructors: `new Pair(...)`, `new(...)`, `base(...)`, `this(...)`, and the base type of
   a primary constructor, as in `class Named(int value) : Pair(...)`.
+- The arguments of an indexer, as in `grid[column: 2, row: 1]`, also through `grid?[...]`.
+- The constructor arguments of an attribute, as in `[Range(maximum: 9, minimum: 1)]`. A name with an
+  equals sign, as in `Extra = 3`, sets a property and not a parameter, so it isn't part of the order.
 
 It reads the argument list as the source has it, and asks the compiler which parameter each
 argument goes to. So an optional parameter that a call leaves out, and an empty `params` array,
 never cause a report, and neither does a call that the compiler makes for an interpolated string. A
 value that goes into a `params` array counts as the `params` parameter, which is always the last.
 
-The warning marks the argument list, such as `(second: 2, first: 1)`, and not the whole call. A
-call on a long receiver doesn't underline the receiver.
-
-It doesn't check the arguments of attributes.
+The warning marks the argument list, such as `(second: 2, first: 1)`, or the brackets of an indexer,
+and not the whole call. A call on a long receiver doesn't underline the receiver.
 
 ## Changing its severity
 

@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using Microsoft.CodeAnalysis;
@@ -21,7 +23,9 @@ namespace MorseCode.Analyzers;
 ///     <para>
 ///         The analyzer examines calls of methods, local functions, and delegates. It
 ///         also examines the calls of constructors by new, by base, and by the base
-///         type of a primary constructor. It reads the argument list of the source.
+///         type of a primary constructor. It also examines the arguments of an
+///         indexer and the constructor arguments of an attribute. It reads the
+///         argument list of the source.
 ///         Thus, an optional parameter that a call leaves out, and a call that the
 ///         compiler makes, such as for an interpolated string, give no report.
 ///     </para>
@@ -80,22 +84,52 @@ public sealed class NamedArgumentOrderAnalyzer : DiagnosticAnalyzer
                 }
             },
             operationKinds: ImmutableArray.Create(item: OperationKind.ObjectCreation));
+
+        // An indexer is a property reference with arguments. A property without parameters has no argument
+        // list, and Check returns at once for it.
+        context.RegisterOperationAction(
+            action: static operationContext =>
+            {
+                IPropertyReferenceOperation reference = (IPropertyReferenceOperation)operationContext.Operation;
+
+                Check(
+                    context: operationContext,
+                    target: reference.Property,
+                    parameters: reference.Property.Parameters,
+                    arguments: reference.Arguments);
+            },
+            operationKinds: ImmutableArray.Create(item: OperationKind.PropertyReference));
+
+        // Roslyn 4.4, the oldest compiler that runs the package, has no operation for the constructor call of
+        // an attribute. Thus, the analyzer reads the syntax and asks the semantic model for the constructor.
+        context.RegisterSyntaxNodeAction(
+            action: CheckAttribute,
+            syntaxKinds: ImmutableArray.Create(item: SyntaxKind.Attribute));
     }
 
     private static void Check(
         OperationAnalysisContext context,
         IMethodSymbol method,
+        ImmutableArray<IArgumentOperation> arguments) =>
+        Check(context: context, target: method, parameters: method.Parameters, arguments: arguments);
+
+    private static void Check(
+        OperationAnalysisContext context,
+        ISymbol target,
+        ImmutableArray<IParameterSymbol> parameters,
         ImmutableArray<IArgumentOperation> arguments)
     {
         // The arguments as the source has them. A call that the compiler makes, such as for an interpolated
         // string, has the syntax of a different node, which has no argument list.
-        ArgumentListSyntax? list =
+        BaseArgumentListSyntax? list =
             context.Operation.Syntax switch
             {
                 InvocationExpressionSyntax invocation => invocation.ArgumentList,
                 BaseObjectCreationExpressionSyntax creation => creation.ArgumentList,
                 ConstructorInitializerSyntax initializer => initializer.ArgumentList,
                 PrimaryConstructorBaseTypeSyntax baseType => baseType.ArgumentList,
+                ElementAccessExpressionSyntax access => access.ArgumentList,
+                ElementBindingExpressionSyntax binding => binding.ArgumentList,
                 _ => null
             };
 
@@ -104,28 +138,12 @@ public sealed class NamedArgumentOrderAnalyzer : DiagnosticAnalyzer
             return;
         }
 
-        int[] ordinals = [.. list.Arguments.Select(selector: Ordinal)];
-
-        bool inOrder =
-            ordinals.Zip(second: ordinals.Skip(count: 1), resultSelector: static (first, next) => first <= next)
-                .All(predicate: static ordered => ordered);
-
-        if (!inOrder)
-        {
-            // The argument list, and not the whole call. A call on a long receiver, or a new with an
-            // initializer, would mark text that the rule is not about.
-            context.ReportDiagnostic(
-                diagnostic: Diagnostic.Create(
-                    descriptor: Rule,
-                    location: list.GetLocation(),
-                    messageArgs:
-                    [
-                        method.ToDisplayString(format: SymbolDisplayFormat.CSharpShortErrorMessageFormat),
-                        string.Join(
-                            separator: ", ",
-                            values: method.Parameters.Select(selector: static parameter => parameter.Name))
-                    ]));
-        }
+        Report(
+            report: context.ReportDiagnostic,
+            target: target,
+            parameters: parameters,
+            list: list,
+            ordinals: [.. list.Arguments.Select(selector: Ordinal)]);
 
         return;
 
@@ -142,8 +160,83 @@ public sealed class NamedArgumentOrderAnalyzer : DiagnosticAnalyzer
                        ? null
                        : arguments.FirstOrDefault(predicate: operation => operation.Syntax == withoutSuppression)
                            ?.Parameter?.Ordinal)
-                   ?? method.Parameters.Length - 1;
+                   ?? parameters.Length - 1;
         }
+    }
+
+    private static void CheckAttribute(SyntaxNodeAnalysisContext context)
+    {
+        if (context.Node is not AttributeSyntax { ArgumentList: { } list } attribute
+            || context.SemanticModel.GetSymbolInfo(
+                    attributeSyntax: attribute,
+                    cancellationToken: context.CancellationToken)
+                .Symbol is not IMethodSymbol constructor)
+        {
+            return;
+        }
+
+        // A name with an equals sign sets a property or a field, and not a parameter. The compiler puts those
+        // after the arguments of the constructor, thus they are left out of the order.
+        AttributeArgumentSyntax[] arguments =
+        [
+            .. list.Arguments.Where(predicate: static argument => argument.NameEquals is null)
+        ];
+
+        if (!arguments.Any(predicate: static argument => argument.NameColon is not null))
+        {
+            return;
+        }
+
+        ImmutableArray<IParameterSymbol> parameters = constructor.Parameters;
+
+        Report(
+            report: context.ReportDiagnostic,
+            target: constructor,
+            parameters: parameters,
+            list: list,
+            ordinals: [.. arguments.Select(selector: Ordinal)]);
+
+        return;
+
+        // An attribute binds a named argument by its name, and a positional argument by its position. A
+        // positional value past the last parameter goes into a params array, which is the last parameter.
+        int Ordinal(AttributeArgumentSyntax argument, int position) =>
+            argument.NameColon is { } name
+                ? parameters.FirstOrDefault(predicate: parameter => parameter.Name == name.Name.Identifier.ValueText)
+                      ?.Ordinal
+                  ?? parameters.Length - 1
+                : Math.Min(val1: position, val2: parameters.Length - 1);
+    }
+
+    private static void Report(
+        Action<Diagnostic> report,
+        ISymbol target,
+        ImmutableArray<IParameterSymbol> parameters,
+        SyntaxNode list,
+        IReadOnlyList<int> ordinals)
+    {
+        bool inOrder =
+            ordinals.Zip(second: ordinals.Skip(count: 1), resultSelector: static (first, next) => first <= next)
+                .All(predicate: static ordered => ordered);
+
+        if (inOrder)
+        {
+            return;
+        }
+
+        // The argument list, and not the whole call. A call on a long receiver, or a new with an initializer,
+        // would mark text that the rule is not about.
+        report(
+            obj: Diagnostic.Create(
+                descriptor: Rule,
+                location: list.GetLocation(),
+                messageArgs:
+                [
+                    target.ToDisplayString(format: SymbolDisplayFormat.CSharpShortErrorMessageFormat),
+                    string.Join(
+                        separator: ", ",
+                        values: parameters.Select(selector: static parameter => parameter.Name))
+                ]));
     }
 
     private static ExpressionSyntax WithoutSuppression(ExpressionSyntax expression) =>
