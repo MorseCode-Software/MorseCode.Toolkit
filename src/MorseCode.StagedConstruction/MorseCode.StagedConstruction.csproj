@@ -31,6 +31,21 @@
         <Compile Include="ValuesConstruct.cs"/>
     </ItemGroup>
 
+    <!--
+        The analyzer for continuations ships inside this package, under analyzers/dotnet/cs, where
+        the compiler of a consumer loads it with no step of their own. NuGet gives the analyzers of a
+        package to each project that has the package anywhere in its packages, thus a project that
+        references MorseCode.Mvvm or MorseCode.Avalonia.Controls gets it too. The dll comes from the
+        build of the analyzer project, which the project reference in Directory.Build.props orders
+        before this one. That reference is not a dependency of the package.
+    -->
+    <ItemGroup>
+        <None Include="..\MorseCode.StagedConstruction.Analyzers\bin\$(Configuration)\netstandard2.0\MorseCode.StagedConstruction.Analyzers.dll"
+              Pack="true"
+              PackagePath="analyzers/dotnet/cs"
+              Visible="false"/>
+    </ItemGroup>
+
     <ItemGroup>
       <None Include="..\..\logo\MorseCode.png" Pack="true" PackagePath="\">
         <Link>MorseCode.png</Link>
