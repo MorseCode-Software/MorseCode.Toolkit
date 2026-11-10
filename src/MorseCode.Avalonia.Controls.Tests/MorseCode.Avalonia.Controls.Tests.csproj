@@ -57,6 +57,7 @@
         <Compile Include="ShownVirtual.cs"/>
         <Compile Include="StringMaybeConverter.cs"/>
         <Compile Include="TestApplication.cs"/>
+        <Compile Include="VirtualizingItemsControlEditTests.cs"/>
         <Compile Include="VirtualizingItemsControlRecipeTests.cs"/>
         <Compile Include="VirtualizingItemsControlTests.cs"/>
         <Compile Include="VirtualModel.cs"/>

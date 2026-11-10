@@ -17,8 +17,17 @@ namespace MorseCode.Avalonia.Controls.Tests;
 // ReSharper disable once InheritdocConsiderUsage - The summary of IVirtualItemsSource does not say what this model builds.
 internal sealed class RecipeModel : IVirtualItemsSource, IDisposable
 {
+    // A control that asks for rows without end is a defect. More values than this stop the test.
+    private const int RowsValuesLimit = 200;
+
+    private readonly StreamSink<CollectionEdit<int, RecipeId, RecipeState>> edits =
+        Stream.CreateSink<CollectionEdit<int, RecipeId, RecipeState>>();
+
     private readonly IVirtualItemsSource source;
     private readonly ViewModelBase viewModel;
+
+    // SodaFlow holds a listener weakly, so this field keeps the listener alive.
+    private readonly IListener rowsListener;
 
     /// <summary>
     ///     Makes the model.
@@ -39,9 +48,9 @@ internal sealed class RecipeModel : IVirtualItemsSource, IDisposable
                             selector: static key =>
                                 new Item<RecipeId, RecipeState>(
                                     identity: new RecipeId(Value: key),
-                                    state: new RecipeState()))
+                                    state: new RecipeState(Revision: 0)))
                 ],
-                Stream.CreateSink<CollectionEdit<int, RecipeId, RecipeState>>());
+                this.edits);
 
         // The view model asks for a scroll with the action. The request is a value, thus a request that
         // comes before the view binds is still there when it binds. The view reports the position that
@@ -72,6 +81,8 @@ internal sealed class RecipeModel : IVirtualItemsSource, IDisposable
 
                     return construct.Construct(constructor: viewModelBase => (viewModelBase, made, scrollTo));
                 });
+
+        this.rowsListener = this.source.Rows.Cell.Updates().Listen(handler: _ => this.CountRows());
     }
 
     /// <inheritdoc />
@@ -101,10 +112,59 @@ internal sealed class RecipeModel : IVirtualItemsSource, IDisposable
     /// </summary>
     public List<int> Evicted { get; } = [];
 
+    /// <summary>
+    ///     Gets the number of values of the rows that the model sent after it was made. The model must
+    ///     send one value for one change of the view or of the collection. A control that reports an
+    ///     incorrect range makes the model send more.
+    /// </summary>
+    public int RowsValues { get; private set; }
+
+    /// <summary>
+    ///     Adds an item at the end of the collection.
+    /// </summary>
+    /// <param name="key">The key of the item.</param>
+    public void Add(int key) =>
+        this.edits.Send(
+            a: CollectionEdit<int, RecipeId, RecipeState>.Add(
+                new Item<RecipeId, RecipeState>(
+                    identity: new RecipeId(Value: key),
+                    state: new RecipeState(Revision: 0))));
+
+    /// <summary>
+    ///     Removes an item from the collection.
+    /// </summary>
+    /// <param name="key">The key of the item.</param>
+    public void Remove(int key) => this.edits.Send(a: CollectionEdit<int, RecipeId, RecipeState>.Remove(key));
+
+    /// <summary>
+    ///     Changes the state of an item. The key and the position of the item stay.
+    /// </summary>
+    /// <param name="key">The key of the item.</param>
+    public void Update(int key) =>
+        this.edits.Send(
+            a: CollectionEdit<int, RecipeId, RecipeState>.Update(
+                key: key,
+                transform: static state => new RecipeState(Revision: state.Revision + 1)));
+
     /// <inheritdoc />
-    public void Dispose() => this.viewModel.Dispose();
+    public void Dispose()
+    {
+        this.rowsListener.Unlisten();
+        this.viewModel.Dispose();
+    }
+
+    private void CountRows()
+    {
+        this.RowsValues++;
+
+        if (this.RowsValues > RowsValuesLimit)
+        {
+            throw new InvalidOperationException(
+                message: $"The model sent the rows more than {RowsValuesLimit} times. The view asks without end.");
+        }
+    }
 
     private sealed record RecipeId(int Value);
 
-    private sealed record RecipeState;
+    private sealed record RecipeState(int Revision);
 }
