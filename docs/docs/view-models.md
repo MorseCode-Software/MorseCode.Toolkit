@@ -54,7 +54,42 @@ passes `BindingScheduler.Immediate`. A null scheduler fails at the call to `Crea
 `ArgumentNullException`.
 
 Call `CreateBase` inside `Transaction.Run` when the graph you build must be created in one
-transaction, as in the examples here.
+transaction, as in the examples here. A forward reference around `CreateBase` does the same job:
+see the next section.
+
+## A view model with a loop
+
+Some graphs feed themselves: a cell is built from a member of the view model that is still being
+made. SodaFlow's `ForwardReference<T>` gives you that view model as a looped cell. Put the forward
+reference outside `CreateBase`:
+
+```csharp
+public static CounterViewModel Create(IBindingScheduler bindingScheduler) =>
+    ForwardReference<CounterViewModel>.WithoutCaptures(viewModelLoop =>
+        ViewModelBase.CreateBase(bindingScheduler, (output, construct) =>
+        {
+            // The view model does not exist yet. This cell reads its member when the loop closes.
+            Cell<int> step = viewModelLoop.Map(viewModel => viewModel.Step).SwitchC();
+
+            // ... the rest of the graph ...
+
+            return construct.Construct(
+                viewModelBase => new CounterViewModel(viewModelBase, /* ... */));
+        }));
+```
+
+The function you give to `WithoutCaptures` has to return the view model itself. `Construct` returns
+a `Constructed<T>`, so it can't be the last call in that function: returning what `Construct` gives
+doesn't compile there. `CreateBase` returns the view model, so it can be.
+
+This shape needs no `Transaction.Run`. A forward reference builds one transaction of its own, and
+the continuation runs inside it, so the whole graph still starts from one instant. A view model
+without a loop has nothing else to open a transaction, and keeps its `Transaction.Run`.
+
+Inside the loop, the looped cell is a promise about the view model and not the view model. Build
+cells from it, as `step` is built above, but don't read its value before the loop closes: SodaFlow
+throws if you do. Its [documentation](https://morsecode-software.github.io/SodaFlow/) has the rules
+for loops.
 
 ## IOutput
 

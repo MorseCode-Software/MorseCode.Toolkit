@@ -57,6 +57,10 @@ Constructed<ClockViewModel> made =
 return (made.Value, made);   // No report: made is still there to return.
 ```
 
+That is what `Construct` inside a `ForwardReference<T>.WithCaptures` looks like. It works, but a
+view model with a loop is simpler with the forward reference outside `CreateBase`: see [View
+models](view-models.md#a-view-model-with-a-loop).
+
 ## MC1002
 
 **The result of the call on the handle isn't used.** A handle can be used one time only, so a

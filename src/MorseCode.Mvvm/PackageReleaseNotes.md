@@ -19,6 +19,14 @@ Construct no longer compiles, so the InvalidOperationException above is reached 
 return, or by the result of a handle that CreateBase did not give. This version needs
 MorseCode.StagedConstruction 0.3.0.
 
+Changed: a continuation that calls Construct inside ForwardReference<T>.WithoutCaptures no longer
+compiles. The function of a forward reference must return T, and Construct now returns a
+Constructed<T>. Put the forward reference outside CreateBase, so that its function returns what
+CreateBase returns: ForwardReference<T>.WithoutCaptures(loop => CreateBase(scheduler, (output,
+construct) => ...)). The forward reference builds one transaction of its own, so a Transaction.Run
+in that continuation is no longer needed. A view model without a loop keeps its Transaction.Run.
+The view models page shows the shape.
+
 Changed: CreateBase now checks that the value it returns is the value that the constructor
 returned, which is the same instance for a class and an equal value for a struct. A continuation
 that calls Construct and then returns null, or the result of a different handle, fails with an
