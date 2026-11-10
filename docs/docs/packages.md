@@ -38,6 +38,11 @@ Construction of immutable objects in ordered stages. It has no dependency on Sod
 was written for objects whose properties are SodaFlow graphs. See
 [Staged construction](staged-construction.md).
 
+The package carries its own analyzer, which reports a continuation that doesn't return the result of
+its handle. It runs in every project that has the package anywhere in its dependencies, so a project
+that references `MorseCode.Mvvm` or `MorseCode.Avalonia.Controls` gets it too, with nothing to
+install. See [Continuation rules](continuation-rules.md).
+
 ## MorseCode.Avalonia.Controls
 
 ```bash
