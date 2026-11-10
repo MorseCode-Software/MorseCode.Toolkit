@@ -104,7 +104,24 @@ IVirtualItemsSource source = output.CreateVirtualItemsSource(
     scrollRequests: scrollTo);
 ```
 
-Both overloads take an optional `Stream<Unit>` of clears. See
+### When every row already exists
+
+If your view model already holds every row, and you want only the virtualization of the row views,
+pass the list itself:
+
+```csharp
+IVirtualItemsSource source = output.CreateVirtualItemsSource(rows: courses);
+```
+
+`courses` is a `Cell<IReadOnlyList<TRow>>`, where `TRow` is a class, so the list goes to the control
+without a copy. The count is the count of the list, and the rows start at position 0. The control
+still reports a range, and the source keeps it where nothing reads it, since every row is there
+already. `scrollRequests` is optional on this overload: pass a `Stream<int>` of positions if the
+view model scrolls. As with the others, don't change a list after you hand it over. Send a new one.
+
+If you build the rows for the range instead, use the overload above, where the range is required.
+
+Each overload takes an optional `Stream<Unit>` of clears. See
 [Scroll from the view model](#scroll-from-the-view-model).
 
 ## The view
@@ -151,7 +168,7 @@ position makes it `Some(position)`, and a report of that same position clears it
 it is an `Accum` over the positions, the clears, and the reports. You don't make
 the sink for the reports, because it is always the same.
 
-Both overloads take an optional `Stream<Unit>` of clears. Each firing of it sets the request to
+Every overload takes an optional `Stream<Unit>` of clears. Each firing of it sets the request to
 `None`, so the view model can withdraw a request that the control didn't use yet. When a request
 and a clear come in one transaction, the request wins.
 
