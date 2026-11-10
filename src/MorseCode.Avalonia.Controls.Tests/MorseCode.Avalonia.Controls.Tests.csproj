@@ -51,12 +51,15 @@
         <Compile Include="MaybeConverterTests.cs"/>
         <Compile Include="MaybeSelectionModel.cs"/>
         <Compile Include="RecipeModel.cs"/>
+        <Compile Include="RecyclingPanel.cs"/>
         <Compile Include="ScrollRequestExtensionsTests.cs"/>
         <Compile Include="SelectionModel.cs"/>
         <Compile Include="ShownMaybe.cs"/>
         <Compile Include="ShownVirtual.cs"/>
         <Compile Include="StringMaybeConverter.cs"/>
         <Compile Include="TestApplication.cs"/>
+        <Compile Include="VirtualizingItemsControlEditTests.cs"/>
+        <Compile Include="VirtualizingItemsControlPanelTests.cs"/>
         <Compile Include="VirtualizingItemsControlRecipeTests.cs"/>
         <Compile Include="VirtualizingItemsControlTests.cs"/>
         <Compile Include="VirtualModel.cs"/>

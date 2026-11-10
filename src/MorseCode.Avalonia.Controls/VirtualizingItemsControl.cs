@@ -89,6 +89,9 @@ public class VirtualizingItemsControl : ItemsControl
     // True from a request to report until the dispatcher runs the report.
     private bool isReportPending;
 
+    // True from a report that found the layout of the panel pending until that layout ran.
+    private bool isReportWaitingForLayout;
+
     // True from a request to scroll until the dispatcher runs it.
     private bool isScrollPending;
 
@@ -443,6 +446,13 @@ public class VirtualizingItemsControl : ItemsControl
     {
         this.isReportPending = false;
 
+        if (this.IsLayoutPending())
+        {
+            this.ReportAfterLayout();
+
+            return;
+        }
+
         ItemRange range = this.Measure();
 
         this.VisibleRange = range;
@@ -451,26 +461,69 @@ public class VirtualizingItemsControl : ItemsControl
         this.source?.VisibleRange.Value = range;
     }
 
-    // Finds the positions of the containers that Avalonia shows now, and adds the buffer on each side.
+    // Measure reads the range of a VirtualizingStackPanel from the panel, which is correct at all times.
+    // A different panel can also recycle a container at a change of the items, and make it again only
+    // at the next layout. The control cannot read the range of such a panel, thus its report waits for
+    // that layout.
+    private bool IsLayoutPending() => this.ItemsPanelRoot is { IsMeasureValid: false } and not VirtualizingStackPanel;
+
+    private void ReportAfterLayout()
+    {
+        if (this.isReportWaitingForLayout)
+        {
+            return;
+        }
+
+        this.isReportWaitingForLayout = true;
+        this.LayoutUpdated += this.OnLayoutUpdated;
+    }
+
+    private void OnLayoutUpdated(object? sender, EventArgs e)
+    {
+        // Avalonia raises the event for each layout of the window, and the panel can be invalid again.
+        if (this.IsLayoutPending())
+        {
+            return;
+        }
+
+        this.LayoutUpdated -= this.OnLayoutUpdated;
+        this.isReportWaitingForLayout = false;
+        this.RequestReport();
+    }
+
+    // Finds the positions that Avalonia shows now, and adds the buffer on each side.
     private ItemRange Measure()
     {
-        // One pass over the containers, and no list. The control measures after each change of the
-        // containers, which is at each scroll.
         int first = int.MaxValue;
         int last = -1;
 
-        // ReSharper disable once LoopCanBePartlyConvertedToQuery - The query allocates its iterators at each report, and this method exists to allocate nothing.
-        foreach (Control container in this.GetRealizedContainers())
+        if (this.ItemsPanelRoot is VirtualizingStackPanel { FirstRealizedIndex: >= 0 } panel)
         {
-            int index = this.IndexFromContainer(container: container);
-
-            if (index < 0)
+            // The panel recycles the container of a replaced item at once, and makes it again only at
+            // the next layout. Until then, the containers are fewer than the positions that show, and a
+            // range from them is too small. The view model then drops rows that show, and the control
+            // asks for them again without end. The panel keeps the position of a recycled container in
+            // its own range.
+            first = panel.FirstRealizedIndex;
+            last = panel.LastRealizedIndex;
+        }
+        else
+        {
+            // One pass over the containers, and no list. The control measures after each change of the
+            // containers, which is at each scroll.
+            // ReSharper disable once LoopCanBePartlyConvertedToQuery - The query allocates its iterators at each report, and this method exists to allocate nothing.
+            foreach (Control container in this.GetRealizedContainers())
             {
-                continue;
-            }
+                int index = this.IndexFromContainer(container: container);
 
-            first = Math.Min(val1: first, val2: index);
-            last = Math.Max(val1: last, val2: index);
+                if (index < 0)
+                {
+                    continue;
+                }
+
+                first = Math.Min(val1: first, val2: index);
+                last = Math.Max(val1: last, val2: index);
+            }
         }
 
         if (last < 0)
