@@ -10,7 +10,7 @@ The packages version independently, and all of them are pre-1.0.
 | --- | --- | --- |
 | `MorseCode.Mvvm` | You write view models on SodaFlow. | `SodaFlow.Bindable.ObjectModel`, `MorseCode.StagedConstruction` |
 | `MorseCode.StagedConstruction` | You want to build immutable objects in ordered stages. | Nothing |
-| `MorseCode.Avalonia.Controls` | Your views are Avalonia, and bind to view models on SodaFlow. | `Avalonia`, `SodaFlow`, `SodaFlow.Bindable.ObjectModel`, `SodaFlow.Collections`, `MorseCode.Mvvm` |
+| `MorseCode.Avalonia.Controls` | Your views are Avalonia, and bind to view models on SodaFlow. | `Avalonia`, `SodaFlow`, `SodaFlow.Bindable.ObjectModel`, `SodaFlow.Collections`, `SodaFlow.Functional`, `MorseCode.Mvvm` |
 | `MorseCode.Analyzers` | You want the build to report code that breaks the conventions MorseCode writes C# with. | Nothing |
 
 ## MorseCode.Mvvm
@@ -88,9 +88,18 @@ the packages of a project that uses it. It needs the .NET 7 SDK or later, or Vis
 
 ## Version ranges
 
-`MorseCode.Mvvm` states its dependency on `MorseCode.StagedConstruction` as a range that ends
-before the next major version. NuGet then refuses a pairing across a breaking change, and does not
-resolve it and fail at run time.
+A package of this repository states its dependency on another one as a range that ends before the
+next breaking version. `MorseCode.Mvvm` depends on `MorseCode.StagedConstruction` this way, and
+`MorseCode.Avalonia.Controls` depends on `MorseCode.Mvvm` this way from 0.3.0 on. NuGet then refuses
+a pairing across a breaking change, and does not resolve it and fail at run time.
+
+From 1.0.0 the next breaking version is the next major, so 1.4.2 gets `[1.4.2, 2.0.0)`. Below 1.0.0
+it is the next minor, because a 0.x package takes its breaking changes in the minor version.
+`MorseCode.Mvvm` 0.2.4, for example, depends on `MorseCode.StagedConstruction` `[0.2.1, 0.3.0)`. The
+one exception is `MorseCode.Mvvm` 0.1.0, which was released with `[0.1.0, 1.0.0)` before this rule.
+
+The dependencies on SodaFlow and Avalonia are a floor only, the version the package was built
+against.
 
 Until 1.0.0, the API of each package can change in a minor version. Read the release notes of a
 package before you update it.
