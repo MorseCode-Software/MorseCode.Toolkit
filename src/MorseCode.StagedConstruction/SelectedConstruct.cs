@@ -1,4 +1,5 @@
 using System;
+using JetBrains.Annotations;
 
 namespace MorseCode.StagedConstruction;
 
@@ -17,7 +18,7 @@ internal sealed class SelectedConstruct<TSourceValues, TBaseValues>(
 
     // Select claimed the source when it made this handle. Thus, this handle is the only one that can give
     // the values of the source to a constructor, and it calls the core of the source directly.
-    protected override TResult ConstructCore<TResult>(Func<TBaseValues, TResult> constructor) =>
+    protected override TResult ConstructCore<TResult>([InstantHandle] Func<TBaseValues, TResult> constructor) =>
         this.source.ConstructAfterSelect(
             constructor: sourceValues => constructor(arg: this.selector(arg: sourceValues)));
 }

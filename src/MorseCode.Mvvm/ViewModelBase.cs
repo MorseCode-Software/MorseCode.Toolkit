@@ -155,7 +155,7 @@ public class ViewModelBase : IViewModel
     /// </exception>
     public static TResult CreateBase<TResult>(
         IBindingScheduler bindingScheduler,
-        StageContinuation<IOutput, Constructor<ViewModelBase>, TResult> continuation)
+        [InstantHandle] StageContinuation<IOutput, Constructor<ViewModelBase>, TResult> continuation)
     {
         // The null checks occur here, where the caller is on the stack, and before the output exists.
 #pragma warning disable CA1510 // ArgumentNullException.ThrowIfNull does not exist on netstandard2.0 and net472.
@@ -279,7 +279,7 @@ public class ViewModelBase : IViewModel
         }
 
         /// <inheritdoc />
-        protected override TResult ConstructCore<TResult>(Func<ViewModelBase, TResult> constructor)
+        protected override TResult ConstructCore<TResult>([InstantHandle] Func<ViewModelBase, TResult> constructor)
         {
             this.IsConstructed = true;
 

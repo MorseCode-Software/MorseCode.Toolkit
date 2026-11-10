@@ -1,4 +1,5 @@
 using System;
+using JetBrains.Annotations;
 
 namespace MorseCode.StagedConstruction;
 
@@ -13,7 +14,7 @@ internal sealed class StageFromBody<TInput, TOutput, TNext>(in Func<TInput, (TOu
 
     protected override Constructed<TResult> AdvanceCore<TResult>(
         TInput input,
-        StageContinuation<TOutput, TNext, TResult> continuation)
+        [InstantHandle] StageContinuation<TOutput, TNext, TResult> continuation)
     {
         (TOutput output, TNext next) = this.Body(arg: input);
 
