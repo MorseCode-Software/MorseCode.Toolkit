@@ -89,6 +89,9 @@ public class VirtualizingItemsControl : ItemsControl
     // True from a request to report until the dispatcher runs the report.
     private bool isReportPending;
 
+    // True from a report that found the layout of the panel pending until that layout ran.
+    private bool isReportWaitingForLayout;
+
     // True from a request to scroll until the dispatcher runs it.
     private bool isScrollPending;
 
@@ -443,12 +446,49 @@ public class VirtualizingItemsControl : ItemsControl
     {
         this.isReportPending = false;
 
+        if (this.IsLayoutPending())
+        {
+            this.ReportAfterLayout();
+
+            return;
+        }
+
         ItemRange range = this.Measure();
 
         this.VisibleRange = range;
 
         // The source drops a write that equals the last one.
         this.source?.VisibleRange.Value = range;
+    }
+
+    // Measure reads the range of a VirtualizingStackPanel from the panel, which is correct at all times.
+    // A different panel can also recycle a container at a change of the items, and make it again only
+    // at the next layout. The control cannot read the range of such a panel, thus its report waits for
+    // that layout.
+    private bool IsLayoutPending() => this.ItemsPanelRoot is { IsMeasureValid: false } and not VirtualizingStackPanel;
+
+    private void ReportAfterLayout()
+    {
+        if (this.isReportWaitingForLayout)
+        {
+            return;
+        }
+
+        this.isReportWaitingForLayout = true;
+        this.LayoutUpdated += this.OnLayoutUpdated;
+    }
+
+    private void OnLayoutUpdated(object? sender, EventArgs e)
+    {
+        // Avalonia raises the event for each layout of the window, and the panel can be invalid again.
+        if (this.IsLayoutPending())
+        {
+            return;
+        }
+
+        this.LayoutUpdated -= this.OnLayoutUpdated;
+        this.isReportWaitingForLayout = false;
+        this.RequestReport();
     }
 
     // Finds the positions that Avalonia shows now, and adds the buffer on each side.

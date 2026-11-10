@@ -5,6 +5,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.Presenters;
 using Avalonia.Controls.Templates;
 using Avalonia.VisualTree;
+using SodaFlow.Functional;
 
 namespace MorseCode.Avalonia.Controls.Tests;
 
@@ -21,11 +22,27 @@ internal sealed class ShownVirtual : IDisposable
     private readonly Window window;
 
     /// <summary>
-    ///     Shows the control and runs its first layout.
+    ///     Shows the control with its default panel, and runs its first layout.
     /// </summary>
     /// <param name="model">The model.</param>
     /// <param name="buffer">The buffer of the control.</param>
     public ShownVirtual(IVirtualItemsSource model, int buffer)
+        : this(model: model, buffer: buffer, panel: Maybe<Func<Panel>>.None)
+    {
+    }
+
+    /// <summary>
+    ///     Shows the control with a panel of the test, and runs its first layout.
+    /// </summary>
+    /// <param name="model">The model.</param>
+    /// <param name="buffer">The buffer of the control.</param>
+    /// <param name="panel">Makes the panel of the control.</param>
+    public ShownVirtual(IVirtualItemsSource model, int buffer, Func<Panel> panel)
+        : this(model: model, buffer: buffer, panel: Maybe<Func<Panel>>.Some(value: panel))
+    {
+    }
+
+    private ShownVirtual(IVirtualItemsSource model, int buffer, Maybe<Func<Panel>> panel)
     {
         this.List =
             new VirtualizingItemsControl
@@ -41,6 +58,8 @@ internal sealed class ShownVirtual : IDisposable
                         supportsRecycling: true),
                 Source = model
             };
+
+        panel.MatchSome(onSome: make => this.List.ItemsPanel = new FuncTemplate<Panel?>(func: make));
 
         this.window = new Window { Content = this.List, Width = 300, Height = 200 };
         this.window.Show();
