@@ -26,11 +26,13 @@ project that has this package anywhere in its packages runs the analyzer with no
 and a rule is turned off by its severity in .editorconfig. The documentation page on the
 continuation rules describes each one.
 
-New: the package has a net8.0 build, next to net472, net6.0, and netstandard2.0. It is the same
-code, compiled for net8.0. A project that targets net8.0 or later now takes the net8.0 build and
-not the netstandard2.0 build. No signature or behavior changed. The reason is that
+Changed: the package targets net472, net8.0, and netstandard2.0. It has a new net8.0 build, and no
+longer has a net6.0 build. Each build is the same code. A project on .NET 8 or later takes the
+net8.0 build. A project on .NET 6 or .NET 7, which are both out of support, now takes the
+netstandard2.0 build in place of the net6.0 build. The net8.0 build exists because
 MorseCode.Avalonia.Controls targets net8.0 and references MorseCode.Mvvm, which references this
-package, and the documentation build needs one target that all three have.
+package, and the documentation build needs one target that all three have. No signature or behavior
+changed.
 
 0.2.1
 

@@ -43,10 +43,12 @@ the continuation that CreateBase refuses when it runs. Six are warnings, so a pr
 warnings as errors and has such a continuation no longer builds. The notes of
 MorseCode.StagedConstruction 0.3.0 list the rules.
 
-New: the package has a net8.0 build, next to net472, net6.0, and netstandard2.0. It is the same
-code, compiled for net8.0. A project that targets net8.0 or later now takes the net8.0 build and
-not the netstandard2.0 build. MorseCode.Avalonia.Controls references this package, and it targets
-net8.0.
+Changed: the package targets net472, net8.0, and netstandard2.0. It has a new net8.0 build, and no
+longer has a net6.0 build. Each build is the same code. A project on .NET 8 or later takes the
+net8.0 build. A project on .NET 6 or .NET 7, which are both out of support, now takes the
+netstandard2.0 build in place of the net6.0 build. The net8.0 build exists because
+MorseCode.Avalonia.Controls references this package and targets net8.0, and the documentation build
+needs one target that all three have.
 
 Changed: the dependencies on SodaFlow packages now have a ceiling at their next major version, as
 the dependencies between the packages of this repository already did: SodaFlow.Bindable.ObjectModel
