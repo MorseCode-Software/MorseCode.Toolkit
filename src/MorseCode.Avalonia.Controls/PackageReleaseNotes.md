@@ -46,10 +46,22 @@ for no content. The base clears the content of a container before its template, 
 ContentPresenter of Avalonia 12 builds an explicit template also when the content is null. The
 control now clears the template first.
 
-The control now finds the range that shows in one pass over the realized containers, without a
-list. With ten containers, one report took about 1.5 microseconds and 96 bytes, where it took
-about 4.1 microseconds and 392 bytes before, both measured through reflection in a headless test.
-The reported ranges do not change.
+Fixed: a change of a row on screen could make the control and the view model exchange ranges and
+rows without end. The panel of Avalonia recycles the container of a replaced item at once and makes
+it again at the next layout. The control measured between the two, found fewer containers, and
+reported a smaller range. The view model dropped the rows outside it, the layout showed
+placeholders for them, and the control asked for the rows again. With Buffer at 0, a scroll by
+three rows, a removal on screen, or an addition at an end on screen never settled, because the
+dispatcher always had a report to run. With the default Buffer of 10, a removal on screen brought
+the rows three times. The control now reads the first and the last position from the
+VirtualizingStackPanel, which keeps the place of a recycled container. With another panel in
+ItemsPanel, the control waits for the layout of the panel before it reads the containers.
+
+The control now finds the range that shows without a list. With the default panel, it reads two
+numbers from the panel. With another panel, it makes one pass over the realized containers. With
+ten containers, one report took between about 0.15 and 0.45 microseconds and 24 bytes with the
+default panel, and about 1.5 microseconds and 96 bytes with the pass. It took about 4.1
+microseconds and 392 bytes before. All were measured through reflection in a headless test.
 
 The package now depends on SodaFlow, SodaFlow.Bindable.ObjectModel, SodaFlow.Collections, and
 MorseCode.Mvvm 0.3.0 or later. To move from 0.2.x: build the source in the view model, expose it as
