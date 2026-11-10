@@ -7,6 +7,21 @@ of order in these two places gave no report. A name with an equals sign in an at
 property and is not part of the order. The rule, its message, and its id are as before. Because it
 now reports more, a build with -warnaserror can fail where it passed with 0.1.2.
 
+New: code fixes for MC0001 and MC0003, in a second assembly, MorseCode.Analyzers.CodeFixes, beside
+the analyzer under analyzers/dotnet/cs. An editor loads it, and the compiler does not, because a
+code fix needs the Roslyn workspaces. For MC0001, the fix puts the arguments in the order of the
+parameters, and each position of the list keeps its line. C# evaluates arguments in the order of
+the source, thus a new order can change what runs first. Where it cannot, because no argument has
+an effect, or one has and each other argument is a constant, the title of the fix says only that it
+puts the arguments in order. In each other case, the title says that it changes the order in which
+they run, and the fix has a different equivalence key, so a fix of all reports with the first key
+never moves an effect. The fix is not offered when one argument declares a variable that a
+different argument names. For MC0003, the fix writes in before the type, or after scoped. It first
+compiles each part of the type with the change, and is offered only when that adds no error, so it
+is not offered for a parameter that a member captures, that a lambda uses, or that code writes. It
+does not change a ref, out, or ref readonly parameter. Each fix has a fix of all reports for a
+document, a project, and a solution.
+
 0.1.2
 
 New rule: MC0003 reports a primary constructor parameter of a class or a struct that is not
