@@ -169,6 +169,44 @@
     </Target>
 
     <!--
+        A dependency on a SodaFlow package gets a ceiling at its next breaking version too, by the rule
+        above, so that a SodaFlow major that this release was not built against is refused and does not
+        fail at run time. The projects keep the bare version that they were built against, as a floor,
+        and this target adds the ceiling.
+
+        It runs before CollectPackageReferences and not at pack time. Pack reads the dependencies of
+        a PackageReference from the assets file of the restore and not from an item, thus the range
+        has to be in the restore. The lock files then record the range as the requested version, and
+        restore and pack agree. Only a packable project gets it: a test project makes no package.
+        A version that is already a range is left as it is.
+    -->
+    <Target Name="AddUpperBoundToSodaFlowPackageReferences"
+            BeforeTargets="CollectPackageReferences"
+            Condition="'$(IsPackable)' != 'false'">
+        <ItemGroup>
+            <_SodaFlowPackageReference Include="@(PackageReference)"
+                                       Condition="$([System.String]::Copy('%(Identity)').StartsWith('SodaFlow')) And $([System.Text.RegularExpressions.Regex]::IsMatch('%(Version)', `^[0-9]+\.[0-9]+\.[0-9]+$`))"/>
+
+            <_SodaFlowPackageReference Update="@(_SodaFlowPackageReference)">
+                <_Major>$([System.Text.RegularExpressions.Regex]::Match(%(Version), `^[0-9]+`).Value)</_Major>
+                <_Minor>$([System.Text.RegularExpressions.Regex]::Match(%(Version), `(?&lt;=^[0-9]+\.)[0-9]+`).Value)</_Minor>
+            </_SodaFlowPackageReference>
+
+            <_SodaFlowPackageReference Update="@(_SodaFlowPackageReference)" Condition="'%(_Major)' == '0'">
+                <_Ceiling>0.$([MSBuild]::Add(%(_Minor), 1)).0</_Ceiling>
+            </_SodaFlowPackageReference>
+
+            <_SodaFlowPackageReference Update="@(_SodaFlowPackageReference)" Condition="'%(_Major)' != '0'">
+                <_Ceiling>$([MSBuild]::Add(%(_Major), 1)).0.0</_Ceiling>
+            </_SodaFlowPackageReference>
+
+            <PackageReference Remove="@(_SodaFlowPackageReference)"/>
+            <PackageReference Include="@(_SodaFlowPackageReference)" Version="[%(_SodaFlowPackageReference.Version), %(_SodaFlowPackageReference._Ceiling))"/>
+            <_SodaFlowPackageReference Remove="@(_SodaFlowPackageReference)"/>
+        </ItemGroup>
+    </Target>
+
+    <!--
         Release notes come from a PackageReleaseNotes.md beside the project, so a release edits one
         file rather than a csproj. Where there is none, the releases page is the answer.
     -->

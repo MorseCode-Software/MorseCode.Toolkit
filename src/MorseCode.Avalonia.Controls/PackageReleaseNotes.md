@@ -67,6 +67,14 @@ The package now depends on SodaFlow, SodaFlow.Bindable.ObjectModel, SodaFlow.Col
 MorseCode.Mvvm 0.3.0 or later. To move from 0.2.x: build the source in the view model, expose it as
 an IVirtualItemsSource, and replace the bindings in the view with Source="{Binding Source}".
 
+Changed: the dependencies on SodaFlow packages now have a ceiling at their next major version, as
+the dependencies between the packages of this repository already did: SodaFlow [5.0.1, 6.0.0),
+SodaFlow.Bindable.ObjectModel [4.0.0, 5.0.0), SodaFlow.Collections [2.0.0, 3.0.0), and
+SodaFlow.Functional [3.0.2, 4.0.0). Before, each was a floor only. The dependency on Avalonia is
+still a floor. A project that asks for a SodaFlow major past the ceiling now gets NuGet warning
+NU1608 at restore, where before it got nothing and could fail at run time. A SodaFlow major
+therefore needs a release of this package, even when nothing here changes.
+
 0.2.2
 
 Changed: a large change of TotalCount now raises one reset of the list, where it raised an

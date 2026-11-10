@@ -25,7 +25,7 @@
       },
       "SodaFlow.Bindable.ObjectModel": {
         "type": "Direct",
-        "requested": "[4.0.0, )",
+        "requested": "[4.0.0, 5.0.0)",
         "resolved": "4.0.0",
         "contentHash": "rtFTmjT49XJfPLPr1S9eUFkXnfgxobeQxKImtRdzw+k1I9rmZ28xPrHOxODCeAIjoQHFnyHOJPRcCuDQgDQjrQ==",
         "dependencies": {
@@ -105,7 +105,7 @@
       },
       "SodaFlow.Bindable.ObjectModel": {
         "type": "Direct",
-        "requested": "[4.0.0, )",
+        "requested": "[4.0.0, 5.0.0)",
         "resolved": "4.0.0",
         "contentHash": "rtFTmjT49XJfPLPr1S9eUFkXnfgxobeQxKImtRdzw+k1I9rmZ28xPrHOxODCeAIjoQHFnyHOJPRcCuDQgDQjrQ==",
         "dependencies": {
@@ -176,7 +176,7 @@
       },
       "SodaFlow.Bindable.ObjectModel": {
         "type": "Direct",
-        "requested": "[4.0.0, )",
+        "requested": "[4.0.0, 5.0.0)",
         "resolved": "4.0.0",
         "contentHash": "rtFTmjT49XJfPLPr1S9eUFkXnfgxobeQxKImtRdzw+k1I9rmZ28xPrHOxODCeAIjoQHFnyHOJPRcCuDQgDQjrQ==",
         "dependencies": {
@@ -242,7 +242,7 @@
       },
       "SodaFlow.Bindable.ObjectModel": {
         "type": "Direct",
-        "requested": "[4.0.0, )",
+        "requested": "[4.0.0, 5.0.0)",
         "resolved": "4.0.0",
         "contentHash": "rtFTmjT49XJfPLPr1S9eUFkXnfgxobeQxKImtRdzw+k1I9rmZ28xPrHOxODCeAIjoQHFnyHOJPRcCuDQgDQjrQ==",
         "dependencies": {

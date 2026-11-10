@@ -48,6 +48,12 @@ code, compiled for net8.0. A project that targets net8.0 or later now takes the 
 not the netstandard2.0 build. MorseCode.Avalonia.Controls references this package, and it targets
 net8.0.
 
+Changed: the dependencies on SodaFlow packages now have a ceiling at their next major version, as
+the dependencies between the packages of this repository already did: SodaFlow.Bindable.ObjectModel
+[4.0.0, 5.0.0). Before, each was a floor only. A project that asks for a SodaFlow major past the
+ceiling now gets NuGet warning NU1608 at restore, where before it got nothing and could fail at run
+time. A SodaFlow major therefore needs a release of this package, even when nothing here changes.
+
 0.2.4
 
 New: BindableFactoryExtensions.CreateScrollRequest, an extension method of

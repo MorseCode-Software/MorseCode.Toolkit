@@ -328,7 +328,7 @@
         "type": "Project",
         "dependencies": {
           "MorseCode.StagedConstruction": "[1.0.0, )",
-          "SodaFlow.Bindable.ObjectModel": "[4.0.0, )"
+          "SodaFlow.Bindable.ObjectModel": "[4.0.0, 5.0.0)"
         }
       },
       "morsecode.stagedconstruction": {
@@ -519,7 +519,7 @@
         "type": "Project",
         "dependencies": {
           "MorseCode.StagedConstruction": "[1.0.0, )",
-          "SodaFlow.Bindable.ObjectModel": "[4.0.0, )"
+          "SodaFlow.Bindable.ObjectModel": "[4.0.0, 5.0.0)"
         }
       },
       "morsecode.stagedconstruction": {
@@ -722,7 +722,7 @@
         "type": "Project",
         "dependencies": {
           "MorseCode.StagedConstruction": "[1.0.0, )",
-          "SodaFlow.Bindable.ObjectModel": "[4.0.0, )"
+          "SodaFlow.Bindable.ObjectModel": "[4.0.0, 5.0.0)"
         }
       },
       "morsecode.stagedconstruction": {

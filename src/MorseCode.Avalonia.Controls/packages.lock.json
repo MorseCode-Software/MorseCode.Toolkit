@@ -27,7 +27,7 @@
       },
       "SodaFlow": {
         "type": "Direct",
-        "requested": "[5.0.1, )",
+        "requested": "[5.0.1, 6.0.0)",
         "resolved": "5.0.1",
         "contentHash": "CeQyU53++j6pKk3K/hN4mhpyRSX7vDBtPKl5vPrKK+NwIFsvHkNpcVjxmPNqggHTV6XfAa+s/emmaRTEd9yrzA==",
         "dependencies": {
@@ -38,7 +38,7 @@
       },
       "SodaFlow.Bindable.ObjectModel": {
         "type": "Direct",
-        "requested": "[4.0.0, )",
+        "requested": "[4.0.0, 5.0.0)",
         "resolved": "4.0.0",
         "contentHash": "rtFTmjT49XJfPLPr1S9eUFkXnfgxobeQxKImtRdzw+k1I9rmZ28xPrHOxODCeAIjoQHFnyHOJPRcCuDQgDQjrQ==",
         "dependencies": {
@@ -50,7 +50,7 @@
       },
       "SodaFlow.Collections": {
         "type": "Direct",
-        "requested": "[2.0.0, )",
+        "requested": "[2.0.0, 3.0.0)",
         "resolved": "2.0.0",
         "contentHash": "ruQQXiSv524/XsPjA4SWA0yZWlEPmOiOLsE1cJu6Yb3IF/2PRDj+TqFEntk52vqNZT7Ixd55zj94ONgd2UFH0A==",
         "dependencies": {
@@ -62,7 +62,7 @@
       },
       "SodaFlow.Functional": {
         "type": "Direct",
-        "requested": "[3.0.2, )",
+        "requested": "[3.0.2, 4.0.0)",
         "resolved": "3.0.2",
         "contentHash": "KPwRRnnxRodPjPoFXqQ395cym2Je9WT4A907inTAWUIoJaefZaSDNPjadc+74XOi8kLBvBrxOFt5rxbEsgsa7w=="
       },
@@ -116,7 +116,7 @@
         "type": "Project",
         "dependencies": {
           "MorseCode.StagedConstruction": "[1.0.0, )",
-          "SodaFlow.Bindable.ObjectModel": "[4.0.0, )"
+          "SodaFlow.Bindable.ObjectModel": "[4.0.0, 5.0.0)"
         }
       },
       "morsecode.stagedconstruction": {
@@ -149,7 +149,7 @@
       },
       "SodaFlow": {
         "type": "Direct",
-        "requested": "[5.0.1, )",
+        "requested": "[5.0.1, 6.0.0)",
         "resolved": "5.0.1",
         "contentHash": "CeQyU53++j6pKk3K/hN4mhpyRSX7vDBtPKl5vPrKK+NwIFsvHkNpcVjxmPNqggHTV6XfAa+s/emmaRTEd9yrzA==",
         "dependencies": {
@@ -159,7 +159,7 @@
       },
       "SodaFlow.Bindable.ObjectModel": {
         "type": "Direct",
-        "requested": "[4.0.0, )",
+        "requested": "[4.0.0, 5.0.0)",
         "resolved": "4.0.0",
         "contentHash": "rtFTmjT49XJfPLPr1S9eUFkXnfgxobeQxKImtRdzw+k1I9rmZ28xPrHOxODCeAIjoQHFnyHOJPRcCuDQgDQjrQ==",
         "dependencies": {
@@ -170,7 +170,7 @@
       },
       "SodaFlow.Collections": {
         "type": "Direct",
-        "requested": "[2.0.0, )",
+        "requested": "[2.0.0, 3.0.0)",
         "resolved": "2.0.0",
         "contentHash": "ruQQXiSv524/XsPjA4SWA0yZWlEPmOiOLsE1cJu6Yb3IF/2PRDj+TqFEntk52vqNZT7Ixd55zj94ONgd2UFH0A==",
         "dependencies": {
@@ -181,7 +181,7 @@
       },
       "SodaFlow.Functional": {
         "type": "Direct",
-        "requested": "[3.0.2, )",
+        "requested": "[3.0.2, 4.0.0)",
         "resolved": "3.0.2",
         "contentHash": "KPwRRnnxRodPjPoFXqQ395cym2Je9WT4A907inTAWUIoJaefZaSDNPjadc+74XOi8kLBvBrxOFt5rxbEsgsa7w=="
       },
@@ -225,7 +225,7 @@
         "type": "Project",
         "dependencies": {
           "MorseCode.StagedConstruction": "[1.0.0, )",
-          "SodaFlow.Bindable.ObjectModel": "[4.0.0, )"
+          "SodaFlow.Bindable.ObjectModel": "[4.0.0, 5.0.0)"
         }
       },
       "morsecode.stagedconstruction": {
