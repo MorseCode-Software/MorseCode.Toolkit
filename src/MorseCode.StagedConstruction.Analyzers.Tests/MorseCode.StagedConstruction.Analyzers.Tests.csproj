@@ -1,0 +1,55 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <!--
+        net10.0 only, as the tests of MorseCode.Analyzers. The tests compile samples of code against
+        the assemblies of the runtime that runs them. The analyzer has one netstandard2.0 build, with
+        no code that changes with the framework.
+    -->
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <OutputType>Exe</OutputType>
+        <LangVersion>14</LangVersion>
+        <Nullable>enable</Nullable>
+        <!-- The usings are listed per file here, as everywhere else in this repository. -->
+        <TUnitImplicitUsings>disable</TUnitImplicitUsings>
+        <TUnitAssertionsImplicitUsings>disable</TUnitAssertionsImplicitUsings>
+    </PropertyGroup>
+
+    <PropertyGroup>
+        <AssemblyName>MorseCode.StagedConstruction.Analyzers.Tests</AssemblyName>
+        <RootNamespace>MorseCode.StagedConstruction.Analyzers.Tests</RootNamespace>
+        <IsPackable>false</IsPackable>
+    </PropertyGroup>
+
+    <!--
+        The compiler that compiles the samples is later than the Roslyn of the analyzer, as the
+        compiler of a user is. SodaFlow is here because the samples call the members of it that the
+        analyzer knows by name. A sample that names a member that SodaFlow does not have does not
+        compile, and its test fails.
+    -->
+    <ItemGroup>
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.14.0"/>
+        <PackageReference Include="SodaFlow" Version="5.0.1"/>
+        <PackageReference Include="TUnit" Version="1.66.27"/>
+    </ItemGroup>
+
+    <!-- The harness of the other analyzer tests. One copy, so the two sets of tests compile a sample in one way. -->
+    <ItemGroup>
+        <Compile Include="..\MorseCode.Analyzers.Tests\AnalyzerHarness.cs" Link="AnalyzerHarness.cs"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <Compile Include="ContinuationAnalyzerTests.cs"/>
+        <Compile Include="Samples.cs"/>
+    </ItemGroup>
+
+    <!--
+        The samples compile against the library itself. The reference puts its assembly beside the
+        tests, where the harness finds it with the assemblies of the runtime.
+    -->
+    <ItemGroup>
+        <ProjectReference Include="..\MorseCode.StagedConstruction.Analyzers\MorseCode.StagedConstruction.Analyzers.csproj"/>
+        <ProjectReference Include="..\MorseCode.StagedConstruction\MorseCode.StagedConstruction.csproj"/>
+    </ItemGroup>
+
+</Project>

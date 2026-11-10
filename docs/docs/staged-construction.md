@@ -66,6 +66,10 @@ The compiler infers `TResult` from the lambdas, so a `Create` method writes no t
 compile. `Animal.CreateBase` reads `.Value` on what the continuation returns and gives the finished
 `Dog` to its caller.
 
+The compiler checks only that the continuation returns a `Constructed<TResult>`, and not that it
+came from this handle. The analyzer inside the package reports the usual ways to return a different
+one: see [Continuation rules](continuation-rules.md).
+
 ## What it guarantees
 
 - **Nothing reads a partly built object.** Every value is a local variable until the last step.

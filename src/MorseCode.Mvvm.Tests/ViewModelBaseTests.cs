@@ -400,6 +400,7 @@ public sealed class ViewModelBaseTests
         List<string> log = [];
         List<ViewModelBase.IOutput> kept = [];
 
+#pragma warning disable MC1003, MC1006 // The continuation that does not use its handle and returns null is the input under test.
         Exception caught =
             Catch(
                 action: () =>
@@ -413,6 +414,7 @@ public sealed class ViewModelBaseTests
                             // ReSharper disable once NullableWarningSuppressionIsUsed - A null is the only value that a continuation can return without a call to Construct, because only Construct makes the value that the continuation returns.
                             return null!;
                         }));
+#pragma warning restore MC1003, MC1006
 
         Exception late =
             Catch(action: () => kept[0].AddDisposable(disposable: new Recording(log: log, name: "late")));
@@ -430,6 +432,7 @@ public sealed class ViewModelBaseTests
     {
         List<string> log = [];
 
+#pragma warning disable MC1004, MC1006 // The continuation that uses only a different handle is the input under test.
         Exception caught =
             Catch(
                 action: () =>
@@ -442,6 +445,7 @@ public sealed class ViewModelBaseTests
                             return Constructor.From(values: "something else")
                                 .Construct(constructor: static values => values);
                         }));
+#pragma warning restore MC1004, MC1006
 
         await Assert.That(caught).IsTypeOf<InvalidOperationException>();
         await Assert.That(caught.Message).Contains(expected: "without a call to Construct");
@@ -480,6 +484,7 @@ public sealed class ViewModelBaseTests
         List<string> log = [];
         InvalidOperationException failure = new(message: "The continuation failed.");
 
+#pragma warning disable MC1002 // The continuation throws after Construct, thus it cannot return the result.
         Exception caught =
             Catch(
                 action: () =>
@@ -492,6 +497,7 @@ public sealed class ViewModelBaseTests
 
                             throw failure;
                         }));
+#pragma warning restore MC1002
 
         await Assert.That(caught).IsSameReferenceAs(expected: failure);
         await Assert.That(log).IsEquivalentTo(expected: ["registered"]);
@@ -505,6 +511,7 @@ public sealed class ViewModelBaseTests
         List<string> log = [];
         List<ViewModelBase.IOutput> kept = [];
 
+#pragma warning disable MC1002, MC1004 // The dropped result of Construct and the result of a different handle are the inputs under test.
         Exception caught =
             Catch(
                 action: () =>
@@ -519,6 +526,7 @@ public sealed class ViewModelBaseTests
                             return Constructor.From(values: "something else")
                                 .Construct(constructor: static values => values);
                         }));
+#pragma warning restore MC1002, MC1004
 
         Exception late =
             Catch(action: () => kept[0].AddDisposable(disposable: new Recording(log: log, name: "late")));
@@ -542,6 +550,7 @@ public sealed class ViewModelBaseTests
                 {
                 });
 
+#pragma warning disable MC1002, MC1004 // The dropped result of Construct and the result of a different handle are the inputs under test.
         Exception caught =
             Catch(
                 action: () =>
@@ -554,6 +563,7 @@ public sealed class ViewModelBaseTests
 
                             return Constructor.From(values: other).Construct(constructor: static values => values);
                         }));
+#pragma warning restore MC1002, MC1004
 
         await Assert.That(caught).IsTypeOf<InvalidOperationException>();
         await Assert.That(caught.Message).Contains(expected: "did not return the result of Construct");
@@ -567,6 +577,7 @@ public sealed class ViewModelBaseTests
     {
         List<string> log = [];
 
+#pragma warning disable MC1002, MC1003 // The dropped result of Construct and the null return are the inputs under test.
         Exception caught =
             Catch(
                 action: () =>
@@ -580,6 +591,7 @@ public sealed class ViewModelBaseTests
                             // ReSharper disable once NullableWarningSuppressionIsUsed - The null return is the input under test: CreateBase must refuse it at run time.
                             return null!;
                         }));
+#pragma warning restore MC1002, MC1003
 
         await Assert.That(caught).IsTypeOf<InvalidOperationException>();
         await Assert.That(caught.Message).Contains(expected: "did not return the result of Construct");
@@ -594,6 +606,7 @@ public sealed class ViewModelBaseTests
     {
         List<string> log = [];
 
+#pragma warning disable MC1004 // The result of a different handle after a failed constructor is the input under test.
         Exception caught =
             Catch(
                 action: () =>
@@ -615,6 +628,7 @@ public sealed class ViewModelBaseTests
                                     .Construct(constructor: static values => values);
                             }
                         }));
+#pragma warning restore MC1004
 
         await Assert.That(caught).IsTypeOf<InvalidOperationException>();
         await Assert.That(caught.Message).Contains(expected: "did not return the result of Construct");
@@ -627,6 +641,7 @@ public sealed class ViewModelBaseTests
     {
         Exception releaseFailure = new InvalidOperationException(message: "The release failed.");
 
+#pragma warning disable MC1002, MC1004 // The dropped result of Construct and the result of a different handle are the inputs under test.
         Exception caught =
             Catch(
                 action: () =>
@@ -642,6 +657,7 @@ public sealed class ViewModelBaseTests
                             return Constructor.From(values: "something else")
                                 .Construct(constructor: static values => values);
                         }));
+#pragma warning restore MC1002, MC1004
 
         Exception[] both = caught is AggregateException aggregate ? [.. aggregate.InnerExceptions] : [];
 
@@ -659,6 +675,7 @@ public sealed class ViewModelBaseTests
     {
         List<string> log = [];
 
+#pragma warning disable MC1001, MC1004 // The same view model returned through a different handle is the input under test.
         ViewModelBase viewModel =
             ViewModelBase.CreateBase(
                 bindingScheduler: BindingScheduler.Immediate,
@@ -671,6 +688,7 @@ public sealed class ViewModelBaseTests
 
                     return Constructor.From(values: made).Construct(constructor: static values => values);
                 });
+#pragma warning restore MC1001, MC1004
 
         await Assert.That(log).IsEmpty();
 
@@ -741,6 +759,7 @@ public sealed class ViewModelBaseTests
                 {
                 });
 
+#pragma warning disable MC1002, MC1004 // The dropped result of Construct and the result of a different handle are the inputs under test.
         Exception caught =
             Catch(
                 action: () =>
@@ -757,6 +776,7 @@ public sealed class ViewModelBaseTests
                             return Constructor.From(values: (Base: other, Count: 3))
                                 .Construct(constructor: static values => values);
                         }));
+#pragma warning restore MC1002, MC1004
 
         await Assert.That(caught).IsTypeOf<InvalidOperationException>();
         await Assert.That(caught.Message).Contains(expected: "did not return the result of Construct");
@@ -771,6 +791,7 @@ public sealed class ViewModelBaseTests
     {
         List<string> log = [];
 
+#pragma warning disable MC1001, MC1004 // The base taken out and given to the view model through a different handle is the input under test.
         Exception caught =
             Catch(
                 action: () =>
@@ -786,6 +807,7 @@ public sealed class ViewModelBaseTests
                             return Constructor.From(values: taken)
                                 .Construct(constructor: static values => new Derived(viewModelBase: values));
                         }));
+#pragma warning restore MC1001, MC1004
 
         await Assert.That(caught).IsTypeOf<InvalidOperationException>();
         await Assert.That(caught.Message).Contains(expected: "did not return the result of Construct");
@@ -797,6 +819,7 @@ public sealed class ViewModelBaseTests
     [Test]
     public async Task SecondConstructFails()
     {
+#pragma warning disable MC1001 // The first Construct is used up for its value, so that the second call is the one under test.
         Exception caught =
             Catch(
                 action: static () =>
@@ -808,6 +831,7 @@ public sealed class ViewModelBaseTests
 
                             return construct.Construct(constructor: static viewModelBase => viewModelBase);
                         }));
+#pragma warning restore MC1001
 
         await Assert.That(caught).IsTypeOf<InvalidOperationException>();
         await Assert.That(caught.Message).Contains(expected: "Construct was already called");

@@ -12,6 +12,20 @@ is unchanged and still returns TResult; AdvanceCore returns the Constructed<TRes
 continuation returns. StageContinuation loses out on TResult, because a sealed class cannot be
 covariant; no caller in this repository used that variance.
 
+New: the package carries a Roslyn analyzer, under analyzers/dotnet/cs, for the continuation that a
+subclass gives to a base. The compiler checks only that a continuation returns a
+Constructed<TResult>. The analyzer reports the usual ways to return one that did not come from the
+handle of the continuation. MC1001 reports Value read directly from Construct or Advance on the
+handle. MC1002 reports a result of that call that is not used. MC1003 reports a null return. MC1004
+reports the result of a handle that the continuation made with Constructor.From. MC1005 reports a
+function for Construct that does not read the values of the base. MC1006 reports a continuation
+that does not use its handle. These six are warnings, and each reports only what it can prove.
+MC1007 is information: it reports where the handle goes to code that the analyzer cannot follow,
+such as a helper method, a field, or a lambda that can run after the continuation returns. A C#
+project that has this package anywhere in its packages runs the analyzer with no step of its own,
+and a rule is turned off by its severity in .editorconfig. The documentation page on the
+continuation rules describes each one.
+
 New: the package has a net8.0 build, next to net472, net6.0, and netstandard2.0. It is the same
 code, compiled for net8.0. A project that targets net8.0 or later now takes the net8.0 build and
 not the netstandard2.0 build. No signature or behavior changed. The reason is that

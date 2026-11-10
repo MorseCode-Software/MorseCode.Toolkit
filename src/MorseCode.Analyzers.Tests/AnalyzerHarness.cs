@@ -80,12 +80,12 @@ internal static class AnalyzerHarness
             references: references,
             options: new CSharpCompilationOptions(
                 outputKind: OutputKind.DynamicallyLinkedLibrary,
-                nullableContextOptions: NullableContextOptions.Enable,
-                allowUnsafe: true));
+                allowUnsafe: true,
+                nullableContextOptions: NullableContextOptions.Enable));
 
     // The assemblies of the runtime that runs the tests, which the samples compile against.
     private static IEnumerable<MetadataReference> PlatformReferences() =>
-        ((string?)AppContext.GetData(name: "TRUSTED_PLATFORM_ASSEMBLIES") ?? string.Empty)
+        (AppContext.GetData(name: "TRUSTED_PLATFORM_ASSEMBLIES") as string ?? string.Empty)
         .Split(separator: Path.PathSeparator, options: StringSplitOptions.RemoveEmptyEntries)
         .Select(selector: static path => MetadataReference.CreateFromFile(path: path));
 }

@@ -109,6 +109,21 @@
     </ItemGroup>
 
     <!--
+        The analyzer of MorseCode.StagedConstruction, in every project but itself and the two that
+        the group above leaves out, so that the code here is held to the rules that a project with
+        the package gets. A consumer gets this analyzer inside the MorseCode.StagedConstruction
+        package. The projects here reference that library as a project, which carries no analyzer,
+        thus they get it in this way. MorseCode.Analyzers is left out because this analyzer
+        references it as an analyzer, and a reference in the two directions is a cycle.
+    -->
+    <ItemGroup Condition="'$(MSBuildProjectName)' != 'MorseCode.Analyzers' And '$(MSBuildProjectName)' != 'MorseCode.Analyzers.Tests' And '$(MSBuildProjectName)' != 'MorseCode.StagedConstruction.Analyzers'">
+        <ProjectReference Include="$(MSBuildThisFileDirectory)MorseCode.StagedConstruction.Analyzers\MorseCode.StagedConstruction.Analyzers.csproj"
+                          OutputItemType="Analyzer"
+                          ReferenceOutputAssembly="false"
+                          PrivateAssets="all"/>
+    </ItemGroup>
+
+    <!--
         Read at build time by the compiler and by ReSharper, and of no use to a consumer at run
         time, so PrivateAssets keeps it out of the packages.
     -->

@@ -41,3 +41,5 @@
       href: explicit-cast.md
     - name: Primary constructor parameter (MC0003)
       href: primary-constructor-parameter.md
+    - name: Continuation rules (MC1001 to MC1007)
+      href: continuation-rules.md

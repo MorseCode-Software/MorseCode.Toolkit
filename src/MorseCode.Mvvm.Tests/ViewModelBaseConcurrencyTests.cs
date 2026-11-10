@@ -181,9 +181,11 @@ public sealed class ViewModelBaseConcurrencyTests
                                             {
                                                 log.Add(item: "construct");
 
+#pragma warning disable MC1007 // The function of the cell calls Construct on purpose, so that the output closes while the factory makes a bindable.
                                                 constructed.Add(
                                                     item: construct.Construct(
                                                         constructor: static viewModelBase => viewModelBase));
+#pragma warning restore MC1007
                                             }
 
                                             return value;

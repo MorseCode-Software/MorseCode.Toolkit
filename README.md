@@ -34,7 +34,8 @@ The documentation site is at <https://morsecode-software.github.io/MorseCode.Too
   constructor that only assigns them. A base type's `CreateBase` method trades values with its
   subclass one stage at a time, so nothing can read a partly built object and the order of the
   work is set by the types. It has no dependency on SodaFlow, though it was written for objects
-  whose properties are SodaFlow graphs.<br>
+  whose properties are SodaFlow graphs. The package carries its own analyzer, rules MC1001 to
+  MC1007, which reports a continuation that doesn't return the result of its handle.<br>
   [![Latest Stable Version](https://img.shields.io/nuget/v/MorseCode.StagedConstruction.svg)](https://www.nuget.org/packages/MorseCode.StagedConstruction/)
   [![Total Downloads](https://img.shields.io/nuget/dt/MorseCode.StagedConstruction.svg)](https://www.nuget.org/packages/MorseCode.StagedConstruction/)
 

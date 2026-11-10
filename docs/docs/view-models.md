@@ -45,7 +45,8 @@ base of your own that sits between `ViewModelBase` and a view model adds its val
 `construct.Select`, as [Multi-stage construction](multi-stage.md) shows. `Select` hands the
 constructor's value back unchanged. A continuation that takes the `ViewModelBase` out with one
 `Construct` call, and gives it to the view model through a second handle, returns a value the base
-never saw, so it fails.
+never saw, so it fails. The build reports the usual forms of this mistake before the code runs: see
+[Continuation rules](continuation-rules.md).
 
 `bindingScheduler` is the scheduler for the bindable values that the output's `BindableFactory`
 makes. Capture it on the UI thread with `SynchronizationContextBindingScheduler.Capture()`. A test

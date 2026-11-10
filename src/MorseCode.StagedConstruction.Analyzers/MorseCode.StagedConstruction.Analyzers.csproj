@@ -1,0 +1,53 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <!--
+        The compiler loads an analyzer into its own process, which runs on .NET Framework in Visual
+        Studio and on .NET elsewhere. netstandard2.0 is the one target that both load.
+    -->
+    <PropertyGroup>
+        <TargetFramework>netstandard2.0</TargetFramework>
+        <LangVersion>14</LangVersion>
+        <Nullable>enable</Nullable>
+        <!-- The rules for an analyzer, such as no access to files, the network, or the clock. -->
+        <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    </PropertyGroup>
+
+    <!--
+        Not a package. The dll ships inside the MorseCode.StagedConstruction package, under
+        analyzers/dotnet/cs, which MorseCode.StagedConstruction.csproj packs from the output of this
+        project. Thus, a project that has that package anywhere in its packages gets the rules, and
+        nobody installs a second package. The rules are about the API of that one library, which is
+        why they are not in MorseCode.Analyzers: that package holds conventions of style, and a
+        project chooses it.
+    -->
+    <PropertyGroup>
+        <AssemblyName>MorseCode.StagedConstruction.Analyzers</AssemblyName>
+        <RootNamespace>MorseCode.StagedConstruction.Analyzers</RootNamespace>
+        <IsPackable>false</IsPackable>
+    </PropertyGroup>
+
+    <!--
+        The analyzer runs inside the compiler, which gives these assemblies. An analyzer must not ask
+        for a later version than the compiler that loads it, or that compiler does not run it. Roslyn
+        4.4 is in the .NET 7 SDK and Visual Studio 2022 17.4, and in each later one, and it has all
+        that the analyzer uses. PrivateAssets keeps Roslyn out of each package.
+    -->
+    <ItemGroup>
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.4.0" PrivateAssets="all"/>
+    </ItemGroup>
+
+    <!-- The release tracking of the rules, which the Roslyn analyzer rules ask for (RS2008). -->
+    <ItemGroup>
+        <AdditionalFiles Include="AnalyzerReleases.Shipped.md"/>
+        <AdditionalFiles Include="AnalyzerReleases.Unshipped.md"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <Compile Include="Continuation.cs"/>
+        <Compile Include="ContinuationAnalyzer.cs"/>
+        <Compile Include="ContinuationRules.cs"/>
+        <Compile Include="KnownSymbols.cs"/>
+        <Compile Include="OperationTree.cs"/>
+    </ItemGroup>
+
+</Project>

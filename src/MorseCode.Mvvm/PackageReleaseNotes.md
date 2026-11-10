@@ -29,6 +29,12 @@ that returns what Construct gives, directly or through Select, sees no change. O
 ViewModelBase out with one Construct call and gives it to the view model through a second handle
 now fails; use Select to add values to the base.
 
+New: a project that references this package gets the continuation rules MC1001 to MC1007, from the
+analyzer inside MorseCode.StagedConstruction 0.3.0. They report, in the build, the usual forms of
+the continuation that CreateBase refuses when it runs. Six are warnings, so a project that treats
+warnings as errors and has such a continuation no longer builds. The notes of
+MorseCode.StagedConstruction 0.3.0 list the rules.
+
 New: the package has a net8.0 build, next to net472, net6.0, and netstandard2.0. It is the same
 code, compiled for net8.0. A project that targets net8.0 or later now takes the net8.0 build and
 not the netstandard2.0 build. MorseCode.Avalonia.Controls references this package, and it targets
