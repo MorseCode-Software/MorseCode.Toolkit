@@ -48,6 +48,16 @@ code, compiled for net8.0. A project that targets net8.0 or later now takes the 
 not the net6.0 build. MorseCode.Avalonia.Controls references this package, and it targets
 net8.0.
 
+New: the net8.0 build is marked as compatible with trimming and native AOT. The build of the
+package runs the trim, AOT, and single-file analyzers on it and fails on a report, so code that
+needs reflection cannot be released by mistake. The assembly carries the metadata IsTrimmable and
+IsAotCompatible, so an app that trims only the assemblies so marked, with TrimMode partial, now
+trims this one too. The net472, net6.0, and netstandard2.0 builds are not marked, because the SDK
+has no such analyzers for them. A native AOT publish that roots the assembly reports nothing in its
+code. It reports IL2091 inside SodaFlow.Core 5, which this package depends on, where SodaFlow.Core
+gives a value factory to Lazy<T>. That is SodaFlow code, which the mark of this package does not
+cover.
+
 Changed: the dependencies on SodaFlow packages now have a ceiling at their next major version, as
 the dependencies between the packages of this repository already did: SodaFlow.Bindable.ObjectModel
 [4.0.0, 5.0.0). Before, each was a floor only. A project that asks for a SodaFlow major past the
