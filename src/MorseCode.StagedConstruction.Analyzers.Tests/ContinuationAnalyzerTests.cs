@@ -113,12 +113,27 @@ internal sealed class ContinuationAnalyzerTests
         await Assert.That(found).IsEmpty();
     }
 
-    // A view model with a loop has two shapes. The first has the forward reference in the function of
-    // Construct. The second has Construct in the forward reference, and keeps the Constructed in a
-    // variable. It reads Value from the variable, and not directly from the call.
+    // The shape to use for a view model with a loop has the forward reference around the base, and
+    // its continuation is the usual one. Two other shapes compile. One has the forward reference in the
+    // function of Construct. One has Construct in the forward reference, and keeps the Constructed in a
+    // variable. It reads Value from the variable, and not directly from the call. No rule reports one
+    // of the three.
     [Test]
-    public async Task ATransactionAndAForwardReferenceAroundTheHandleGiveNoReport()
+    public async Task AViewModelWithALoopGivesNoReport()
     {
+        IReadOnlyList<Diagnostic> outside =
+            await Analyze(
+                    source: Samples.With(
+                        code: $$"""
+                                public static class Use
+                                {
+                                    public static Thing Go() =>
+                                        ForwardReference<Thing>.WithoutCaptures(
+                                            loop => Base.Create(continuation: (output, construct) => construct.Construct({{Samples.Make}})));
+                                }
+                                """))
+                .ConfigureAwait(continueOnCapturedContext: false);
+
         IReadOnlyList<Diagnostic> inside =
             await Analyze(
                     source: Samples.OfBase(
@@ -150,6 +165,7 @@ internal sealed class ContinuationAnalyzerTests
                                         """))
                 .ConfigureAwait(continueOnCapturedContext: false);
 
+        await Assert.That(outside).IsEmpty();
         await Assert.That(inside).IsEmpty();
         await Assert.That(around).IsEmpty();
     }

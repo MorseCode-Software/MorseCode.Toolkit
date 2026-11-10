@@ -814,6 +814,43 @@ public sealed class ViewModelBaseTests
         await Assert.That(log).IsEquivalentTo(expected: ["registered"]);
     }
 
+    // A view model with a loop has the forward reference around CreateBase. The function of a forward
+    // reference returns the view model, and Construct returns a Constructed. Thus, Construct cannot be
+    // the last call in that function, but CreateBase can. The forward reference opens a transaction,
+    // thus the continuation needs no Transaction.Run.
+    [Test]
+    public async Task AForwardReferenceAroundCreateBaseGivesTheViewModelInOneTransaction()
+    {
+        List<bool> inTransaction = [];
+
+        Looped viewModel =
+            ForwardReference<Looped>.WithoutCaptures(
+                f: viewModelLoop =>
+                    ViewModelBase.CreateBase(
+                        bindingScheduler: BindingScheduler.Immediate,
+                        continuation: (output, construct) =>
+                        {
+                            inTransaction.Add(item: Transaction.IsActive());
+
+                            CellSink<int> source = Cell.CreateSink(initialValue: 5);
+
+                            // The view model does not exist yet. This cell reads one of its members when
+                            // the loop closes.
+                            Cell<int> echo = viewModelLoop.Map(f: static looped => looped.Source).SwitchC();
+                            IOneWayBindableValue<int> bound = output.BindableFactory.CreateOneWay(cell: source);
+
+                            return construct.Construct(
+                                constructor: viewModelBase =>
+                                    new Looped(viewModelBase: viewModelBase, source: source, echo: echo, bound: bound));
+                        }));
+
+        await Assert.That(inTransaction).IsEquivalentTo(expected: [true]);
+        await Assert.That(viewModel.Echo.Sample()).IsEqualTo(expected: 5);
+        await Assert.That(viewModel.Bound.Value).IsEqualTo(expected: 5);
+
+        viewModel.Dispose();
+    }
+
     // A second Construct call cannot make a second owner of the same entries. The handle that Select
     // makes refuses the call, and the base does not seal the output a second time.
     [Test]
@@ -964,6 +1001,20 @@ public sealed class ViewModelBaseTests
 
     private sealed class Derived(in ViewModelBase viewModelBase)
         : ViewModelBase(viewModelBase: viewModelBase);
+
+    private sealed class Looped(
+        in ViewModelBase viewModelBase,
+        in Cell<int> source,
+        in Cell<int> echo,
+        in IOneWayBindableValue<int> bound)
+        : ViewModelBase(viewModelBase: viewModelBase)
+    {
+        public Cell<int> Source { get; } = source;
+
+        public Cell<int> Echo { get; } = echo;
+
+        public IOneWayBindableValue<int> Bound { get; } = bound;
+    }
 
     private sealed class Recording(in ICollection<string> log, in string name) : IDisposable
     {
