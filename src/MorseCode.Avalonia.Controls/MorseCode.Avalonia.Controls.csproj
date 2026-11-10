@@ -10,6 +10,10 @@
         <Nullable>enable</Nullable>
     </PropertyGroup>
 
+    <PropertyGroup Condition="$([MSBuild]::IsTargetFrameworkCompatible('$(TargetFramework)', 'net8.0'))">
+        <IsAotCompatible>true</IsAotCompatible>
+    </PropertyGroup>
+
     <PropertyGroup>
         <PackageId>MorseCode.Avalonia.Controls</PackageId>
         <MinVerTagPrefix>morsecode-avalonia-controls-</MinVerTagPrefix>
