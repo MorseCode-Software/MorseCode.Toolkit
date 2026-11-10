@@ -28,11 +28,14 @@
     -->
     <ItemGroup>
         <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.14.0"/>
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="4.14.0"/>
         <PackageReference Include="TUnit" Version="1.66.27"/>
     </ItemGroup>
 
     <ItemGroup>
         <Compile Include="AnalyzerHarness.cs"/>
+        <Compile Include="CodeFixHarness.cs"/>
+        <Compile Include="PrimaryConstructorParameterCodeFixTests.cs"/>
         <Compile Include="ExplicitCastAnalyzerTests.cs"/>
         <Compile Include="NamedArgumentOrderAnalyzerTests.cs"/>
         <Compile Include="PrimaryConstructorParameterAnalyzerTests.cs"/>
@@ -40,6 +43,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\MorseCode.Analyzers\MorseCode.Analyzers.csproj"/>
+        <ProjectReference Include="..\MorseCode.Analyzers.CodeFixes\MorseCode.Analyzers.CodeFixes.csproj"/>
     </ItemGroup>
 
 </Project>
