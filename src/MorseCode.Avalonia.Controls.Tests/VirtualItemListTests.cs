@@ -92,6 +92,81 @@ public sealed class VirtualItemListTests
         await Assert.That((changes[1].After as VirtualRow)?.Position).IsEqualTo(expected: 3);
     }
 
+    // The list reads only the two sets of rows. This test reads each position of the list before and
+    // after the update, and compares.
+    [Test]
+    public async Task TheChangedPositionsOfEachTwoSetsOfRowsAreThePositionsWhoseItemDiffers()
+    {
+        int[] counts = [0, 5, 20, 40];
+        int[] offsets = [0, 1, 3, 8, 17, 25, 39, 45];
+        int[] lengths = [0, 1, 4, 10];
+
+        // The new rows from the same pool keep the row object of a position. The new rows from the
+        // other pool have a different row object for it.
+        VirtualRow[] pool = Pool();
+        VirtualRow[] otherPool = Pool();
+
+        List<(VirtualRows Old, VirtualRows New)> cases =
+        [
+            .. from oldCount in counts
+            from newCount in counts
+            from oldOffset in offsets
+            from newOffset in offsets
+            from oldLength in lengths
+            from newLength in lengths
+            from newPool in new[] { pool, otherPool }
+            select (
+                Window(pool: pool, count: oldCount, offset: oldOffset, length: oldLength),
+                Window(pool: newPool, count: newCount, offset: newOffset, length: newLength))
+        ];
+
+        List<string> wrong =
+        [
+            .. cases.Where(predicate: static pair => !GivesThePositionsThatDiffer(oldRows: pair.Old, newRows: pair.New))
+                .Select(
+                    selector: static pair =>
+                        $"{pair.Old.TotalCount}: {pair.Old.Offset}+{pair.Old.Items.Count} to "
+                        + $"{pair.New.TotalCount}: {pair.New.Offset}+{pair.New.Items.Count}")
+        ];
+
+        await Assert.That(cases.Count).IsEqualTo(expected: 32768);
+        await Assert.That(wrong).IsEmpty();
+    }
+
+    // A jump puts the new rows far from the old rows. Each position between them holds the
+    // placeholder before and after, thus the list must not read it.
+    [Test]
+    public async Task AJumpToFarRowsReadsOnlyTheRows()
+    {
+        const int farOffset = 9_000_000;
+
+        ReadCountingList near = new(items: [.. Pool().Take(count: 30)]);
+
+        ReadCountingList far =
+            new(
+                items:
+                [
+                    .. Enumerable.Range(start: farOffset, count: 30)
+                        .Select(selector: static position => new VirtualRow(Position: position))
+                ]);
+
+        VirtualItemList items =
+            Items(count: 10_000_000, rows: new VirtualRows(TotalCount: 0, Offset: 0, Items: near));
+
+        int readsBefore = near.Reads + far.Reads;
+
+        List<ItemChange> changes =
+            [.. items.Update(newRows: new VirtualRows(TotalCount: 10_000_000, Offset: farOffset, Items: far))];
+
+        await Assert.That(changes.Select(selector: static change => change.Index).ToList())
+            .IsEquivalentTo(
+                expected: [.. Enumerable.Range(start: 0, count: 30), .. Enumerable.Range(start: farOffset, count: 30)],
+                ordering: CollectionOrdering.Matching);
+
+        // A walk of each position between the rows reads the two lists 9 million times.
+        await Assert.That(near.Reads + far.Reads - readsBefore).IsLessThan(maximum: 1000);
+    }
+
     [Test]
     public async Task AReplaceRaisesOneEventForThePosition()
     {
@@ -278,5 +353,71 @@ public sealed class VirtualItemListTests
         items.CollectionChanged += (_, args) => events.Add(item: args);
 
         return events;
+    }
+
+    private static VirtualRow[] Pool() =>
+    [
+        .. Enumerable.Range(start: 0, count: 60)
+            .Select(selector: static position => new VirtualRow(Position: position))
+    ];
+
+    private static VirtualRows Window(IEnumerable<VirtualRow> pool, int count, int offset, int length) =>
+        new(TotalCount: count, Offset: offset, Items: [.. pool.Skip(count: offset).Take(count: length)]);
+
+    // Reads each position of the list before and after the update. A row is a record, thus the test
+    // compares the items as references.
+    private static bool GivesThePositionsThatDiffer(VirtualRows oldRows, VirtualRows newRows)
+    {
+        VirtualItemList items = new();
+        items.Update(newRows: oldRows);
+
+        object?[] before = [.. items];
+        List<ItemChange> given = [.. items.Update(newRows: newRows)];
+        object?[] after = [.. items];
+
+        List<int> expected =
+        [
+            .. Enumerable.Range(start: 0, count: Math.Min(val1: before.Length, val2: after.Length))
+                .Where(predicate: index => !ReferenceEquals(objA: before[index], objB: after[index]))
+        ];
+
+        return given.Select(selector: static change => change.Index).SequenceEqual(second: expected)
+            && given.All(
+                predicate: change =>
+                    ReferenceEquals(objA: change.Before, objB: before[change.Index])
+                    && ReferenceEquals(objA: change.After, objB: after[change.Index]));
+    }
+
+    // Counts each read of the count and of an item.
+    // ReSharper disable once InheritdocConsiderUsage - The summary of IReadOnlyList does not say what this list counts.
+    private sealed class ReadCountingList(in IReadOnlyList<object?> items) : IReadOnlyList<object?>
+    {
+        private readonly IReadOnlyList<object?> items = items;
+
+        public int Reads { get; private set; }
+
+        public int Count
+        {
+            get
+            {
+                this.Reads++;
+
+                return this.items.Count;
+            }
+        }
+
+        public object? this[int index]
+        {
+            get
+            {
+                this.Reads++;
+
+                return this.items[index: index];
+            }
+        }
+
+        public IEnumerator<object?> GetEnumerator() => this.items.GetEnumerator();
+
+        IEnumerator IEnumerable.GetEnumerator() => this.GetEnumerator();
     }
 }
