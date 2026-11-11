@@ -12,8 +12,9 @@ using TUnit.Core;
 namespace MorseCode.Avalonia.Controls.Tests;
 
 /// <summary>
-///     Checks the list that a <see cref="VirtualizingItemsControl" /> gives to Avalonia, and the events
-///     that it raises when the length or the rows change.
+///     Checks the list that a <see cref="VirtualizingItemsControl" /> gives to Avalonia. The tests
+///     read the events that the list raises when the length changes, and the positions that it gives
+///     when the rows change.
 /// </summary>
 public sealed class VirtualItemListTests
 {
@@ -55,13 +56,14 @@ public sealed class VirtualItemListTests
         VirtualItemList items = Items(count: 5, rows: rows);
         List<NotifyCollectionChangedEventArgs> events = Record(items: items);
 
-        items.Update(newRows: rows with { TotalCount = 5 });
+        IEnumerable<ItemChange> changes = items.Update(newRows: rows with { TotalCount = 5 });
 
         await Assert.That(events).IsEmpty();
+        await Assert.That(changes).IsEmpty();
     }
 
     [Test]
-    public async Task RowsThatMoveReplaceOnlyThePositionsThatChanged()
+    public async Task RowsThatMoveRaiseNoEventAndGiveOnlyThePositionsThatChanged()
     {
         VirtualRow shared = new(Position: 2);
 
@@ -72,20 +74,38 @@ public sealed class VirtualItemListTests
 
         List<NotifyCollectionChangedEventArgs> events = Record(items: items);
 
-        items.Update(
-            newRows: new VirtualRows(TotalCount: 10, Offset: 2, Items: [shared, new VirtualRow(Position: 3)]));
+        List<ItemChange> changes =
+        [
+            .. items.Update(
+                newRows: new VirtualRows(TotalCount: 10, Offset: 2, Items: [shared, new VirtualRow(Position: 3)]))
+        ];
 
         // Position 1 loses its row, and position 3 gets one. Position 2 keeps the same row.
-        await Assert.That(events.Select(selector: static args => args.Action).ToList())
-            .IsEquivalentTo(
-                expected: [NotifyCollectionChangedAction.Replace, NotifyCollectionChangedAction.Replace],
-                ordering: CollectionOrdering.Matching);
+        await Assert.That(events).IsEmpty();
 
-        await Assert.That(events.Select(selector: static args => args.NewStartingIndex).ToList())
+        await Assert.That(changes.Select(selector: static change => change.Index).ToList())
             .IsEquivalentTo(expected: [1, 3], ordering: CollectionOrdering.Matching);
 
-        await Assert.That(FirstNewItem(args: events[0])).IsSameReferenceAs(expected: RowPlaceholder.Instance);
-        await Assert.That((FirstNewItem(args: events[1]) as VirtualRow)?.Position).IsEqualTo(expected: 3);
+        await Assert.That((changes[0].Before as VirtualRow)?.Position).IsEqualTo(expected: 1);
+        await Assert.That(changes[0].After).IsSameReferenceAs(expected: RowPlaceholder.Instance);
+        await Assert.That(changes[1].Before).IsSameReferenceAs(expected: RowPlaceholder.Instance);
+        await Assert.That((changes[1].After as VirtualRow)?.Position).IsEqualTo(expected: 3);
+    }
+
+    [Test]
+    public async Task AReplaceRaisesOneEventForThePosition()
+    {
+        VirtualItemList items = Items(count: 10, rows: Rows(offset: 1, 1, 2));
+        List<NotifyCollectionChangedEventArgs> events = Record(items: items);
+        VirtualRow before = new(Position: 7);
+
+        items.Replace(change: new ItemChange(Index: 2, Before: before, After: items[2]));
+
+        await Assert.That(events.Count).IsEqualTo(expected: 1);
+        await Assert.That(events[0].Action).IsEqualTo(expected: NotifyCollectionChangedAction.Replace);
+        await Assert.That(events[0].NewStartingIndex).IsEqualTo(expected: 2);
+        await Assert.That(FirstNewItem(args: events[0])).IsSameReferenceAs(expected: items[2]);
+        await Assert.That(events[0].OldItems?[0]).IsSameReferenceAs(expected: before);
     }
 
     [Test]
@@ -118,33 +138,55 @@ public sealed class VirtualItemListTests
     }
 
     [Test]
-    public async Task AListThatGrowsAndFillsItsRowsAddsTheTailAndReplacesTheRest()
+    public async Task AListThatGrowsAndFillsItsRowsAddsTheTailAndGivesTheRest()
     {
         VirtualItemList items = Items(count: 2, rows: VirtualRows.Empty);
         List<NotifyCollectionChangedEventArgs> events = Record(items: items);
 
-        items.Update(newRows: Rows(offset: 1, 1, 2, 3) with { TotalCount = 4 });
+        List<ItemChange> changes = [.. items.Update(newRows: Rows(offset: 1, 1, 2, 3) with { TotalCount = 4 })];
 
         await Assert.That(events.Select(selector: static args => args.Action).ToList())
-            .IsEquivalentTo(
-                expected: [NotifyCollectionChangedAction.Add, NotifyCollectionChangedAction.Replace],
-                ordering: CollectionOrdering.Matching);
+            .IsEquivalentTo(expected: [NotifyCollectionChangedAction.Add], ordering: CollectionOrdering.Matching);
 
         // Positions 2 and 3 are new and already hold rows. Position 1 was a placeholder.
-        await Assert.That(events[1].NewStartingIndex).IsEqualTo(expected: 1);
+        await Assert.That(changes.Select(selector: static change => change.Index).ToList())
+            .IsEquivalentTo(expected: [1], ordering: CollectionOrdering.Matching);
+
         await Assert.That(PositionAt(items: items, index: 3)).IsEqualTo(expected: 3);
     }
 
+    // The control shows a changed position in the container that it has, thus the number of changed
+    // positions has no limit.
     [Test]
-    public async Task AChangeToManyPositionsRaisesOneReset()
+    public async Task AChangeToManyPositionsRaisesNoEvent()
     {
         VirtualItemList items = Items(count: 5000, rows: VirtualRows.Empty);
         List<NotifyCollectionChangedEventArgs> events = Record(items: items);
 
-        items.Update(newRows: Rows(offset: 0, positions: [.. Enumerable.Range(start: 0, count: 1000)]) with { TotalCount = 5000 });
+        List<ItemChange> changes =
+        [
+            .. items.Update(
+                newRows: Rows(offset: 0, positions: [.. Enumerable.Range(start: 0, count: 1000)]) with
+                {
+                    TotalCount = 5000
+                })
+        ];
+
+        await Assert.That(events).IsEmpty();
+        await Assert.That(changes.Count).IsEqualTo(expected: 1000);
+    }
+
+    [Test]
+    public async Task AResetGivesNoPositions()
+    {
+        VirtualItemList items = Items(count: 100, rows: Rows(offset: 0, 0, 1));
+        List<NotifyCollectionChangedEventArgs> events = Record(items: items);
+
+        IEnumerable<ItemChange> changes = items.Update(newRows: Rows(offset: 0, 0, 1) with { TotalCount = 5000 });
 
         await Assert.That(events.Count).IsEqualTo(expected: 1);
         await Assert.That(events[0].Action).IsEqualTo(expected: NotifyCollectionChangedAction.Reset);
+        await Assert.That(changes).IsEmpty();
     }
 
     [Test]

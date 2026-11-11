@@ -32,6 +32,7 @@
 
     <ItemGroup>
         <Compile Include="Change.cs"/>
+        <Compile Include="GivenRowsModel.cs"/>
         <AvaloniaXaml Include="ComboBoxView.axaml">
             <SubType>Designer</SubType>
         </AvaloniaXaml>
@@ -59,6 +60,7 @@
         <Compile Include="StringMaybeConverter.cs"/>
         <Compile Include="TestApplication.cs"/>
         <Compile Include="VirtualizingItemsControlEditTests.cs"/>
+        <Compile Include="VirtualizingItemsControlInPlaceTests.cs"/>
         <Compile Include="VirtualizingItemsControlPanelTests.cs"/>
         <Compile Include="VirtualizingItemsControlRecipeTests.cs"/>
         <Compile Include="VirtualizingItemsControlTests.cs"/>

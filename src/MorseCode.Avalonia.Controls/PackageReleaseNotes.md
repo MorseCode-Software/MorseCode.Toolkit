@@ -63,6 +63,30 @@ ten containers, one report took between about 0.15 and 0.45 microseconds and 24 
 default panel, and about 1.5 microseconds and 96 bytes with the pass. It took about 4.1
 microseconds and 392 bytes before. All were measured through reflection in a headless test.
 
+Fixed: after a jump, an edit could send the list to a different part and back, and a view model
+that makes new row objects never settled. The list raised a Replace for each position whose item
+changed, and the panel of Avalonia then built each of those containers again. A panel with no
+container left on screen estimates its position from an average height. When the rows and the
+placeholders differ in height, that estimate is a different part of the list. With rows of 40 and
+placeholders of 20, a removal above the rows on screen took four layouts and four values of the
+rows, and two of the layouts showed only placeholders. A view model on the overload for its own
+rows that made a new row object for each position got a different range after each answer, without
+end. The control now keeps the container of each position and gives it the new row. The same
+removal takes one layout and one value, and the view model with new row objects settles. A jump
+also stays at the position that agrees with the scroll bar, where before it went on to a
+different position.
+
+Changed: because the container stays, a row template that reuses its view gets the new row only
+as the data context of that view. Each XAML DataTemplate reuses its view, and a FuncDataTemplate
+does so with supportsRecycling: true. Such a view must read its values through bindings. A view
+that sets its values when the template builds it shows the row from before, with no error. A
+FuncDataTemplate with the default supportsRecycling: false builds a view for each row and is not
+affected. The focus stays in its container, at the position, where before it left the list.
+ContainerPrepared is raised when Avalonia makes a container for a position, and no longer when
+the row of a position changes. An item that is a Control, and a container that is not a
+ContentPresenter or a ContentControl, are replaced through the panel as before. A change of more
+than 512 rows is no longer a reset. Only a change of the count by more than 512 positions is.
+
 The package now depends on SodaFlow, SodaFlow.Bindable.ObjectModel, SodaFlow.Collections, and
 MorseCode.Mvvm 0.3.0 or later. To move from 0.2.x: build the source in the view model, expose it as
 an IVirtualItemsSource, and replace the bindings in the view with Source="{Binding Source}".

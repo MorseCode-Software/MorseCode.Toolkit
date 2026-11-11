@@ -3,6 +3,7 @@ using System.ComponentModel;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Presenters;
+using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Templates;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
@@ -42,6 +43,14 @@ namespace MorseCode.Avalonia.Controls;
 ///         placeholder must be about as high as a row. Otherwise, Avalonia shows more
 ///         placeholders than the screen needs, and the view model builds rows that the
 ///         user cannot see.
+///     </para>
+///     <para>
+///         When the rows change, the control keeps the container of each position and gives it
+///         the new row. A row template that uses its view again, as each XAML template does, gets
+///         the new row only as the data context of that view. Thus, such a view must read each
+///         value from its data context, as a binding does. The control raises
+///         <see cref="ItemsControl.ContainerPrepared" /> when Avalonia makes a container for a
+///         position, and not when the row of the position changes.
 ///     </para>
 ///     <para>
 ///         The control uses the style of <see cref="ListBox" />. Thus, a style in the application
@@ -211,7 +220,10 @@ public class VirtualizingItemsControl : ItemsControl
 
         if (change.Property == RowsProperty)
         {
-            this.items.Update(newRows: this.Rows);
+            foreach (ItemChange itemChange in this.items.Update(newRows: this.Rows))
+            {
+                this.Show(itemChange: itemChange);
+            }
         }
         else if (change.Property == BufferProperty)
         {
@@ -313,6 +325,74 @@ public class VirtualizingItemsControl : ItemsControl
         }
 
         base.ClearContainerForItemOverride(container: container);
+    }
+
+    // Shows the new item of a position in the container that the position has. For a replaced item,
+    // the panel builds the container again. A panel with no container left that shows estimates its
+    // position from an average height. After a jump, that estimate is a different part of the list
+    // when the rows and the placeholders have different heights.
+    private void Show(ItemChange itemChange)
+    {
+        if (this.ContainerFromIndex(index: itemChange.Index) is not { } container)
+        {
+            return;
+        }
+
+        bool isShown =
+            container switch
+            {
+                ContentPresenter =>
+                    this.TryShow(
+                        container: container,
+                        content: ContentPresenter.ContentProperty,
+                        contentTemplate: ContentPresenter.ContentTemplateProperty,
+                        itemChange: itemChange),
+                ContentControl and not HeaderedContentControl =>
+                    this.TryShow(
+                        container: container,
+                        content: ContentControl.ContentProperty,
+                        contentTemplate: ContentControl.ContentTemplateProperty,
+                        itemChange: itemChange),
+                _ => false
+            };
+
+        if (!isShown)
+        {
+            this.items.Replace(change: itemChange);
+        }
+    }
+
+    // The control can change only a container that it made for the item from before. A control is its
+    // own container, and a container of a different type can show the item in a different property.
+    private bool TryShow(
+        Control container,
+        StyledProperty<object?> content,
+        StyledProperty<IDataTemplate?> contentTemplate,
+        ItemChange itemChange)
+    {
+        if (itemChange.After is Control
+            || !ReferenceEquals(objA: container.GetValue(property: content), objB: itemChange.Before))
+        {
+            return false;
+        }
+
+        // The presenter builds its view at each of the two changes. The placeholder template accepts
+        // each item, and a row template with bindings accepts only a row. Thus, the order is the one in
+        // which the row template never gets a placeholder.
+        if (itemChange.After is RowPlaceholder)
+        {
+            container.SetValue(property: contentTemplate, value: this.PlaceholderTemplate);
+            container.SetCurrentValue(property: content, value: itemChange.After);
+        }
+        else
+        {
+            container.SetCurrentValue(property: content, value: itemChange.After);
+            container.SetValue(property: contentTemplate, value: this.ItemTemplate);
+        }
+
+        container.DataContext = itemChange.After;
+
+        return true;
     }
 
     private void RequestScroll()

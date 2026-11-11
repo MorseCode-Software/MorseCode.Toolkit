@@ -47,7 +47,7 @@ public sealed class VirtualizingItemsControlEditTests
                     .IsEquivalentTo(expected: Rows(first: 0, count: 10), ordering: CollectionOrdering.Matching);
             });
 
-    // Each row that shows moves up by one position, thus the panel replaces each container.
+    // Each row that shows moves up by one position, thus each container gets a different row.
     [Test]
     [Arguments(0)]
     [Arguments(10)]
@@ -72,7 +72,7 @@ public sealed class VirtualizingItemsControlEditTests
                     .IsEquivalentTo(expected: Rows(first: 501, count: 10), ordering: CollectionOrdering.Matching);
             });
 
-    // The rows above the key stay, and the panel replaces only the containers from the key down.
+    // The rows above the key stay, and only the containers from the key down get a different row.
     [Test]
     [Arguments(0)]
     [Arguments(10)]
