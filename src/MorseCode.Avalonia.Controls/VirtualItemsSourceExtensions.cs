@@ -182,9 +182,15 @@ public static class VirtualItemsSourceExtensions
     ///     do not come from a <c>ReactiveCollection</c>.
     /// </summary>
     /// <remarks>
-    ///     The view model reads the range from <paramref name="visibleRange" /> and answers in
-    ///     <paramref name="rows" />. Make the count, the rows, and their offset from one cell, so that
-    ///     they always agree.
+    ///     <para>
+    ///         The view model reads the range from <paramref name="visibleRange" /> and answers in
+    ///         <paramref name="rows" />. Make the count, the rows, and their offset from one cell, so
+    ///         that they always agree.
+    ///     </para>
+    ///     <para>
+    ///         The range can end after the last position of the list, by the buffer of the control.
+    ///         Give rows only for the positions that the list has.
+    ///     </para>
     /// </remarks>
     /// <param name="output">The output of the view model. The source makes its values with the factory of the output.</param>
     /// <param name="rows">The rows for some of the positions, with the position of the first and the number of positions in the whole list.</param>

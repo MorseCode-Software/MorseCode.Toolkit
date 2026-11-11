@@ -181,8 +181,16 @@ public class VirtualizingItemsControl : ItemsControl
     ///     positions that show, when it reports the range to the source.
     /// </summary>
     /// <remarks>
-    ///     A scroll that is faster than the view model can answer shows placeholders.
-    ///     More positions on each side give the view model time to answer.
+    ///     <para>
+    ///         A scroll that is faster than the view model can answer shows placeholders.
+    ///         More positions on each side give the view model time to answer.
+    ///     </para>
+    ///     <para>
+    ///         The range does not stop at the last position of the list. It continues for this
+    ///         number of positions, and an empty list reports this number of positions from 0. Thus,
+    ///         a row that the list gets at an end that shows comes with the new count, and not after
+    ///         a placeholder. With 0, the range has no positions after the last one.
+    ///     </para>
     /// </remarks>
     public int Buffer
     {
@@ -606,19 +614,25 @@ public class VirtualizingItemsControl : ItemsControl
             }
         }
 
+        int buffer = Math.Max(val1: 0, val2: this.Buffer);
+
         if (last < 0)
         {
             // No container, with positions to show, means that the control is not laid out. This is also
             // the case after a change of the items. The panel clears its containers then, and makes them
             // again at the next layout. Thus, the last range stays. If it did not, the view model would
-            // drop its rows, the items would change again, and the cycle would repeat without end.
-            return this.items.Count == 0 ? ItemRange.Empty : this.VisibleRange;
+            // drop its rows, the items would change again, and the cycle would repeat without end. An
+            // empty list shows no position, and it reports its buffer for the rows that come.
+            return this.items.Count == 0 ? new ItemRange(First: 0, Count: buffer) : this.VisibleRange;
         }
 
-        int buffer = Math.Max(val1: 0, val2: this.Buffer);
         int start = Math.Max(val1: 0, val2: first - buffer);
-        int end = Math.Min(val1: this.items.Count, val2: last + 1 + buffer);
 
-        return new ItemRange(First: start, Count: Math.Max(val1: 0, val2: end - start));
+        // The range does not stop at the end of the list. A position that the list gets at its end is
+        // then in the range already, and its row comes with the new count. With a stop at the end, the
+        // new position shows a placeholder until the next report. The sum stops at the largest number.
+        int end = buffer > int.MaxValue - last - 1 ? int.MaxValue : last + 1 + buffer;
+
+        return new ItemRange(First: start, Count: end - start);
     }
 }

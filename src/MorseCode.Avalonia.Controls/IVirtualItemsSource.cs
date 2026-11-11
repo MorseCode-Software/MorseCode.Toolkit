@@ -36,6 +36,10 @@ public interface IVirtualItemsSource
     ///     Gets the value that the control writes with the positions that show, with its buffer on each
     ///     side.
     /// </summary>
+    /// <remarks>
+    ///     The range can end after the last position of the list, by the buffer of the control. A view
+    ///     model that makes its own rows gives rows only for the positions that the list has.
+    /// </remarks>
     IOneWayToSourceBindableValue<ItemRange> VisibleRange { get; }
 
     /// <summary>
