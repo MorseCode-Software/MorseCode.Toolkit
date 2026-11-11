@@ -63,6 +63,14 @@ ten containers, one report took between about 0.15 and 0.45 microseconds and 24 
 default panel, and about 1.5 microseconds and 96 bytes with the pass. It took about 4.1
 microseconds and 392 bytes before. All were measured through reflection in a headless test.
 
+An update of the rows after a jump no longer takes time in proportion to the distance of the jump.
+The control compared the old and the new item at every position from the first of the old and new
+rows to the last. After a jump, that is every position between the two, and each of those holds
+the placeholder before and after. The control now compares only the positions of the old rows and
+of the new rows. With 30 old rows and 30 new rows, one update took about 1.2 to 1.6 milliseconds
+when they were 450,000 positions apart, and about 17 to 19 milliseconds at 9,000,000 apart. It now
+takes about 4 microseconds at any distance, and it finds the same changed positions.
+
 Fixed: after a jump, an edit could send the list to a different part and back, and a view model
 that makes new row objects never settled. The list raised a Replace for each position whose item
 changed, and the panel of Avalonia then built each of those containers again. A panel with no
