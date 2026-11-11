@@ -209,8 +209,10 @@ internal sealed class VirtualItemList : IList, IReadOnlyList<object?>, INotifyCo
     }
 
     // The positions that were in the list before and after, and that hold a different item now. Only
-    // the two sets of rows can differ, because every other position is a placeholder in both. The
-    // sequence keeps no list, thus a long run of changed positions costs no memory.
+    // the two sets of rows can differ, because every other position is a placeholder in both. Thus,
+    // the walk reads the two sets of rows and not the positions between them. A jump of the list
+    // then costs no more than the rows. The sequence keeps no list, thus a long run of changed
+    // positions costs no memory.
     private static IEnumerable<ItemChange> Changes(
         VirtualRows oldRows,
         int oldCount,
@@ -218,17 +220,25 @@ internal sealed class VirtualItemList : IList, IReadOnlyList<object?>, INotifyCo
         int newCount)
     {
         int shared = Math.Min(val1: oldCount, val2: newCount);
-        int from = Math.Max(val1: 0, val2: Math.Min(val1: oldRows.Offset, val2: newRows.Offset));
 
-        int to =
-            Math.Min(
-                val1: shared,
-                val2: Math.Max(
-                    val1: oldRows.Offset + oldRows.Items.Count,
-                    val2: newRows.Offset + newRows.Items.Count));
+        (VirtualRows lower, VirtualRows upper) =
+            oldRows.Offset <= newRows.Offset ? (oldRows, newRows) : (newRows, oldRows);
 
-        for (int index = from; index < to; index++)
+        int lowerEnd = lower.Offset + lower.Items.Count;
+        int upperStart = Math.Max(val1: 0, val2: upper.Offset);
+        int end = Math.Min(val1: shared, val2: Math.Max(val1: lowerEnd, val2: upper.Offset + upper.Items.Count));
+        int index = Math.Max(val1: 0, val2: lower.Offset);
+
+        while (index < end)
         {
+            // The positions between the two sets of rows. When the sets touch or overlap, there are none.
+            if (index >= lowerEnd && index < upperStart)
+            {
+                index = upperStart;
+
+                continue;
+            }
+
             object? before = ItemAt(rows: oldRows, index: index);
             object? after = ItemAt(rows: newRows, index: index);
 
@@ -236,6 +246,8 @@ internal sealed class VirtualItemList : IList, IReadOnlyList<object?>, INotifyCo
             {
                 yield return new ItemChange(Index: index, Before: before, After: after);
             }
+
+            index++;
         }
     }
 
