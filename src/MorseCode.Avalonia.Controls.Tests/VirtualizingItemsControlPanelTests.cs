@@ -30,7 +30,7 @@ public sealed class VirtualizingItemsControlPanelTests
 
                 await Assert.That(model.RowsValues).IsEqualTo(expected: 1);
 
-                await Assert.That(shown.List.VisibleRange)
+                await Assert.That(shown.List.ReportedRange.Constructed)
                     .IsEqualTo(expected: new ItemRange(First: 0, Count: 10 + buffer));
 
                 await Assert.That(Texts(shown: shown))
@@ -105,8 +105,8 @@ public sealed class VirtualizingItemsControlPanelTests
                 await Assert.That(model.RowsValues - before).IsEqualTo(expected: 2);
                 await Assert.That(model.Built.Count).IsEqualTo(expected: built);
 
-                await Assert.That(shown.List.VisibleRange)
-                    .IsEqualTo(expected: new ItemRange(First: 0, Count: 4 + buffer));
+                await Assert.That(shown.List.ReportedRange.Constructed)
+                    .IsEqualTo(expected: new ItemRange(First: 0, Count: 4));
 
                 await Assert.That(Texts(shown: shown))
                     .IsEquivalentTo(
@@ -115,24 +115,27 @@ public sealed class VirtualizingItemsControlPanelTests
             });
 
     // The four tests that follow are the tests of the default panel, with this panel.
-    // The range goes on after the last position, by the buffer. Thus, the position that a new key gets
-    // at the end of the list is in the range already.
+    // Each range that the control reports stops at the count. The positions that the control wants after
+    // the end of the list are a number, which only the slice of a collection source reads.
     [Test]
     [Arguments(0)]
     [Arguments(10)]
-    public Task TheRangeOfAListThatEndsInsideTheWindowGoesOnAfterTheEndByTheBuffer(int buffer) =>
+    public Task TheRangesOfAListThatEndsInsideTheWindowStayInsideTheList(int buffer) =>
         TestApplication.Run(
             test: async () =>
             {
                 using RecipeModel model = new(total: 5, retainedBeyondTheView: 512);
                 using ShownVirtual shown = Show(model: model, buffer: buffer);
 
-                await Assert.That(shown.List.VisibleRange)
-                    .IsEqualTo(expected: new ItemRange(First: 0, Count: 5 + buffer));
+                ReportedRange reported = shown.List.ReportedRange;
+
+                await Assert.That(reported.Visible).IsEqualTo(expected: new ItemRange(First: 0, Count: 5));
+                await Assert.That(reported.Constructed).IsEqualTo(expected: new ItemRange(First: 0, Count: 5));
+                await Assert.That(reported.Ahead).IsEqualTo(expected: buffer);
             });
 
-    // With no buffer, the range has no room after the last position. The first value has the new
-    // count. The control can report the new position only after the panel made a container for it.
+    // With no buffer, the control wants no position after the end of the list. The first value has the
+    // new count. The control can report the new position only after the panel made a container for it.
     // The second value has the row for that position.
     [Test]
     public Task AnAddedKeyAtAnEndThatShowsBringsTheCountAndThenTheRowWithNoBuffer() =>
@@ -153,9 +156,9 @@ public sealed class VirtualizingItemsControlPanelTests
                     .IsEquivalentTo(expected: Rows(first: 0, count: 6), ordering: CollectionOrdering.Matching);
             });
 
-    // With a buffer, the position of the new key is in the range already. Thus, the first value has
-    // its row, and no layout shows a placeholder. The control then reports the longer range, and the
-    // second value is the answer to it, with the same rows.
+    // With a buffer, the slice of the source goes on after the end of the list. Thus, the first value
+    // has the row of the new key, and no layout shows a placeholder. The control then reports the
+    // longer ranges, and the second value is the answer to them, with the same rows.
     [Test]
     public Task AnAddedKeyAtAnEndThatShowsComesWithItsRow() =>
         TestApplication.Run(
@@ -179,8 +182,8 @@ public sealed class VirtualizingItemsControlPanelTests
                     .IsEquivalentTo(expected: Rows(first: 0, count: 6), ordering: CollectionOrdering.Matching);
             });
 
-    // An empty list shows no position, and it reports its buffer. Thus, the first key comes with its
-    // row.
+    // An empty list shows no position, and the control wants the positions that come. Thus, the first
+    // key comes with its row.
     [Test]
     public Task TheFirstKeyOfAnEmptyListComesWithItsRow() =>
         TestApplication.Run(
@@ -189,7 +192,8 @@ public sealed class VirtualizingItemsControlPanelTests
                 using RecipeModel model = new(total: 0, retainedBeyondTheView: 512);
                 using ShownVirtual shown = Show(model: model, buffer: 10);
 
-                await Assert.That(shown.List.VisibleRange).IsEqualTo(expected: new ItemRange(First: 0, Count: 10));
+                await Assert.That(shown.List.ReportedRange)
+                    .IsEqualTo(expected: ReportedRange.Empty with { Ahead = 10 });
 
                 shown.WatchLayouts();
 

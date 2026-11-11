@@ -89,7 +89,7 @@ internal sealed class RecipeModel : IVirtualItemsSource, IDisposable
     public IOneWayBindableValue<VirtualRows> Rows => this.source.Rows;
 
     /// <inheritdoc />
-    public IOneWayToSourceBindableValue<ItemRange> VisibleRange => this.source.VisibleRange;
+    public IOneWayToSourceBindableValue<ReportedRange> Range => this.source.Range;
 
     /// <inheritdoc />
     public IOneWayBindableValue<Maybe<int>> ScrollRequest => this.source.ScrollRequest;

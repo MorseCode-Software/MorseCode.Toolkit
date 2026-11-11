@@ -32,11 +32,13 @@ internal sealed class ShownVirtual : IDisposable
     ///     Shows the control with its default panel, and runs its first layout.
     /// </summary>
     /// <param name="model">The model.</param>
-    /// <param name="buffer">The buffer of the control.</param>
+    /// <param name="buffer">
+    ///     The number of positions that the control adds on each side of the positions that show.
+    /// </param>
     public ShownVirtual(IVirtualItemsSource model, int buffer)
         : this(
             model: model,
-            buffer: buffer,
+            buffer: Maybe<int>.Some(value: buffer),
             panel: Maybe<Func<Panel>>.None,
             rowHeight: DefaultHeight,
             placeholderHeight: DefaultHeight)
@@ -47,12 +49,14 @@ internal sealed class ShownVirtual : IDisposable
     ///     Shows the control with a panel of the test, and runs its first layout.
     /// </summary>
     /// <param name="model">The model.</param>
-    /// <param name="buffer">The buffer of the control.</param>
+    /// <param name="buffer">
+    ///     The number of positions that the control adds on each side of the positions that show.
+    /// </param>
     /// <param name="panel">Makes the panel of the control.</param>
     public ShownVirtual(IVirtualItemsSource model, int buffer, Func<Panel> panel)
         : this(
             model: model,
-            buffer: buffer,
+            buffer: Maybe<int>.Some(value: buffer),
             panel: Maybe<Func<Panel>>.Some(value: panel),
             rowHeight: DefaultHeight,
             placeholderHeight: DefaultHeight)
@@ -64,13 +68,15 @@ internal sealed class ShownVirtual : IDisposable
     ///     heights, and runs its first layout.
     /// </summary>
     /// <param name="model">The model.</param>
-    /// <param name="buffer">The buffer of the control.</param>
+    /// <param name="buffer">
+    ///     The number of positions that the control adds on each side of the positions that show.
+    /// </param>
     /// <param name="rowHeight">The height of each row.</param>
     /// <param name="placeholderHeight">The height of each placeholder.</param>
     public ShownVirtual(IVirtualItemsSource model, int buffer, int rowHeight, int placeholderHeight)
         : this(
             model: model,
-            buffer: buffer,
+            buffer: Maybe<int>.Some(value: buffer),
             panel: Maybe<Func<Panel>>.None,
             rowHeight: rowHeight,
             placeholderHeight: placeholderHeight)
@@ -79,25 +85,29 @@ internal sealed class ShownVirtual : IDisposable
 
     private ShownVirtual(
         IVirtualItemsSource model,
-        int buffer,
+        Maybe<int> buffer,
         Maybe<Func<Panel>> panel,
         int rowHeight,
         int placeholderHeight)
     {
+        // An app cannot set the number of positions on each side. A test can, with the constructor that
+        // an app cannot call.
         this.List =
-            new VirtualizingItemsControl
-            {
-                Buffer = buffer,
-                ItemTemplate =
-                    new FuncDataTemplate<object>(
-                        build: (_, _) => this.BuildRowView(height: rowHeight),
-                        supportsRecycling: true),
-                PlaceholderTemplate =
-                    new FuncDataTemplate<object>(
-                        build: (_, _) => new TextBlock { Text = PlaceholderText, Height = placeholderHeight },
-                        supportsRecycling: true),
-                Source = model
-            };
+            buffer.Match(
+                onSome: static positions => new VirtualizingItemsControl(bufferFor: _ => positions),
+                onNone: static () => new VirtualizingItemsControl());
+
+        this.List.ItemTemplate =
+            new FuncDataTemplate<object>(
+                build: (_, _) => this.BuildRowView(height: rowHeight),
+                supportsRecycling: true);
+
+        this.List.PlaceholderTemplate =
+            new FuncDataTemplate<object>(
+                build: (_, _) => new TextBlock { Text = PlaceholderText, Height = placeholderHeight },
+                supportsRecycling: true);
+
+        this.List.Source = model;
 
         panel.MatchSome(onSome: make => this.List.ItemsPanel = new FuncTemplate<Panel?>(func: make));
 
@@ -110,6 +120,21 @@ internal sealed class ShownVirtual : IDisposable
     ///     Gets the control.
     /// </summary>
     public VirtualizingItemsControl List { get; }
+
+    /// <summary>
+    ///     Shows the control as an app makes it, and runs its first layout. The control sets the number
+    ///     of positions on each side.
+    /// </summary>
+    /// <param name="model">The model.</param>
+    /// <param name="rowHeight">The height of each row and of each placeholder.</param>
+    /// <returns>The shown control.</returns>
+    public static ShownVirtual AsAnAppMakesIt(IVirtualItemsSource model, int rowHeight) =>
+        new(
+            model: model,
+            buffer: Maybe<int>.None,
+            panel: Maybe<Func<Panel>>.None,
+            rowHeight: rowHeight,
+            placeholderHeight: rowHeight);
 
     /// <summary>
     ///     Gets the number of row views that the row template built.
