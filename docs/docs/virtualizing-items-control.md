@@ -40,7 +40,7 @@ halves are there:
 | Value | Direction | What it is |
 | --- | --- | --- |
 | `Rows` | view model to control | The rows for some of the positions, the position of the first, and the number of positions in the whole list. |
-| `VisibleRange` | control to view model | The positions on screen, with `Buffer` more on each side. |
+| `VisibleRange` | control to view model | The positions on screen, with `Buffer` more on each side. It can go past the end of the list. |
 | `ScrollRequest` | view model to control | The position that the view model wants to show, or none. |
 | `ScrollHandled` | control to view model | The position of the request that the control handled. |
 
@@ -103,6 +103,9 @@ IVirtualItemsSource source = output.CreateVirtualItemsSource(
     visibleRange: range,
     scrollRequests: scrollTo);
 ```
+
+The range can go past the end of your list, so give rows only for the positions that exist. See
+[The range goes past the end of the list](#the-range-goes-past-the-end-of-the-list).
 
 Both overloads take an optional `Stream<Unit>` of clears. See
 [Scroll from the view model](#scroll-from-the-view-model).
@@ -234,6 +237,21 @@ view model would build rows nobody can see. Make the placeholder about as high a
 
 If rows differ in height, use a typical height. Avalonia corrects its estimate as real rows
 arrive.
+
+### The range goes past the end of the list
+
+The range that the control reports does not stop at the last position. It carries on for `Buffer`
+more positions, and an empty list reports the first `Buffer` positions. This is deliberate. When a
+row is added at an end of the list that is on screen, its position is already inside the range, so
+the row arrives together with the new count. If the range stopped at the end, the new position
+would show a placeholder until the control had reported it. A list that is read at its end while
+rows arrive, such as a log, is the usual case.
+
+With `CreateVirtualItemsSource` on a collection you have nothing to do: a `Slice` past the end
+gives the keys that exist. If you build the rows yourself, do not read past your own count.
+
+With `Buffer` at 0 the range has no room after the last position, and a row that is added at a
+visible end shows a placeholder first.
 
 ### The control uses the style of `ListBox`
 

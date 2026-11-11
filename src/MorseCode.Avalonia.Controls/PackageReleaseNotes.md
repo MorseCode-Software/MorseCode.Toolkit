@@ -87,6 +87,16 @@ the row of a position changes. An item that is a Control, and a container that i
 ContentPresenter or a ContentControl, are replaced through the panel as before. A change of more
 than 512 rows is no longer a reset. Only a change of the count by more than 512 positions is.
 
+Changed: the range that the control reports no longer stops at the end of the list. It carries on
+past the last position for Buffer more positions, and an empty list reports the first Buffer
+positions. A row that is added at an end of the list that is on screen is then already inside the
+range, so it arrives together with the new count. Before, the new position showed a placeholder
+until the control had reported it. That includes the first row of an empty list, and a list that is
+read at its end while rows arrive, such as a log. CreateVirtualItemsSource on a collection needs no
+change, because a Slice past the end gives the keys that exist. A view model on the overload for
+its own rows must not read past its own count. With Buffer at 0 nothing changes. A Buffer of
+int.MaxValue now asks for every row. Before, the sum overflowed and the control asked for none.
+
 The package now depends on SodaFlow, SodaFlow.Bindable.ObjectModel, SodaFlow.Collections, and
 MorseCode.Mvvm 0.3.0 or later. To move from 0.2.x: build the source in the view model, expose it as
 an IVirtualItemsSource, and replace the bindings in the view with Source="{Binding Source}".
