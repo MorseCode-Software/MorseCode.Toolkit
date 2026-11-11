@@ -3,7 +3,7 @@
 Breaking: VirtualizingItemsControl is now bound through one property, Source, and the
 public properties TotalCount, Rows, VisibleRange, and ScrollRequest are gone. The type of
 Source is the new interface IVirtualItemsSource. It holds the SodaFlow bindable values Rows,
-ScrollRequest, VisibleRange, and ScrollHandled. The control attaches to all of them when Source is
+ScrollRequest, Range, and ScrollHandled. The control attaches to all of them when Source is
 set, so none of them can be left unbound. The two pairs, range with rows and request with report,
 are made together.
 
@@ -14,12 +14,12 @@ different instant. Before, the two arrived one after the other, and the list was
 
 New: CreateVirtualItemsSource, an extension method of the IOutput of a ViewModelBase from
 MorseCode.Mvvm. One overload takes a ReactiveCollection, a function that builds the row for a key,
-and a Stream of scroll positions. It slices the collection with the range that the control reports,
-maps each key in the slice to a row, and counts the keys. It returns an IVirtualItemsSource, and it
-registers the rows with the output, so disposing of the view model releases them. The other
-overload is for a view model that makes its own rows. It takes a Cell of VirtualRows, which carries
-their count, a CellSink that receives the range that the control reports, and a Stream of scroll
-positions. Both take an optional Stream of clears that withdraw a scroll request.
+and a Stream of scroll positions. It slices the collection with the range that the control wants
+rows for, maps each key in the slice to a row, and counts the keys. It returns an
+IVirtualItemsSource, and it registers the rows with the output, so disposing of the view model
+releases them. The other overload is for a view model that makes its own rows. It takes a Cell of
+VirtualRows, which carries their count, a CellSink that receives what the control reports, and a
+Stream of scroll positions. Both take an optional Stream of clears that withdraw a scroll request.
 
 The scroll protocol is also new. The control no longer writes none to ScrollRequest. It reports
 the position that it handled in ScrollHandled, and the view model clears a request only if it is
@@ -87,15 +87,27 @@ the row of a position changes. An item that is a Control, and a container that i
 ContentPresenter or a ContentControl, are replaced through the panel as before. A change of more
 than 512 rows is no longer a reset. Only a change of the count by more than 512 positions is.
 
-Changed: the range that the control reports no longer stops at the end of the list. It carries on
-past the last position for Buffer more positions, and an empty list reports the first Buffer
-positions. A row that is added at an end of the list that is on screen is then already inside the
-range, so it arrives together with the new count. Before, the new position showed a placeholder
-until the control had reported it. That includes the first row of an empty list, and a list that is
-read at its end while rows arrive, such as a log. CreateVirtualItemsSource on a collection needs no
-change, because a Slice past the end gives the keys that exist. A view model on the overload for
-its own rows must not read past its own count. With Buffer at 0 nothing changes. A Buffer of
-int.MaxValue now asks for every row. Before, the sum overflowed and the control asked for none.
+Breaking: the Buffer property is gone. The control now decides how far ahead of the screen it asks
+for rows: one screen of positions on each side, and never fewer than 10. A scroll shows no
+placeholder when its step is no longer than the positions on one side, so a fixed number was right
+for one window size only. With 20 rows on screen and Buffer at 10, every step of one screen showed
+placeholders. Remove Buffer from your XAML.
+
+Breaking: the control reports a ReportedRange where it reported an ItemRange, and the value of the
+source is named Range, where it was VisibleRange. A ReportedRange holds two ranges from the same
+instant. Visible is the positions on screen, where a row that is only partly on screen counts, so a
+view model can now tell what the user sees. Constructed is the positions that the control wants
+rows for. Both stay inside the list. On the overload for a view model with its own rows, the
+parameter visibleRange is now reportedRange, a CellSink of ReportedRange, and the view model builds
+rows for Constructed. The overloads for a collection take an optional reportedRange, for a view
+model that wants to read Visible.
+
+A row that is added at an end of the list that is on screen no longer shows as a placeholder first.
+A source made from a collection slices past the end of the list by the positions that the control
+wants there, so the row arrives together with the new count. That includes the first row of an
+empty list, and a list that is read at its end while rows arrive, such as a log. For a view model
+with its own rows, the control now reports as soon as it sees a new count, where it waited for a
+container before. With the default panel the row then arrives before the next layout.
 
 The package now depends on SodaFlow, SodaFlow.Bindable.ObjectModel, SodaFlow.Collections, and
 MorseCode.Mvvm 0.3.0 or later. To move from 0.2.x: build the source in the view model, expose it as
