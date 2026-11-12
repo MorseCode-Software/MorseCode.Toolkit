@@ -9,7 +9,7 @@
         "",
         "TargetFramework is pinned because the projects multi-target. Without pinning, DocFX builds every",
         "target and emits duplicate members. It is net8.0, the one target that all three have:",
-        "MorseCode.Avalonia.Controls targets net8.0 and net10.0, as Avalonia 12 does, and references",
+        "MorseCode.Controls.UI.Avalonia targets net8.0 and net10.0, as Avalonia 12 does, and references",
         "MorseCode.Mvvm. DocFX must see the same target for a project and for the reference to it. When",
         "the Controls entry was separate and pinned to net8.0 while Mvvm had no such target, DocFX",
         "reported that it found a project reference without a matching metadata reference."
@@ -20,7 +20,7 @@
           "files": [
             "MorseCode.StagedConstruction/MorseCode.StagedConstruction.csproj",
             "MorseCode.Mvvm/MorseCode.Mvvm.csproj",
-            "MorseCode.Avalonia.Controls/MorseCode.Avalonia.Controls.csproj"
+            "MorseCode.Controls.UI.Avalonia/MorseCode.Controls.UI.Avalonia.csproj"
           ]
         }
       ],

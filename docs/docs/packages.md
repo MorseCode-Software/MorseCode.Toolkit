@@ -10,7 +10,7 @@ The packages version independently, and all of them are pre-1.0.
 | --- | --- | --- |
 | `MorseCode.Mvvm` | You write view models on SodaFlow. | `SodaFlow.Bindable.ObjectModel`, `MorseCode.StagedConstruction` |
 | `MorseCode.StagedConstruction` | You want to build immutable objects in ordered stages. | Nothing |
-| `MorseCode.Avalonia.Controls` | Your views are Avalonia, and bind to view models on SodaFlow. | `Avalonia`, `SodaFlow`, `SodaFlow.Bindable.ObjectModel`, `SodaFlow.Collections`, `SodaFlow.Functional`, `MorseCode.Mvvm` |
+| `MorseCode.Controls.UI.Avalonia` | Your views are Avalonia, and bind to view models on SodaFlow. | `Avalonia`, `SodaFlow`, `SodaFlow.Bindable.ObjectModel`, `SodaFlow.Collections`, `SodaFlow.Functional`, `MorseCode.Mvvm` |
 | `MorseCode.Analyzers` | You want the build to report code that breaks the conventions MorseCode writes C# with. | Nothing |
 
 ## MorseCode.Mvvm
@@ -40,16 +40,17 @@ was written for objects whose properties are SodaFlow graphs. See
 
 The package carries its own analyzer, which reports a continuation that doesn't return the result of
 its handle. It runs in every project that has the package anywhere in its dependencies, so a project
-that references `MorseCode.Mvvm` or `MorseCode.Avalonia.Controls` gets it too, with nothing to
+that references `MorseCode.Mvvm` or `MorseCode.Controls.UI.Avalonia` gets it too, with nothing to
 install. See [Continuation rules](continuation-rules.md).
 
-## MorseCode.Avalonia.Controls
+## MorseCode.Controls.UI.Avalonia
 
 ```bash
-dotnet add package MorseCode.Avalonia.Controls
+dotnet add package MorseCode.Controls.UI.Avalonia
 ```
 
-Avalonia controls for views that bind to view models on SodaFlow. It holds:
+Avalonia controls for views that bind to view models on SodaFlow. Up to 0.2.1 this package was
+`MorseCode.Avalonia.Controls`. Its id, its assembly, and its namespace changed in 0.3.0. It holds:
 
 - `ComboBox`, a drop-in replacement for Avalonia's, which applies a new list and a new selected
   item together. Use it in its place. See [ComboBox](combo-box.md).
@@ -89,7 +90,7 @@ the packages of a project that uses it. It needs the .NET 7 SDK or later, or Vis
 ## Trimming and native AOT
 
 From 0.3.0, the .NET 8 builds of `MorseCode.StagedConstruction` and `MorseCode.Mvvm`, and both
-builds of `MorseCode.Avalonia.Controls`, are marked as compatible with trimming and native AOT. The
+builds of `MorseCode.Controls.UI.Avalonia`, are marked as compatible with trimming and native AOT. The
 build of each package runs the .NET trim, AOT, and single-file analyzers and fails on any warning,
 so code that needs reflection can't reach a release unnoticed. The .NET Framework, .NET 6, and .NET
 Standard builds aren't marked, because those analyzers don't exist for them.
@@ -103,7 +104,7 @@ them reports a few warnings from inside `SodaFlow.Core` 5, where it passes a val
 A package of this repository states its dependency on another package of this repository, and from
 0.3.0 on its dependency on a SodaFlow package, as a range that ends before the next breaking
 version. `MorseCode.Mvvm` depends on `MorseCode.StagedConstruction` this way, and
-`MorseCode.Avalonia.Controls` depends on `MorseCode.Mvvm` this way from 0.3.0 on.
+`MorseCode.Controls.UI.Avalonia` depends on `MorseCode.Mvvm` this way from 0.3.0 on.
 
 On its own, NuGet never picks a version past the end of a range. If your project asks for one
 directly, NuGet uses it and warns with NU1608, which a build that treats warnings as errors fails
