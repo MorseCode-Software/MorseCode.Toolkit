@@ -385,55 +385,159 @@ public sealed class VirtualItemsSourceExtensionsTests
         using ViewModelBase owner = viewModel;
 
         ItemRange constructed = new(First: 5, Count: 15);
-        source.Range.Value = new ReportedRange(Visible: new ItemRange(First: 10, Count: 5), Constructed: constructed);
+        source.Range.Value = Reported(visible: new ItemRange(First: 10, Count: 5), constructed: constructed);
 
         List<VirtualRows> values = [];
         IListener listener = source.Rows.Cell.Updates().Listen(handler: values.Add);
 
-        source.Range.Value = new ReportedRange(Visible: new ItemRange(First: 11, Count: 5), Constructed: constructed);
+        // A different row shows, and then a different amount of a row.
+        ReportedRange next = Reported(visible: new ItemRange(First: 11, Count: 5), constructed: constructed);
+        source.Range.Value = next;
+        source.Range.Value = next with { FirstVisibilityAmount = 0.5 };
         listener.Unlisten();
 
         await Assert.That(values).IsEmpty();
     }
 
+    // The source of a collection has the type of the rows. The view model reads the report of the
+    // control, the rows that the control wants, and the rows that show.
     [Test]
-    public async Task ACollectionSourceGivesTheReportOfTheControlToTheCellOfTheViewModel()
+    public async Task ACollectionSourceGivesTheViewModelTheReportAndItsRows()
     {
-        CellSink<ReportedRange> byPosition = Cell.CreateSink(initialValue: ReportedRange.Empty);
-        CellSink<ReportedRange> byKey = Cell.CreateSink(initialValue: ReportedRange.Empty);
-
-        (IVirtualItemsSource source, ViewModelBase viewModel) =
+        (IVirtualItemsSource<VirtualRow> source, ViewModelBase viewModel) =
             Make(
-                make: output =>
+                make: static output =>
                     output.CreateVirtualItemsSource(
                         collection: Collection(total: 100),
                         project: static key => new VirtualRow(Position: key),
-                        scrollRequests: Stream.CreateSink<int>(),
-                        reportedRange: byPosition));
+                        scrollRequests: Stream.CreateSink<int>()));
 
-        (IVirtualItemsSource keySource, ViewModelBase keyViewModel) =
+        (IVirtualItemsSource<VirtualRow> keySource, ViewModelBase keyViewModel) =
             Make(
-                make: output =>
+                make: static output =>
                     output.CreateVirtualItemsSourceByKey(
                         collection: Collection(total: 100),
                         project: static key => new VirtualRow(Position: key),
-                        scrollRequests: Stream.CreateSink<int>(),
-                        reportedRange: byKey));
+                        scrollRequests: Stream.CreateSink<int>()));
 
         using ViewModelBase owner = viewModel;
         using ViewModelBase keyOwner = keyViewModel;
 
         ReportedRange reported =
-            new(Visible: new ItemRange(First: 10, Count: 5), Constructed: new ItemRange(First: 5, Count: 15));
+            new(
+                Visible: new ItemRange(First: 10, Count: 5),
+                Constructed: new ItemRange(First: 5, Count: 15),
+                FirstVisibilityAmount: 0.25,
+                LastVisibilityAmount: 0.75);
 
         source.Range.Value = reported;
         keySource.Range.Value = reported;
 
-        await Assert.That(byPosition.Sample()).IsEqualTo(expected: reported);
-        await Assert.That(byKey.Sample()).IsEqualTo(expected: reported);
-        await Assert.That(source.Rows.Value.Offset).IsEqualTo(expected: 5);
-        await Assert.That(source.Rows.Value.Items.Count).IsEqualTo(expected: 15);
-        await Assert.That(keySource.Rows.Value.Items.Count).IsEqualTo(expected: 15);
+        await Assert.That(source.Reported.Sample()).IsEqualTo(expected: reported);
+        await Assert.That(keySource.Reported.Sample()).IsEqualTo(expected: reported);
+        await Assert.That(source.FirstVisibilityAmount.Sample()).IsEqualTo(expected: 0.25);
+        await Assert.That(source.LastVisibilityAmount.Sample()).IsEqualTo(expected: 0.75);
+        await Assert.That(keySource.FirstVisibilityAmount.Sample()).IsEqualTo(expected: 0.25);
+        await Assert.That(keySource.LastVisibilityAmount.Sample()).IsEqualTo(expected: 0.75);
+
+        // The constructed rows are the list that the control gets, and not a copy.
+        await Assert.That(source.ConstructedRows.Sample()).IsSameReferenceAs(expected: source.Rows.Value.Items);
+
+        await Assert.That(source.ConstructedRows.Sample().Select(selector: static row => row.Position))
+            .IsEquivalentTo(expected: Enumerable.Range(start: 5, count: 15), ordering: CollectionOrdering.Matching);
+
+        await Assert.That(source.VisibleRows.Sample().Select(selector: static row => row.Position))
+            .IsEquivalentTo(expected: [10, 11, 12, 13, 14], ordering: CollectionOrdering.Matching);
+
+        await Assert.That(keySource.VisibleRows.Sample().Select(selector: static row => row.Position))
+            .IsEquivalentTo(expected: [10, 11, 12, 13, 14], ordering: CollectionOrdering.Matching);
+    }
+
+    // The control reports at each step of a scroll. The rows that show change only when a different
+    // row shows.
+    [Test]
+    public async Task TheRowsThatShowChangeOnlyWhenADifferentRowShows()
+    {
+        (IVirtualItemsSource<VirtualRow> source, ViewModelBase viewModel) =
+            Make(
+                make: static output =>
+                    output.CreateVirtualItemsSource(
+                        collection: Collection(total: 100),
+                        project: static key => new VirtualRow(Position: key),
+                        scrollRequests: Stream.CreateSink<int>()));
+
+        using ViewModelBase owner = viewModel;
+
+        ItemRange visible = new(First: 10, Count: 5);
+        source.Range.Value = Reported(visible: visible, constructed: new ItemRange(First: 5, Count: 15));
+
+        List<IReadOnlyList<VirtualRow>> values = [];
+        List<double> amounts = [];
+        List<double> lastAmounts = [];
+        IListener listener = source.VisibleRows.Updates().Listen(handler: values.Add);
+        IListener amountListener = source.FirstVisibilityAmount.Updates().Listen(handler: amounts.Add);
+        IListener lastAmountListener = source.LastVisibilityAmount.Updates().Listen(handler: lastAmounts.Add);
+
+        // A different amount of the first row shows. The cell of the amount changes, and the rows do not.
+        source.Range.Value =
+            Reported(visible: visible, constructed: new ItemRange(First: 5, Count: 15)) with
+            {
+                FirstVisibilityAmount = 0.5
+            };
+
+        // The slice moves, and the rows that show stay. The amount is the same number.
+        source.Range.Value =
+            Reported(visible: visible, constructed: new ItemRange(First: 4, Count: 17)) with
+            {
+                FirstVisibilityAmount = 0.5
+            };
+
+        await Assert.That(values).IsEmpty();
+        await Assert.That(amounts).IsEquivalentTo(expected: [0.5], ordering: CollectionOrdering.Matching);
+        await Assert.That(lastAmounts).IsEmpty();
+
+        // A different row shows.
+        source.Range.Value =
+            Reported(visible: new ItemRange(First: 11, Count: 5), constructed: new ItemRange(First: 4, Count: 17));
+
+        listener.Unlisten();
+        amountListener.Unlisten();
+        lastAmountListener.Unlisten();
+
+        await Assert.That(values.Count).IsEqualTo(expected: 1);
+
+        await Assert.That(values[0].Select(selector: static row => row.Position))
+            .IsEquivalentTo(expected: [11, 12, 13, 14, 15], ordering: CollectionOrdering.Matching);
+    }
+
+    // The report of the control and the rows of the slice can be from different instants. A report of
+    // positions that the rows do not have gives the rows that there are.
+    [Test]
+    public async Task TheRowsThatShowStopAtTheRowsThatTheSourceHas()
+    {
+        (IVirtualItemsSource<VirtualRow> source, ViewModelBase viewModel) =
+            Make(
+                make: static output =>
+                    output.CreateVirtualItemsSource(
+                        collection: Collection(total: 12),
+                        project: static key => new VirtualRow(Position: key),
+                        scrollRequests: Stream.CreateSink<int>()));
+
+        using ViewModelBase owner = viewModel;
+
+        source.Range.Value =
+            Reported(visible: new ItemRange(First: 10, Count: 5), constructed: new ItemRange(First: 5, Count: 15));
+
+        await Assert.That(source.VisibleRows.Sample().Select(selector: static row => row.Position))
+            .IsEquivalentTo(expected: [10, 11], ordering: CollectionOrdering.Matching);
+
+        // A view model can make a report in a test, and the positions that show can start before the
+        // rows. Positions 3 and 4 have no row then.
+        source.Range.Value =
+            Reported(visible: new ItemRange(First: 3, Count: 5), constructed: new ItemRange(First: 5, Count: 7));
+
+        await Assert.That(source.VisibleRows.Sample().Select(selector: static row => row.Position))
+            .IsEquivalentTo(expected: [5, 6, 7], ordering: CollectionOrdering.Matching);
     }
 
     [Test]
@@ -501,7 +605,13 @@ public sealed class VirtualItemsSourceExtensionsTests
 
     // A report of a control with no positions on each side: it wants rows for the positions that show.
     private static ReportedRange Reported(int first, int count) =>
-        new(Visible: new ItemRange(First: first, Count: count), Constructed: new ItemRange(First: first, Count: count));
+        Reported(
+            visible: new ItemRange(First: first, Count: count),
+            constructed: new ItemRange(First: first, Count: count));
+
+    // A report in which each row that shows is there in full.
+    private static ReportedRange Reported(ItemRange visible, ItemRange constructed) =>
+        new(Visible: visible, Constructed: constructed, FirstVisibilityAmount: 1.0, LastVisibilityAmount: 1.0);
 
     // The value that the construction returns carries the result and the view model out.
     private static (T Result, ViewModelBase ViewModel) Make<T>(Func<ViewModelBase.IOutput, T> make) =>

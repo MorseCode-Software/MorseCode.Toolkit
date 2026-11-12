@@ -55,6 +55,7 @@
     <ItemGroup>
         <Compile Include="ComboBox.cs"/>
         <Compile Include="IVirtualItemsSource.cs"/>
+        <Compile Include="IVirtualItemsSource.Generic.cs"/>
         <Compile Include="ItemChange.cs"/>
         <Compile Include="ItemRange.cs"/>
         <Compile Include="ReportedRange.cs"/>
@@ -68,6 +69,7 @@
         <Compile Include="VirtualRows.cs"/>
         <Compile Include="VirtualItemList.cs"/>
         <Compile Include="VirtualItemsSource.cs"/>
+        <Compile Include="VirtualItemsSource.Generic.cs"/>
         <Compile Include="VirtualItemsSourceExtensions.cs"/>
     </ItemGroup>
 

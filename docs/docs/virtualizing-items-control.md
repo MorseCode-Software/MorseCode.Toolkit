@@ -91,8 +91,8 @@ Make a new list for each change.
 
 ### What the control reports
 
-The control writes a `ReportedRange` to the source. It holds two ranges, which always come from the
-same instant:
+The control writes a `ReportedRange` to the source. Everything in it comes from the same instant.
+It holds two ranges:
 
 | Range | What it is |
 | --- | --- |
@@ -100,23 +100,49 @@ same instant:
 | `Constructed` | The positions that the control wants rows for: the visible ones, and more on each side, so that a scroll finds its rows ready. |
 
 Both ranges stay inside the list. `CreateVirtualItemsSource` builds the rows of `Constructed` for
-you. If your view model wants to know what the user sees, hand it a cell of your own and read
-`Visible` from it:
+you. The source that it returns carries the type of your rows, and your view model can read the
+report and the rows from it:
 
 ```csharp
-CellSink<ReportedRange> reported = Cell.CreateSink(ReportedRange.Empty);
-
-IVirtualItemsSource source = output.CreateVirtualItemsSource(
+IVirtualItemsSource<RowViewModel> source = output.CreateVirtualItemsSource(
     collection: collection,
     project: key => new RowViewModel(key),
-    scrollRequests: scrollTo,
-    reportedRange: reported);
+    scrollRequests: scrollTo);
 
-Cell<ItemRange> onScreen = reported.Map(static range => range.Visible);
+Cell<IReadOnlyList<RowViewModel>> onScreen = source.VisibleRows;
+Cell<double> firstRowShare = source.FirstVisibilityAmount;
+Cell<double> lastRowShare = source.LastVisibilityAmount;
+Cell<IReadOnlyList<RowViewModel>> built = source.ConstructedRows;
+Cell<ReportedRange> reported = source.Reported;
 ```
 
-`Visible` is exact with the default panel. A panel that makes containers for rows that are not on
-screen reports those too.
+| Member | What it is |
+| --- | --- |
+| `VisibleRows` | The rows on screen, in order. It changes only when a different row shows. |
+| `FirstVisibilityAmount` | How much of the first of `VisibleRows` is on screen, from 0.0 to 1.0. |
+| `LastVisibilityAmount` | How much of the last of `VisibleRows` is on screen, from 0.0 to 1.0. |
+| `ConstructedRows` | The rows that the control was given. It is the list in `Rows`, with the type of your rows. |
+| `Reported` | The last `ReportedRange`. It changes at every step of a scroll. |
+
+Expose the source to the view as an `IVirtualItemsSource`. The typed members are for the view model.
+The source can hold more rows than `ConstructedRows`, because `Map` keeps the row of a key that has
+scrolled out. If you need every row that exists, collect them in `project` and drop them in
+`onEvicted`.
+
+`Visible` holds only rows that are really on screen. If a parent clips part of the list, the rows
+it hides are left out, even though the panel can still keep containers for them. A panel other than
+the default one is read as a list from top to bottom.
+
+The rows sit in one line along the scroll direction, so every visible row is fully on screen
+except possibly the first and the last. The report carries those two as `FirstVisibilityAmount` and
+`LastVisibilityAmount`, each from 0.0 for none of the row to 1.0 for all of it. A row that is half
+scrolled out gives 0.5. When a single row is visible, the two amounts are the same number. The
+typed source has a cell for each of them, as shown above.
+
+An amount is measured along the scroll direction, against the part of the list that nothing above
+it clips. Because the amounts change with every pixel, the control reports at every step of a
+scroll. The two ranges change far less often. `CreateVirtualItemsSource` on a collection sends no
+rows for a report that leaves `Constructed` as it was.
 
 ### When the rows do not come from a collection
 
@@ -134,7 +160,12 @@ IVirtualItemsSource source = output.CreateVirtualItemsSource(
 ```
 
 Build rows for `Constructed`, and stop at your own count. The range is inside the list as the
-control knew it, and your list can have changed since.
+control knew it, and your list can have changed since. Calm it first, or you will build the rows
+again at every step of a scroll:
+
+```csharp
+Cell<ItemRange> constructed = reported.Map(static range => range.Constructed).Calm();
+```
 
 ### When every row already exists
 

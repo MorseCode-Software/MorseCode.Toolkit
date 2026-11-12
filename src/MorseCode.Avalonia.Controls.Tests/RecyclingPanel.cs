@@ -24,6 +24,37 @@ internal sealed class RecyclingPanel : VirtualizingPanel
     // The container of each position that has one.
     private readonly Dictionary<int, Control> containers = [];
 
+    // Makes the container of a position from the generator, the item, the position, and the recycle key.
+    private readonly Func<ItemContainerGenerator, object?, int, object?, Control> createContainer;
+
+    /// <summary>
+    ///     Makes a panel that gets each container from the items control.
+    /// </summary>
+    public RecyclingPanel()
+        : this(
+            createContainer: static (generator, item, index, recycleKey) =>
+                generator.CreateContainer(item: item, index: index, recycleKey: recycleKey))
+    {
+    }
+
+    /// <summary>
+    ///     Makes a panel that gets each container from a function of the test. Thus, a test can
+    ///     give the control a container of a type in which the control cannot change the item.
+    /// </summary>
+    /// <param name="makeContainer">Makes each container.</param>
+    public RecyclingPanel(Func<Control> makeContainer)
+        : this(createContainer: (_, _, _, _) => makeContainer())
+    {
+    }
+
+    private RecyclingPanel(Func<ItemContainerGenerator, object?, int, object?, Control> createContainer) =>
+        this.createContainer = createContainer;
+
+    /// <summary>
+    ///     Gets the number of containers that the panel recycled.
+    /// </summary>
+    public int Recycled { get; private set; }
+
     private ItemContainerGenerator Generator =>
         this.ItemContainerGenerator
         ?? throw new InvalidOperationException(message: "The panel is not in an items control.");
@@ -118,7 +149,7 @@ internal sealed class RecyclingPanel : VirtualizingPanel
         // The items of the tests are not controls, thus each item needs a container.
         _ = this.Generator.NeedsContainer(item: item, index: index, recycleKey: out object? recycleKey);
 
-        Control container = this.Generator.CreateContainer(item: item, index: index, recycleKey: recycleKey);
+        Control container = this.createContainer(arg1: this.Generator, arg2: item, arg3: index, arg4: recycleKey);
 
         this.Generator.PrepareItemContainer(container: container, item: item, index: index);
         this.AddInternalChild(control: container);
@@ -137,6 +168,7 @@ internal sealed class RecyclingPanel : VirtualizingPanel
 
         this.Generator.ClearItemContainer(container: container);
         this.RemoveInternalChild(child: container);
+        this.Recycled++;
     }
 
     private void RecycleFrom(int first)

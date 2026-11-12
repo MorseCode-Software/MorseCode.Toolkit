@@ -6,6 +6,7 @@ using Avalonia.Controls.Presenters;
 using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Templates;
 using Avalonia.Interactivity;
+using Avalonia.Layout;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using JetBrains.Annotations;
@@ -104,9 +105,6 @@ public class VirtualizingItemsControl : ItemsControl
     // True from a request to report until the dispatcher runs the report.
     private bool isReportPending;
 
-    // True from a report that found the layout of the panel pending until that layout ran.
-    private bool isReportWaitingForLayout;
-
     // True from a request to scroll until the dispatcher runs it.
     private bool isScrollPending;
 
@@ -148,6 +146,10 @@ public class VirtualizingItemsControl : ItemsControl
         this.ItemsSource = this.items;
         this.ContainerPrepared += (_, _) => this.RequestReport();
         this.ContainerClearing += (_, _) => this.RequestReport();
+
+        // The amount of a row that shows changes with each scroll and with each change of a size, and no
+        // container changes then. A layout is the one event that each of those has.
+        this.LayoutUpdated += (_, _) => this.RequestReport();
     }
 
     /// <summary>
@@ -534,10 +536,9 @@ public class VirtualizingItemsControl : ItemsControl
     {
         this.isReportPending = false;
 
+        // The layout that is pending brings the next report.
         if (this.IsLayoutPending())
         {
-            this.ReportAfterLayout();
-
             return;
         }
 
@@ -554,30 +555,6 @@ public class VirtualizingItemsControl : ItemsControl
     // at the next layout. The control cannot read the range of such a panel, thus its report waits for
     // that layout.
     private bool IsLayoutPending() => this.ItemsPanelRoot is { IsMeasureValid: false } and not VirtualizingStackPanel;
-
-    private void ReportAfterLayout()
-    {
-        if (this.isReportWaitingForLayout)
-        {
-            return;
-        }
-
-        this.isReportWaitingForLayout = true;
-        this.LayoutUpdated += this.OnLayoutUpdated;
-    }
-
-    private void OnLayoutUpdated(object? sender, EventArgs e)
-    {
-        // Avalonia raises the event for each layout of the window, and the panel can be invalid again.
-        if (this.IsLayoutPending())
-        {
-            return;
-        }
-
-        this.LayoutUpdated -= this.OnLayoutUpdated;
-        this.isReportWaitingForLayout = false;
-        this.RequestReport();
-    }
 
     // Finds the positions that Avalonia shows now, and the positions that the control wants rows for.
     private ReportedRange Measure()
@@ -622,21 +599,117 @@ public class VirtualizingItemsControl : ItemsControl
         }
 
         // A container can be older than the count. Each range stays inside the list.
-        int visibleEnd = Math.Min(val1: count, val2: last + 1);
-        int visibleStart = Math.Min(val1: first, val2: visibleEnd);
-        int buffer = Math.Max(val1: 0, val2: this.bufferFor(arg: visibleEnd - visibleStart));
+        int containersEnd = Math.Min(val1: count, val2: last + 1);
+        int containersStart = Math.Min(val1: first, val2: containersEnd);
+        int buffer = Math.Max(val1: 0, val2: this.bufferFor(arg: containersEnd - containersStart));
 
         // The sum stops at the largest number.
-        int wantedEnd = buffer > int.MaxValue - visibleEnd ? int.MaxValue : visibleEnd + buffer;
-        int start = Math.Max(val1: 0, val2: visibleStart - buffer);
+        int wantedEnd = buffer > int.MaxValue - containersEnd ? int.MaxValue : containersEnd + buffer;
+        int start = Math.Max(val1: 0, val2: containersStart - buffer);
         int end = Math.Min(val1: count, val2: wantedEnd);
 
+        (ItemRange visible, double firstAmount, double lastAmount) =
+            this.PositionsThatShow(first: containersStart, end: containersEnd);
+
         return new ReportedRange(
-            Visible: new ItemRange(First: visibleStart, Count: visibleEnd - visibleStart),
-            Constructed: new ItemRange(First: start, Count: end - start))
+            Visible: visible,
+            Constructed: new ItemRange(First: start, Count: end - start),
+            FirstVisibilityAmount: firstAmount,
+            LastVisibilityAmount: lastAmount)
         {
             Ahead = wantedEnd - end
         };
+    }
+
+    // Finds the positions with a container that are in the viewport. It also finds how much of the
+    // first and of the last of them is in it. The panel can keep a container for a row that a control
+    // above the list hides. Thus, a container is not always a row that shows. The rows are in one line
+    // in the direction of the scroll, thus each row between the first and the last shows in full.
+    private (ItemRange Visible, double First, double Last) PositionsThatShow(int first, int end)
+    {
+        if (this.ItemsPanelRoot is not { } panel)
+        {
+            return (Visible: ItemRange.Empty, First: 0.0, Last: 0.0);
+        }
+
+        Rect viewport = ViewportOf(visual: panel);
+
+        // A panel that is not the default one is read as a list from top to bottom.
+        bool isHorizontal = panel is VirtualizingStackPanel { Orientation: Orientation.Horizontal };
+
+        double firstAmount = 0.0;
+
+        while (first < end && (firstAmount = Amount(position: first)) <= 0.0)
+        {
+            first++;
+        }
+
+        if (first == end)
+        {
+            return (Visible: ItemRange.Empty, First: 0.0, Last: 0.0);
+        }
+
+        double lastAmount = firstAmount;
+
+        while (end - 1 > first && (lastAmount = Amount(position: end - 1)) <= 0.0)
+        {
+            end--;
+        }
+
+        // One position is the first and the last.
+        return (
+            Visible: new ItemRange(First: first, Count: end - first),
+            First: firstAmount,
+            Last: end - 1 == first ? firstAmount : lastAmount);
+
+        double Amount(int position) =>
+            this.AmountAt(position: position, viewport: viewport, isHorizontal: isHorizontal);
+    }
+
+    // A position with no container at this instant gets its container at the next layout, and that
+    // layout brings the next report.
+    private double AmountAt(int position, Rect viewport, bool isHorizontal) =>
+        this.ContainerFromIndex(index: position) is { } container
+            ? AmountOf(bounds: container.Bounds, viewport: viewport, isHorizontal: isHorizontal)
+            : 1.0;
+
+    // The part of a container, in the direction of the scroll, that is in the viewport.
+    private static double AmountOf(Rect bounds, Rect viewport, bool isHorizontal)
+    {
+        (double start, double length, double from, double to) =
+            isHorizontal
+                ? (bounds.X, bounds.Width, viewport.X, viewport.Right)
+                : (bounds.Y, bounds.Height, viewport.Y, viewport.Bottom);
+
+        if (length <= 0)
+        {
+            return 0.0;
+        }
+
+        double shown = Math.Min(val1: start + length, val2: to) - Math.Max(val1: start, val2: from);
+
+        return Math.Clamp(value: shown / length, min: 0.0, max: 1.0);
+    }
+
+    // The part of a visual that the visuals above it do not clip, in the coordinates of the visual. This
+    // is the effective viewport of Avalonia, which the layout manager gives only in an event. The
+    // control needs it at each report, thus the control finds it then and keeps no copy. A render
+    // transform of a visual above the list is not used.
+    private static Rect ViewportOf(Visual visual)
+    {
+        if (visual.GetVisualParent() is not { } parent)
+        {
+            return new Rect(size: visual.Bounds.Size);
+        }
+
+        Rect inParent = ViewportOf(visual: parent);
+
+        if (parent.ClipToBounds)
+        {
+            inParent = inParent.Intersect(rect: new Rect(size: parent.Bounds.Size));
+        }
+
+        return inParent.Translate(offset: -visual.Bounds.Position);
     }
 
     // No container, with positions to show, means that the control is not laid out. This is also the
@@ -659,8 +732,9 @@ public class VirtualizingItemsControl : ItemsControl
         {
             int wanted = Math.Min(val1: count, val2: buffer);
 
-            return new ReportedRange(Visible: ItemRange.Empty, Constructed: new ItemRange(First: 0, Count: wanted))
+            return ReportedRange.Empty with
             {
+                Constructed = new ItemRange(First: 0, Count: wanted),
                 Ahead = buffer - wanted
             };
         }
