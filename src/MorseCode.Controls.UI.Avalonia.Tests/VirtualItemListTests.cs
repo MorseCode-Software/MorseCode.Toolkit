@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Linq;
 using System.Threading.Tasks;
+using MorseCode.Controls.ViewModels;
 using TUnit.Assertions;
 using TUnit.Assertions.Enums;
 using TUnit.Assertions.Extensions;

@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using JetBrains.Annotations;
 using SodaFlow;
 
-namespace MorseCode.Controls.UI.Avalonia;
+namespace MorseCode.Controls.ViewModels;
 
 /// <summary>
 ///     A source with the rows that the view model can read. The view gets it as an

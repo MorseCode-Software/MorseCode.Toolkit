@@ -7,6 +7,7 @@ using Avalonia.Controls.Presenters;
 using Avalonia.Controls.Templates;
 using Avalonia.Layout;
 using Avalonia.VisualTree;
+using MorseCode.Controls.ViewModels;
 using SodaFlow.Functional;
 
 namespace MorseCode.Controls.UI.Avalonia.Tests;

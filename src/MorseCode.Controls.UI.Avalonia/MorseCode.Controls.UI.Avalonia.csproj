@@ -37,40 +37,30 @@
 
     <!--
         MaybeConverter converts the Maybe of SodaFlow view models. The control reads and writes the
-        bindable values of SodaFlow, and the builders of its source use the cells, the streams, and
-        the collections.
+        bindable values of SodaFlow.
     -->
     <ItemGroup>
-        <PackageReference Include="SodaFlow" Version="5.0.1"/>
         <PackageReference Include="SodaFlow.Bindable.ObjectModel" Version="4.0.0"/>
-        <PackageReference Include="SodaFlow.Collections" Version="2.0.0"/>
         <PackageReference Include="SodaFlow.Functional" Version="3.0.2"/>
     </ItemGroup>
 
-    <!-- CreateVirtualItemsSource registers the disposal of its source with the IOutput of a view model. -->
+    <!--
+        The source that the control binds to, and the values that go between the two. They are in a
+        package with no UI framework, so that a view model does not reference this one.
+    -->
     <ItemGroup>
-        <ProjectReference Include="..\MorseCode.Mvvm\MorseCode.Mvvm.csproj"/>
+        <ProjectReference Include="..\MorseCode.Controls.ViewModels\MorseCode.Controls.ViewModels.csproj"/>
     </ItemGroup>
 
     <ItemGroup>
         <Compile Include="ComboBox.cs"/>
-        <Compile Include="IVirtualItemsSource.cs"/>
-        <Compile Include="IVirtualItemsSource.Generic.cs"/>
         <Compile Include="ItemChange.cs"/>
-        <Compile Include="ItemRange.cs"/>
-        <Compile Include="ReportedRange.cs"/>
         <Compile Include="MaybeConversion.cs"/>
         <Compile Include="MaybeConverter.cs"/>
         <Compile Include="MaybeConverter.Generic.cs"/>
         <Compile Include="RowPlaceholder.cs"/>
-        <Compile Include="ScrollRequestBindables.cs"/>
-        <Compile Include="ScrollRequestExtensions.cs"/>
         <Compile Include="VirtualizingItemsControl.cs"/>
-        <Compile Include="VirtualRows.cs"/>
         <Compile Include="VirtualItemList.cs"/>
-        <Compile Include="VirtualItemsSource.cs"/>
-        <Compile Include="VirtualItemsSource.Generic.cs"/>
-        <Compile Include="VirtualItemsSourceExtensions.cs"/>
     </ItemGroup>
 
     <!-- VirtualItemList is internal, and its tests check the events that it raises. -->

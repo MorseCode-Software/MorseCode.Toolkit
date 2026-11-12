@@ -12,7 +12,7 @@ using TUnit.Assertions.Enums;
 using TUnit.Assertions.Extensions;
 using TUnit.Core;
 
-namespace MorseCode.Controls.UI.Avalonia.Tests;
+namespace MorseCode.Controls.ViewModels.Tests;
 
 /// <summary>
 ///     Checks the sources that <c>CreateVirtualItemsSource</c> makes, without a control. Each test makes
@@ -279,8 +279,10 @@ public sealed class VirtualItemsSourceExtensionsTests
         await Assert.That(source.VisibleRows.Sample().Select(selector: static row => row.Position))
             .IsEquivalentTo(expected: [10, 11], ordering: CollectionOrdering.Matching);
 
-        // The list loses rows before the control reports again.
-        rows.Send(a: Rows(count: 7));
+        // The list loses rows at its end before the control reports again. The rows that stay are the
+        // same objects. Thus, the new rows of the report are the first rows of the old ones, and only
+        // the count is different.
+        rows.Send(a: [.. rows.Sample().Take(count: 7)]);
 
         await Assert.That(source.ConstructedRows.Sample().Select(selector: static row => row.Position))
             .IsEquivalentTo(expected: [5, 6], ordering: CollectionOrdering.Matching);
@@ -459,7 +461,7 @@ public sealed class VirtualItemsSourceExtensionsTests
 
         viewModel.Dispose();
 
-        await Assert.That(evicted.Order())
+        await Assert.That(evicted.OrderBy(keySelector: static position => position))
             .IsEquivalentTo(expected: [10, 11, 12], ordering: CollectionOrdering.Matching);
     }
 

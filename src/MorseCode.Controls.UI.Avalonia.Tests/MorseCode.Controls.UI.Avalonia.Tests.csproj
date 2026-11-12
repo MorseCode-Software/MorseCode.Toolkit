@@ -53,7 +53,6 @@
         <Compile Include="MaybeSelectionModel.cs"/>
         <Compile Include="RecipeModel.cs"/>
         <Compile Include="RecyclingPanel.cs"/>
-        <Compile Include="ScrollRequestExtensionsTests.cs"/>
         <Compile Include="SelectionModel.cs"/>
         <Compile Include="ShownMaybe.cs"/>
         <Compile Include="ShownVirtual.cs"/>
@@ -68,7 +67,6 @@
         <Compile Include="VirtualModel.cs"/>
         <Compile Include="VirtualRow.cs"/>
         <Compile Include="VirtualItemListTests.cs"/>
-        <Compile Include="VirtualItemsSourceExtensionsTests.cs"/>
     </ItemGroup>
 
     <ItemGroup>

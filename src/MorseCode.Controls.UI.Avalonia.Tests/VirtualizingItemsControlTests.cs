@@ -5,6 +5,7 @@ using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Threading;
+using MorseCode.Controls.ViewModels;
 using MorseCode.Mvvm;
 using SodaFlow;
 using SodaFlow.Bindable.ObjectModel;

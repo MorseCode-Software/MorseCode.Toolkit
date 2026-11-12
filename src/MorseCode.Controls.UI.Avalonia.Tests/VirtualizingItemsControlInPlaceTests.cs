@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Presenters;
+using MorseCode.Controls.ViewModels;
 using TUnit.Assertions;
 using TUnit.Assertions.Enums;
 using TUnit.Assertions.Extensions;

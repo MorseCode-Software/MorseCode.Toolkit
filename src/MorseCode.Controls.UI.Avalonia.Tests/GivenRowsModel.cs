@@ -1,3 +1,4 @@
+using MorseCode.Controls.ViewModels;
 using SodaFlow;
 using SodaFlow.Bindable.ObjectModel;
 using SodaFlow.Functional;

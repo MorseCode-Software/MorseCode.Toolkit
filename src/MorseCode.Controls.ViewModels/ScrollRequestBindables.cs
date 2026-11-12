@@ -1,7 +1,7 @@
 using SodaFlow.Bindable.ObjectModel;
 using SodaFlow.Functional;
 
-namespace MorseCode.Controls.UI.Avalonia;
+namespace MorseCode.Controls.ViewModels;
 
 /// <summary>
 ///     The bindable values of a scroll request: the request that the view model makes, and the report

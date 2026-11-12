@@ -1,10 +1,10 @@
 using System.Collections.Generic;
 using JetBrains.Annotations;
 
-namespace MorseCode.Controls.UI.Avalonia;
+namespace MorseCode.Controls.ViewModels;
 
 /// <summary>
-///     The items that a <see cref="VirtualizingItemsControl" /> can show, the
+///     The items that a <c>VirtualizingItemsControl</c> can show, the
 ///     position of the first one in the whole list, and the length of the whole list.
 /// </summary>
 /// <remarks>

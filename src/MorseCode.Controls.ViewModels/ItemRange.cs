@@ -1,6 +1,6 @@
 using JetBrains.Annotations;
 
-namespace MorseCode.Controls.UI.Avalonia;
+namespace MorseCode.Controls.ViewModels;
 
 /// <summary>
 ///     A run of positions in a list.

@@ -3,7 +3,7 @@ using SodaFlow;
 using SodaFlow.Bindable.ObjectModel;
 using SodaFlow.Functional;
 
-namespace MorseCode.Controls.UI.Avalonia;
+namespace MorseCode.Controls.ViewModels;
 
 /// <summary>
 ///     A source with the type of its rows. It has the values of an <see cref="IVirtualItemsSource" />,

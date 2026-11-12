@@ -10,7 +10,7 @@ using TUnit.Assertions.Enums;
 using TUnit.Assertions.Extensions;
 using TUnit.Core;
 
-namespace MorseCode.Controls.UI.Avalonia.Tests;
+namespace MorseCode.Controls.ViewModels.Tests;
 
 public sealed class ScrollRequestExtensionsTests
 {

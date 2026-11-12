@@ -8,11 +8,11 @@ using SodaFlow.Bindable.ObjectModel;
 using SodaFlow.Collections;
 using SodaFlow.Functional;
 
-namespace MorseCode.Controls.UI.Avalonia;
+namespace MorseCode.Controls.ViewModels;
 
 /// <summary>
 ///     Makes the <see cref="IVirtualItemsSource" /> that a view model gives to a
-///     <see cref="VirtualizingItemsControl" />.
+///     <c>VirtualizingItemsControl</c>.
 /// </summary>
 [PublicAPI]
 public static class VirtualItemsSourceExtensions
@@ -50,7 +50,7 @@ public static class VirtualItemsSourceExtensions
     /// <param name="onEvicted">Receives a row that the map removed. Release its resources here.</param>
     /// <returns>
     ///     The source. Expose it on the view model as an <see cref="IVirtualItemsSource" />, and bind
-    ///     <see cref="VirtualizingItemsControl.Source" /> to it. The view model reads its rows from it.
+    ///     <c>VirtualizingItemsControl.Source</c> to it. The view model reads its rows from it.
     /// </returns>
     /// <exception cref="ArgumentNullException">
     ///     <paramref name="output" />, <paramref name="collection" />, <paramref name="project" />,
@@ -68,10 +68,10 @@ public static class VirtualItemsSourceExtensions
         where TIdentity : notnull
         where TRow : class
     {
-        ArgumentNullException.ThrowIfNull(argument: output);
-        ArgumentNullException.ThrowIfNull(argument: collection);
-        ArgumentNullException.ThrowIfNull(argument: project);
-        ArgumentNullException.ThrowIfNull(argument: scrollRequests);
+        Argument.ThrowIfNull(argument: output, paramName: nameof(output));
+        Argument.ThrowIfNull(argument: collection, paramName: nameof(collection));
+        Argument.ThrowIfNull(argument: project, paramName: nameof(project));
+        Argument.ThrowIfNull(argument: scrollRequests, paramName: nameof(scrollRequests));
 
         // One transaction, so that the count, the slice, and the rows start from one instant.
         return Transaction.Run(
@@ -160,7 +160,7 @@ public static class VirtualItemsSourceExtensions
     /// <param name="onEvicted">Receives a row that the map removed. Release its resources here.</param>
     /// <returns>
     ///     The source. Expose it on the view model as an <see cref="IVirtualItemsSource" />, and bind
-    ///     <see cref="VirtualizingItemsControl.Source" /> to it. The view model reads its rows from it.
+    ///     <c>VirtualizingItemsControl.Source</c> to it. The view model reads its rows from it.
     /// </returns>
     /// <exception cref="ArgumentNullException">
     ///     <paramref name="output" />, <paramref name="collection" />, <paramref name="project" />,
@@ -178,10 +178,10 @@ public static class VirtualItemsSourceExtensions
         where TIdentity : notnull
         where TRow : class
     {
-        ArgumentNullException.ThrowIfNull(argument: output);
-        ArgumentNullException.ThrowIfNull(argument: collection);
-        ArgumentNullException.ThrowIfNull(argument: project);
-        ArgumentNullException.ThrowIfNull(argument: scrollRequests);
+        Argument.ThrowIfNull(argument: output, paramName: nameof(output));
+        Argument.ThrowIfNull(argument: collection, paramName: nameof(collection));
+        Argument.ThrowIfNull(argument: project, paramName: nameof(project));
+        Argument.ThrowIfNull(argument: scrollRequests, paramName: nameof(scrollRequests));
 
         return Transaction.Run(
             f: () =>
@@ -228,7 +228,9 @@ public static class VirtualItemsSourceExtensions
     /// <param name="reportedRange">The cell that receives what the control reports.</param>
     /// <param name="scrollRequests">The positions to scroll to.</param>
     /// <param name="clears">The events that withdraw a request that the control did not use yet. None by default.</param>
-    /// <returns>The source. Expose it on the view model, and bind <see cref="VirtualizingItemsControl.Source" /> to it.</returns>
+    /// <returns>
+    ///     The source. Expose it on the view model, and bind <c>VirtualizingItemsControl.Source</c> to it.
+    /// </returns>
     /// <exception cref="ArgumentNullException">
     ///     <paramref name="output" />, <paramref name="rows" />, <paramref name="reportedRange" />, or
     ///     <paramref name="scrollRequests" /> is null.
@@ -240,10 +242,10 @@ public static class VirtualItemsSourceExtensions
         Stream<int> scrollRequests,
         Stream<Unit>? clears = null)
     {
-        ArgumentNullException.ThrowIfNull(argument: output);
-        ArgumentNullException.ThrowIfNull(argument: rows);
-        ArgumentNullException.ThrowIfNull(argument: reportedRange);
-        ArgumentNullException.ThrowIfNull(argument: scrollRequests);
+        Argument.ThrowIfNull(argument: output, paramName: nameof(output));
+        Argument.ThrowIfNull(argument: rows, paramName: nameof(rows));
+        Argument.ThrowIfNull(argument: reportedRange, paramName: nameof(reportedRange));
+        Argument.ThrowIfNull(argument: scrollRequests, paramName: nameof(scrollRequests));
 
         return Transaction.Run(
             f: () =>
@@ -280,7 +282,7 @@ public static class VirtualItemsSourceExtensions
     /// <param name="clears">The events that withdraw a request that the control did not use yet. None by default.</param>
     /// <returns>
     ///     The source. Expose it on the view model as an <see cref="IVirtualItemsSource" />, and bind
-    ///     <see cref="VirtualizingItemsControl.Source" /> to it. The view model reads the rows that show
+    ///     <c>VirtualizingItemsControl.Source</c> to it. The view model reads the rows that show
     ///     from it.
     /// </returns>
     /// <exception cref="ArgumentNullException">
@@ -293,8 +295,8 @@ public static class VirtualItemsSourceExtensions
         Stream<Unit>? clears = null)
         where TRow : class
     {
-        ArgumentNullException.ThrowIfNull(argument: output);
-        ArgumentNullException.ThrowIfNull(argument: rows);
+        Argument.ThrowIfNull(argument: output, paramName: nameof(output));
+        Argument.ThrowIfNull(argument: rows, paramName: nameof(rows));
 
         return Transaction.Run(
             f: () =>
@@ -325,16 +327,23 @@ public static class VirtualItemsSourceExtensions
         where TRow : class =>
         place.Calm()
             .Lift(c2: items, f: static (range, list) => RowsAt(items: list, place: range))
-            .Calm(
-                areEqual: static (left, right) =>
-                    left.SequenceEqual(second: right, comparer: ReferenceEqualityComparer.Instance));
+            .Calm(areEqual: static (left, right) => HaveTheSameRows(left: left, right: right));
+
+    // The two lists have the same objects in the same sequence. ReferenceEqualityComparer does not exist
+    // on netstandard2.0 and net472.
+    private static bool HaveTheSameRows<TRow>(IReadOnlyList<TRow> left, IReadOnlyList<TRow> right)
+        where TRow : class =>
+        left.Count == right.Count
+        && left.Zip(second: right, resultSelector: static (a, b) => ReferenceEquals(objA: a, objB: b))
+            .All(predicate: static same => same);
 
     // The rows of a place in a list. The place stops at the two ends of the list. The report of the
     // control and the rows of the slice can be from different instants.
     private static IReadOnlyList<TRow> RowsAt<TRow>(IReadOnlyList<TRow> items, ItemRange place)
     {
-        int first = Math.Clamp(value: place.First, min: 0, max: items.Count);
-        int end = Math.Clamp(value: place.First + place.Count, min: first, max: items.Count);
+        // Math.Clamp does not exist on netstandard2.0 and net472.
+        int first = Math.Max(val1: 0, val2: Math.Min(val1: place.First, val2: items.Count));
+        int end = Math.Max(val1: first, val2: Math.Min(val1: place.First + place.Count, val2: items.Count));
 
         return [.. items.Skip(count: first).Take(count: end - first)];
     }

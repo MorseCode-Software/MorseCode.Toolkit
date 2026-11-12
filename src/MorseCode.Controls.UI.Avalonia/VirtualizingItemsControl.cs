@@ -10,6 +10,7 @@ using Avalonia.Layout;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using JetBrains.Annotations;
+using MorseCode.Controls.ViewModels;
 using SodaFlow.Functional;
 
 namespace MorseCode.Controls.UI.Avalonia;

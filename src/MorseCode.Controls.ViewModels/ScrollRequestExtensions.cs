@@ -3,7 +3,7 @@ using SodaFlow;
 using SodaFlow.Bindable.ObjectModel;
 using SodaFlow.Functional;
 
-namespace MorseCode.Controls.UI.Avalonia;
+namespace MorseCode.Controls.ViewModels;
 
 /// <summary>
 ///     Makes the bindable values that ask a list control to scroll to a position.
@@ -65,9 +65,9 @@ internal static class ScrollRequestExtensions
         Stream<int> requests,
         Stream<Unit> clears)
     {
-        ArgumentNullException.ThrowIfNull(argument: bindableFactory);
-        ArgumentNullException.ThrowIfNull(argument: requests);
-        ArgumentNullException.ThrowIfNull(argument: clears);
+        Argument.ThrowIfNull(argument: bindableFactory, paramName: nameof(bindableFactory));
+        Argument.ThrowIfNull(argument: requests, paramName: nameof(requests));
+        Argument.ThrowIfNull(argument: clears, paramName: nameof(clears));
 
         // One transaction, so that the values start from one instant as the rest of the view model does.
         return Transaction.Run(

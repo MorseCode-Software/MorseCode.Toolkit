@@ -2,10 +2,10 @@ using JetBrains.Annotations;
 using SodaFlow.Bindable.ObjectModel;
 using SodaFlow.Functional;
 
-namespace MorseCode.Controls.UI.Avalonia;
+namespace MorseCode.Controls.ViewModels;
 
 /// <summary>
-///     The values that a <see cref="VirtualizingItemsControl" /> reads from a view model and writes to
+///     The values that a <c>VirtualizingItemsControl</c> reads from a view model and writes to
 ///     it. The view model gives them to the control as one object, and the control binds to all of them.
 /// </summary>
 /// <remarks>

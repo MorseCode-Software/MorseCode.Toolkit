@@ -7,6 +7,8 @@
   <Project Path="MorseCode.StagedConstruction.Tests/MorseCode.StagedConstruction.Tests.csproj" />
   <Project Path="MorseCode.StagedConstruction.Analyzers/MorseCode.StagedConstruction.Analyzers.csproj" />
   <Project Path="MorseCode.StagedConstruction.Analyzers.Tests/MorseCode.StagedConstruction.Analyzers.Tests.csproj" />
+  <Project Path="MorseCode.Controls.ViewModels/MorseCode.Controls.ViewModels.csproj" />
+  <Project Path="MorseCode.Controls.ViewModels.Tests/MorseCode.Controls.ViewModels.Tests.csproj" />
   <Project Path="MorseCode.Controls.UI.Avalonia/MorseCode.Controls.UI.Avalonia.csproj" />
   <Project Path="MorseCode.Controls.UI.Avalonia.Tests/MorseCode.Controls.UI.Avalonia.Tests.csproj" />
 </Solution>

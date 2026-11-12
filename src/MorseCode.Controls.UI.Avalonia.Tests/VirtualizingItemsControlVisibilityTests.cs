@@ -5,6 +5,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Layout;
+using MorseCode.Controls.ViewModels;
 using SodaFlow;
 using TUnit.Assertions;
 using TUnit.Assertions.Enums;

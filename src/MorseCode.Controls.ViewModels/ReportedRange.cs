@@ -1,9 +1,9 @@
 using JetBrains.Annotations;
 
-namespace MorseCode.Controls.UI.Avalonia;
+namespace MorseCode.Controls.ViewModels;
 
 /// <summary>
-///     The report of a <see cref="VirtualizingItemsControl" /> to its source. It has the positions
+///     The report of a <c>VirtualizingItemsControl</c> to its source. It has the positions
 ///     that show, and how much of the first and of the last of them shows. It also has the positions
 ///     that the control wants rows for.
 /// </summary>
@@ -66,8 +66,15 @@ public readonly record struct ReportedRange(
             FirstVisibilityAmount: 0.0,
             LastVisibilityAmount: 0.0);
 
-    // The number of positions after the end of the list that the control also wants rows for, when
-    // the list gets them. A range in this value cannot hold them, because each range stays inside the
-    // list. Only the slice of a collection source reads this number.
-    internal int Ahead { get; init; }
+    /// <summary>
+    ///     Gets the number of positions after the end of the list that the control also wants rows
+    ///     for, when the list gets them.
+    /// </summary>
+    /// <remarks>
+    ///     A range in this value cannot hold those positions, because each range stays inside the
+    ///     list. The source of a collection adds this number to its slice. Thus, a row that the list
+    ///     gets at an end that shows comes in the value that has the new count. The control sets the
+    ///     number, and it is zero if the control does not.
+    /// </remarks>
+    public int Ahead { get; init; }
 }

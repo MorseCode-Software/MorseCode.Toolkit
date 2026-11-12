@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Avalonia.Controls.Primitives;
+using MorseCode.Controls.ViewModels;
 using TUnit.Assertions;
 using TUnit.Assertions.Enums;
 using TUnit.Assertions.Extensions;

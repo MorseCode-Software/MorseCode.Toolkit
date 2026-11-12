@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Specialized;
+using MorseCode.Controls.ViewModels;
 
 namespace MorseCode.Controls.UI.Avalonia;
 

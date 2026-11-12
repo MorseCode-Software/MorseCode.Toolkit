@@ -1,10 +1,10 @@
 using SodaFlow.Bindable.ObjectModel;
 using SodaFlow.Functional;
 
-namespace MorseCode.Controls.UI.Avalonia;
+namespace MorseCode.Controls.ViewModels;
 
 /// <summary>
-///     The values of a <see cref="VirtualizingItemsControl" />. <c>CreateVirtualItemsSource</c> makes
+///     The values of a <c>VirtualizingItemsControl</c>. <c>CreateVirtualItemsSource</c> makes
 ///     it, and gives it to the view model as an <see cref="IVirtualItemsSource" />.
 /// </summary>
 // ReSharper disable once InheritdocConsiderUsage - The summary of IVirtualItemsSource does not say how this class makes the source.

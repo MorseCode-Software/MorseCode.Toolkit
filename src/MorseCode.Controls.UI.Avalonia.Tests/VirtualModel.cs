@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using MorseCode.Controls.ViewModels;
 using SodaFlow;
 using SodaFlow.Bindable.ObjectModel;
 using SodaFlow.Functional;
