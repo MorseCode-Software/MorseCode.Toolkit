@@ -52,7 +52,12 @@ public sealed class VirtualizingItemsControlTests
 
                 await Assert.That(model.Writes.Last()).IsEqualTo(expected: new ItemRange(First: 0, Count: 15));
                 await Assert.That(model.Built.Count).IsEqualTo(expected: 15);
-                await Assert.That(shown.List.VisibleRange).IsEqualTo(expected: new ItemRange(First: 0, Count: 15));
+
+                await Assert.That(shown.List.ReportedRange.Constructed)
+                    .IsEqualTo(expected: new ItemRange(First: 0, Count: 15));
+
+                await Assert.That(shown.List.ReportedRange.Visible)
+                    .IsEqualTo(expected: new ItemRange(First: 0, Count: 10));
             });
 
     [Test]

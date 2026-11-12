@@ -23,15 +23,21 @@ namespace MorseCode.Avalonia.Controls;
 ///         Set <see cref="Source" /> to the one object that the view model gives. The control has a
 ///         position for each item that the source counts. Thus, the scroll bar, the size of the
 ///         scroll area, and <see cref="ItemsControl.ScrollIntoView(int)" /> work as on any items
-///         control. Avalonia makes containers for the positions that show, and the control reports
-///         them to the source, with <see cref="Buffer" /> more positions on each side. A position
-///         that the rows of the source do not cover shows <see cref="PlaceholderTemplate" />.
+///         control. Avalonia makes containers for the positions that show. The control reports
+///         those positions to the source, and with them a larger range that it wants rows for. A
+///         position that the rows of the source do not cover shows
+///         <see cref="PlaceholderTemplate" />.
+///     </para>
+///     <para>
+///         The larger range has one screen of positions on each side of the positions that show,
+///         and not fewer than 10. Thus, a scroll by one screen finds its rows. No property sets
+///         that number.
 ///     </para>
 ///     <para>
 ///         In the view model, make the source with <c>CreateVirtualItemsSource</c>. It sends the
-///         reported range to the offset and the limit of <c>Slice</c>, and builds the rows with
-///         <c>Map</c> after it. The <c>Map</c> builds a row for a key only when the key is inside
-///         the slice.
+///         range that the control wants rows for to the offset and the limit of <c>Slice</c>, and
+///         builds the rows with <c>Map</c> after it. The <c>Map</c> builds a row for a key only
+///         when the key is inside the slice.
 ///     </para>
 ///     <para>
 ///         To scroll, the view model makes a request in the source. The control scrolls there when
@@ -84,16 +90,16 @@ public class VirtualizingItemsControl : ItemsControl
     public static readonly StyledProperty<IDataTemplate?> PlaceholderTemplateProperty =
         AvaloniaProperty.Register<VirtualizingItemsControl, IDataTemplate?>(name: nameof(PlaceholderTemplate));
 
-    /// <summary>
-    ///     Defines the <see cref="Buffer" /> property.
-    /// </summary>
-    public static readonly StyledProperty<int> BufferProperty =
-        AvaloniaProperty.Register<VirtualizingItemsControl, int>(name: nameof(Buffer), defaultValue: 10);
+    // The fewest positions on each side of the positions that show, for which the control wants rows.
+    private const int SmallestBuffer = 10;
 
     private static readonly FuncTemplate<Panel?> DefaultPanel =
         new(func: static () => new VirtualizingStackPanel());
 
     private readonly VirtualItemList items = new();
+
+    // Gives the number of positions on each side, from the number of positions that show.
+    private readonly Func<int, int> bufferFor;
 
     // True from a request to report until the dispatcher runs the report.
     private bool isReportPending;
@@ -127,7 +133,18 @@ public class VirtualizingItemsControl : ItemsControl
     /// </summary>
     // ReSharper disable once InheritdocConsiderUsage - The constructor of ItemsControl does not say what this one sets.
     public VirtualizingItemsControl()
+
+        // A scroll shows no placeholder when its step is not longer than the positions on one side.
+        // Thus, the control wants rows for one screen of positions on each side. A screen with few
+        // rows, and an empty list, get the smallest number.
+        : this(bufferFor: static shown => Math.Max(val1: SmallestBuffer, val2: shown))
     {
+    }
+
+    // A test gives its own number of positions on each side. An app cannot.
+    internal VirtualizingItemsControl(Func<int, int> bufferFor)
+    {
+        this.bufferFor = bufferFor;
         this.ItemsSource = this.items;
         this.ContainerPrepared += (_, _) => this.RequestReport();
         this.ContainerClearing += (_, _) => this.RequestReport();
@@ -176,20 +193,6 @@ public class VirtualizingItemsControl : ItemsControl
         set => this.SetValue(property: PlaceholderTemplateProperty, value: value);
     }
 
-    /// <summary>
-    ///     Gets or sets the number of positions that the control adds on each side of the
-    ///     positions that show, when it reports the range to the source.
-    /// </summary>
-    /// <remarks>
-    ///     A scroll that is faster than the view model can answer shows placeholders.
-    ///     More positions on each side give the view model time to answer.
-    /// </remarks>
-    public int Buffer
-    {
-        get => this.GetValue(property: BufferProperty);
-        set => this.SetValue(property: BufferProperty, value: value);
-    }
-
     // The position that the view model wants to show. The control scrolls to it and then reports the
     // position to the source. It scrolls once for each value of this property. If the view model has not
     // cleared the request yet, a change of the count does not scroll again. A request beyond the count
@@ -201,8 +204,9 @@ public class VirtualizingItemsControl : ItemsControl
         set => this.SetValue(property: ScrollRequestProperty, value: value);
     }
 
-    // The positions that show, with the buffer on each side. The control reports them to the source.
-    internal ItemRange VisibleRange { get; private set; } = ItemRange.Empty;
+    // The positions that show, and the positions that the control wants rows for. The control reports
+    // them to the source.
+    internal ReportedRange ReportedRange { get; private set; } = ReportedRange.Empty;
 
     /// <inheritdoc />
     protected override Type StyleKeyOverride => typeof(ListBox);
@@ -224,10 +228,14 @@ public class VirtualizingItemsControl : ItemsControl
             {
                 this.Show(itemChange: itemChange);
             }
-        }
-        else if (change.Property == BufferProperty)
-        {
-            this.RequestReport();
+
+            // The count is the limit of each range that the control reports. Thus, a new count can
+            // change the ranges before a container changes. The row of a new position can then come
+            // before the layout that shows the position.
+            if (change.GetOldValue<VirtualRows>().TotalCount != change.GetNewValue<VirtualRows>().TotalCount)
+            {
+                this.RequestReport();
+            }
         }
         else if (change.Property == SourceProperty)
         {
@@ -469,8 +477,8 @@ public class VirtualizingItemsControl : ItemsControl
 
         this.ReadSource(source: newSource);
 
-        // The new source has no range yet.
-        this.VisibleRange = ItemRange.Empty;
+        // The new source has no report yet.
+        this.ReportedRange = ReportedRange.Empty;
         this.RequestReport();
     }
 
@@ -533,12 +541,12 @@ public class VirtualizingItemsControl : ItemsControl
             return;
         }
 
-        ItemRange range = this.Measure();
+        ReportedRange range = this.Measure();
 
-        this.VisibleRange = range;
+        this.ReportedRange = range;
 
         // The source drops a write that equals the last one.
-        this.source?.VisibleRange.Value = range;
+        this.source?.Range.Value = range;
     }
 
     // Measure reads the range of a VirtualizingStackPanel from the panel, which is correct at all times.
@@ -571,8 +579,8 @@ public class VirtualizingItemsControl : ItemsControl
         this.RequestReport();
     }
 
-    // Finds the positions that Avalonia shows now, and adds the buffer on each side.
-    private ItemRange Measure()
+    // Finds the positions that Avalonia shows now, and the positions that the control wants rows for.
+    private ReportedRange Measure()
     {
         int first = int.MaxValue;
         int last = -1;
@@ -606,19 +614,57 @@ public class VirtualizingItemsControl : ItemsControl
             }
         }
 
+        int count = this.items.Count;
+
         if (last < 0)
         {
-            // No container, with positions to show, means that the control is not laid out. This is also
-            // the case after a change of the items. The panel clears its containers then, and makes them
-            // again at the next layout. Thus, the last range stays. If it did not, the view model would
-            // drop its rows, the items would change again, and the cycle would repeat without end.
-            return this.items.Count == 0 ? ItemRange.Empty : this.VisibleRange;
+            return this.MeasureWithNoContainer(count: count);
         }
 
-        int buffer = Math.Max(val1: 0, val2: this.Buffer);
-        int start = Math.Max(val1: 0, val2: first - buffer);
-        int end = Math.Min(val1: this.items.Count, val2: last + 1 + buffer);
+        // A container can be older than the count. Each range stays inside the list.
+        int visibleEnd = Math.Min(val1: count, val2: last + 1);
+        int visibleStart = Math.Min(val1: first, val2: visibleEnd);
+        int buffer = Math.Max(val1: 0, val2: this.bufferFor(arg: visibleEnd - visibleStart));
 
-        return new ItemRange(First: start, Count: Math.Max(val1: 0, val2: end - start));
+        // The sum stops at the largest number.
+        int wantedEnd = buffer > int.MaxValue - visibleEnd ? int.MaxValue : visibleEnd + buffer;
+        int start = Math.Max(val1: 0, val2: visibleStart - buffer);
+        int end = Math.Min(val1: count, val2: wantedEnd);
+
+        return new ReportedRange(
+            Visible: new ItemRange(First: visibleStart, Count: visibleEnd - visibleStart),
+            Constructed: new ItemRange(First: start, Count: end - start))
+        {
+            Ahead = wantedEnd - end
+        };
+    }
+
+    // No container, with positions to show, means that the control is not laid out. This is also the
+    // case after a change of the items. The panel clears its containers then, and makes them again at
+    // the next layout. Thus, the last report stays. If it did not, the view model would drop its rows,
+    // the items would change again, and the cycle would repeat without end.
+    private ReportedRange MeasureWithNoContainer(int count)
+    {
+        int buffer = Math.Max(val1: 0, val2: this.bufferFor(arg: 0));
+
+        // An empty list shows no position. The control wants rows for the positions that come.
+        if (count == 0)
+        {
+            return ReportedRange.Empty with { Ahead = buffer };
+        }
+
+        // A list that was empty has no container until its next layout. The control wants rows for
+        // its first positions now, so that they come before that layout.
+        if (this.IsLoaded && this.ReportedRange.Constructed.Count == 0)
+        {
+            int wanted = Math.Min(val1: count, val2: buffer);
+
+            return new ReportedRange(Visible: ItemRange.Empty, Constructed: new ItemRange(First: 0, Count: wanted))
+            {
+                Ahead = buffer - wanted
+            };
+        }
+
+        return this.ReportedRange;
     }
 }

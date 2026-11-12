@@ -24,10 +24,10 @@ internal sealed class GivenRowsModel : IVirtualItemsSource
         this.Rows = factory.CreateOneWay(cell: this.rows);
         this.ScrollRequest = factory.CreateOneWay(cell: Cell.Constant(value: Maybe<int>.None));
 
-        this.VisibleRange =
+        this.Range =
             factory.CreateOneWayToSource(
-                editsStreamSink: Stream.CreateSink<ItemRange>(),
-                initialValue: ItemRange.Empty);
+                editsStreamSink: Stream.CreateSink<ReportedRange>(),
+                initialValue: ReportedRange.Empty);
 
         this.ScrollHandled =
             factory.CreateOneWayToSource(
@@ -39,7 +39,7 @@ internal sealed class GivenRowsModel : IVirtualItemsSource
     public IOneWayBindableValue<VirtualRows> Rows { get; }
 
     /// <inheritdoc />
-    public IOneWayToSourceBindableValue<ItemRange> VisibleRange { get; }
+    public IOneWayToSourceBindableValue<ReportedRange> Range { get; }
 
     /// <inheritdoc />
     public IOneWayBindableValue<Maybe<int>> ScrollRequest { get; }

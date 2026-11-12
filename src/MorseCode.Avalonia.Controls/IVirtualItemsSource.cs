@@ -14,7 +14,7 @@ namespace MorseCode.Avalonia.Controls;
 ///         rows that answer the range, and the request that the report clears.
 ///     </para>
 ///     <para>
-///         The values go in two pairs. The control writes <see cref="VisibleRange" />, and the view model
+///         The values go in two pairs. The control writes <see cref="Range" />, and the view model
 ///         answers with <see cref="Rows" />. The view model makes a <see cref="ScrollRequest" />, and the
 ///         control answers with <see cref="ScrollHandled" />.
 ///     </para>
@@ -33,10 +33,14 @@ public interface IVirtualItemsSource
     IOneWayBindableValue<VirtualRows> Rows { get; }
 
     /// <summary>
-    ///     Gets the value that the control writes with the positions that show, with its buffer on each
-    ///     side.
+    ///     Gets the value that the control writes: the positions that show, and the positions that it
+    ///     wants rows for.
     /// </summary>
-    IOneWayToSourceBindableValue<ItemRange> VisibleRange { get; }
+    /// <remarks>
+    ///     A view model that makes its own rows builds them for <see cref="ReportedRange.Constructed" />,
+    ///     and stops at its own count.
+    /// </remarks>
+    IOneWayToSourceBindableValue<ReportedRange> Range { get; }
 
     /// <summary>
     ///     Gets the position that the view model wants to show, or none.
