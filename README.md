@@ -39,6 +39,14 @@ The documentation site is at <https://morsecode-software.github.io/MorseCode.Too
   [![Latest Stable Version](https://img.shields.io/nuget/v/MorseCode.StagedConstruction.svg)](https://www.nuget.org/packages/MorseCode.StagedConstruction/)
   [![Total Downloads](https://img.shields.io/nuget/dt/MorseCode.StagedConstruction.svg)](https://www.nuget.org/packages/MorseCode.StagedConstruction/)
 
+- **MorseCode.Controls.ViewModels**: what a view model gives to a control of this toolkit, with no
+  dependency on a UI framework. `CreateVirtualItemsSource` builds the object that
+  `VirtualizingItemsControl` binds to, from a SodaFlow `ReactiveCollection`, from a list, or from
+  rows the view model makes itself. The project that holds your view models references this
+  package and no UI package.<br>
+  [![Latest Stable Version](https://img.shields.io/nuget/v/MorseCode.Controls.ViewModels.svg)](https://www.nuget.org/packages/MorseCode.Controls.ViewModels/)
+  [![Total Downloads](https://img.shields.io/nuget/dt/MorseCode.Controls.ViewModels.svg)](https://www.nuget.org/packages/MorseCode.Controls.ViewModels/)
+
 - **MorseCode.Controls.UI.Avalonia**: Avalonia controls for views that bind to view models
   on SodaFlow. `ComboBox` is a drop-in replacement for Avalonia's that applies a new list and a new
   selected item together, so a view model that changes both in one update keeps the selection it

@@ -4,10 +4,20 @@ Breaking: this package was MorseCode.Avalonia.Controls up to 0.2.1. Its package 
 and its namespace are now MorseCode.Controls.UI.Avalonia. Controls is what the package is for, UI
 is the layer, and Avalonia is one UI framework of that layer, so a package for another framework
 can sit beside this one. To move from 0.2.x: reference this package in place of the old one,
-change each using of MorseCode.Avalonia.Controls to MorseCode.Controls.UI.Avalonia, and change the
-XAML namespace to clr-namespace:MorseCode.Controls.UI.Avalonia;assembly=MorseCode.Controls.UI.Avalonia.
-The old package id stays on nuget.org at 0.2.1. The notes below this entry are those of the old
-package, and they name it as it was.
+change each using of MorseCode.Avalonia.Controls in a view to MorseCode.Controls.UI.Avalonia, and
+change the XAML namespace to
+clr-namespace:MorseCode.Controls.UI.Avalonia;assembly=MorseCode.Controls.UI.Avalonia. The old
+package id stays on nuget.org at 0.2.1. The notes below this entry are those of the old package,
+and they name it as it was.
+
+Breaking: what a view model uses is now in a second package, MorseCode.Controls.ViewModels, which
+has no dependency on a UI framework. That is IVirtualItemsSource, VirtualRows, ReportedRange,
+ItemRange, CreateVirtualItemsSource, and CreateVirtualItemsSourceByKey, in the namespace
+MorseCode.Controls.ViewModels. This package depends on that one, so a project of views gets both.
+A project of view models references that one alone, and gets no Avalonia. Before, a view model
+that named VirtualRows or ItemRange had to reference this package. The notes of
+MorseCode.Controls.ViewModels 0.3.0 say what is new in the methods that build a source. The entries
+below say what changed in the control, and in the values that it reads and writes.
 
 Breaking: VirtualizingItemsControl is now bound through one property, Source, and the
 public properties TotalCount, Rows, VisibleRange, and ScrollRequest are gone. The type of
@@ -21,29 +31,11 @@ Items, and there is no separate count. A change of the count and the rows reache
 one value, so the control applies both in one update and never shows a count with the rows of a
 different instant. Before, the two arrived one after the other, and the list was updated twice.
 
-New: CreateVirtualItemsSource, an extension method of the IOutput of a ViewModelBase from
-MorseCode.Mvvm. One overload takes a ReactiveCollection, a function that builds the row for a key,
-and a Stream of scroll positions. It slices the collection with the range that the control wants
-rows for, maps each key in the slice to a row, and counts the keys. It returns an
-IVirtualItemsSource, and it registers the rows with the output, so disposing of the view model
-releases them. The other overload is for a view model that makes its own rows. It takes a Cell of
-VirtualRows, which carries their count, a CellSink that receives what the control reports, and a
-Stream of scroll positions. Both take an optional Stream of clears that withdraw a scroll request.
-
 The scroll protocol is also new. The control no longer writes none to ScrollRequest. It reports
 the position that it handled in ScrollHandled, and the view model clears a request only if it is
 still that position. A request that the view model made while the report was on its way was
 cleared with the old one before. The control also scrolls once for each request, so a change of
 the count before the view model clears the request does not scroll again.
-
-New: CreateVirtualItemsSourceByKey, which takes a Stream of keys instead of a Stream of positions.
-It finds the position of a key in the collection in the transaction of the request, so a view
-model does not keep positions, which move when the collection changes. A key that the collection
-does not have at that instant makes no request. It has its own name because a collection with int
-keys would make an overload by key the same as the overload by position.
-
-Moved: the helper CreateScrollRequest of MorseCode.Mvvm 0.2.4 is now inside this package and is
-not public. CreateVirtualItemsSource uses it to make the request and the report.
 
 The control follows its source only while it is in a visual tree. When it leaves the tree, it
 removes its handlers from the values of the source, so a view model that outlives its view does
@@ -118,20 +110,13 @@ rows for. Both stay inside the list. On the overload for a view model with its o
 parameter visibleRange is now reportedRange, a CellSink of ReportedRange, and the view model builds
 rows for Constructed.
 
-New: the overloads of CreateVirtualItemsSource for a collection return an IVirtualItemsSource of
-the row type. It is an IVirtualItemsSource, so the view binds to it as before, and it gives the view
-model these cells. VisibleRows is the rows on screen, and it changes only when a different row
-shows. FirstVisibilityAmount and LastVisibilityAmount say how much of the first and of the last of
-those rows is on screen. ConstructedRows is the rows that the control was given, which is the list
-in Rows with the type of the rows. Reported is the last ReportedRange. Before, a view model could
-read its rows only as a list of object, and had to work out the visible ones itself.
-
 A row that is added at an end of the list that is on screen no longer shows as a placeholder first.
 A source made from a collection slices past the end of the list by the positions that the control
-wants there, so the row arrives together with the new count. That includes the first row of an
-empty list, and a list that is read at its end while rows arrive, such as a log. For a view model
-with its own rows, the control now reports as soon as it sees a new count, where it waited for a
-container before. With the default panel the row then arrives before the next layout.
+wants there, which the control reports as ReportedRange.Ahead, so the row arrives together with the
+new count. That includes the first row of an empty list, and a list that is read at its end while
+rows arrive, such as a log. For a view model with its own rows, the control now reports as soon as
+it sees a new count, where it waited for a container before. With the default panel the row then
+arrives before the next layout.
 
 New: ReportedRange has FirstVisibilityAmount and LastVisibilityAmount, which say how much of the
 first and of the last visible row is on screen, from 0.0 for none of it to 1.0 for all of it. Every
@@ -143,17 +128,18 @@ as it was. A view model with its own rows should calm Constructed before it buil
 Measured with no screen, a scroll step that brings no new row takes about 0.07 milliseconds and
 4 KB more than before, and a step that brings a row takes the same time as before.
 
-The package now depends on SodaFlow, SodaFlow.Bindable.ObjectModel, SodaFlow.Collections, and
-MorseCode.Mvvm 0.3.0 or later. To move from 0.2.x: build the source in the view model, expose it as
-an IVirtualItemsSource, and replace the bindings in the view with Source="{Binding Source}".
+The package now depends on MorseCode.Controls.ViewModels 0.3.0 and on
+SodaFlow.Bindable.ObjectModel, next to Avalonia and SodaFlow.Functional. To move from 0.2.x: build
+the source in the view model with CreateVirtualItemsSource, expose it as an IVirtualItemsSource,
+and replace the bindings in the view with Source="{Binding Source}".
 
 Changed: the dependencies on SodaFlow packages now have a ceiling at their next major version, as
-the dependencies between the packages of this repository already did: SodaFlow [5.0.1, 6.0.0),
-SodaFlow.Bindable.ObjectModel [4.0.0, 5.0.0), SodaFlow.Collections [2.0.0, 3.0.0), and
-SodaFlow.Functional [3.0.2, 4.0.0). Before, each was a floor only. The dependency on Avalonia is
-still a floor. A project that asks for a SodaFlow major past the ceiling now gets NuGet warning
-NU1608 at restore, where before it got nothing and could fail at run time. A SodaFlow major
-therefore needs a release of this package, even when nothing here changes.
+the dependencies between the packages of this repository already did: SodaFlow.Bindable.ObjectModel
+[4.0.0, 5.0.0) and SodaFlow.Functional [3.0.2, 4.0.0). Before, the one on SodaFlow.Functional was a
+floor only. The dependency on Avalonia is still a floor. A project that asks for a SodaFlow major
+past the ceiling now gets NuGet warning NU1608 at restore, where before it got nothing and could
+fail at run time. A SodaFlow major therefore needs a release of this package, even when nothing
+here changes.
 
 New: the net8.0 and net10.0 builds are marked as compatible with trimming and native AOT. The build
 of the package runs the trim, AOT, and single-file analyzers on them and fails on a report, so code
@@ -162,18 +148,8 @@ and IsAotCompatible, so an app that trims only the assemblies so marked, with Tr
 trims this one too. A native AOT publish that roots the assembly reports nothing in its code or in
 Avalonia. It reports IL2091 inside SodaFlow.Core 5, which this package depends on, where
 SodaFlow.Core gives a value factory to Lazy<T>. That is SodaFlow code, which the mark of this
-package does not cover.
-
-New: an overload of CreateVirtualItemsSource for a list whose rows all exist, for a view model that
-wants only the virtualization of the row views. It takes a Cell of an IReadOnlyList of rows, where
-the type of a row is a class, so the list goes into VirtualRows without a copy, and an optional
-Stream of scroll positions and of clears. The count is the count of the list, and the rows start at
-position zero. It returns an IVirtualItemsSource of the row type, as the overloads for a collection
-do. VisibleRows is the rows of the list on screen. ConstructedRows is the rows of the list at the
-positions of Constructed, which here is a part of the list in Rows. Each changes only when a
-different row object is at one of its positions, so an edit elsewhere in the list changes neither.
-With 0.2.x, an app bound TotalCount and Rows to such a list. Without this overload, 0.3.0 would make
-it pass a sink of the report and a stream of positions that never fires.
+package does not cover. That publish ran when the control and the methods that build a source
+were one assembly.
 
 0.2.2
 
@@ -309,7 +285,7 @@ a functional reactive style on SodaFlow. It is part of the MorseCode toolkit,
 which holds the conventions that MorseCode Software builds its own applications
 with.
 
-Targets net8.0 and net10.0, as Avalonia 12 does. Depends on Avalonia and
-SodaFlow.Functional.
+Targets net8.0 and net10.0, as Avalonia 12 does. Depends on Avalonia,
+MorseCode.Controls.ViewModels, SodaFlow.Bindable.ObjectModel, and SodaFlow.Functional.
 
 Source: https://github.com/MorseCode-Software/MorseCode.Toolkit

@@ -15,6 +15,10 @@ make: they hold bindables, subscriptions, or a query of their own.
 The control is made for SodaFlow. It has one property to bind, `Source`, and one helper that makes
 the object to bind it to. The sections below show both.
 
+They come in two packages. The control is in `MorseCode.Controls.UI.Avalonia`. The helper, and every
+type your view model touches, is in `MorseCode.Controls.ViewModels`, which has no dependency on
+Avalonia. So the project that holds your view models does not need one either.
+
 ## How it works
 
 The control has a position for every item in the whole list. That gives you a scroll bar of the
@@ -60,8 +64,9 @@ returns to a tree, the control reads the source again and catches up with whatev
 ## The view model
 
 `CreateVirtualItemsSource` makes the source from a `ReactiveCollection`. It slices the collection
-with the range that the control wants rows for, builds the rows with `Map`, and counts the keys. It is an extension method of the `IOutput` that `ViewModelBase` gives your constructor,
-in `MorseCode.Controls.UI.Avalonia`:
+with the range that the control wants rows for, builds the rows with `Map`, and counts the keys. It
+is an extension method of the `IOutput` that `ViewModelBase` gives your constructor, in
+`MorseCode.Controls.ViewModels`:
 
 ```csharp
 StreamSink<int> scrollTo = Stream.CreateSink<int>();
@@ -331,10 +336,11 @@ size. There is no setting for it.
 
 A row that is added at an end of the list that is on screen does not show as a placeholder first.
 A source made from a collection delivers the row together with the new count, because its slice
-reaches past the end of the list. A list that is read at its end while rows arrive, such as a log,
-is the usual case. A view model that builds its own rows gets there in two steps: the control
-reports again as soon as it sees the new count, and the view model answers with the row. With the
-default panel that happens before the next layout.
+reaches past the end of the list. The control says how far past in `Ahead`, a number in the same
+`ReportedRange`. It is not part of either range, because both stay inside the list. A list that is
+read at its end while rows arrive, such as a log, is the usual case. A view model that builds its
+own rows gets there in two steps: the control reports again as soon as it sees the new count, and
+the view model answers with the row. With the default panel that happens before the next layout.
 
 ### The control uses the style of `ListBox`
 
@@ -364,7 +370,15 @@ The control gives Avalonia its own list, one position per item. Setting `ItemsSo
 
 ## Targets and dependencies
 
-The control is in `MorseCode.Controls.UI.Avalonia`, which targets `net8.0` and `net10.0`. It depends on
-SodaFlow, `SodaFlow.Bindable.ObjectModel`, `SodaFlow.Collections`, and `MorseCode.Mvvm` 0.3.0 or
-later. The source is made of SodaFlow bindable values, and `CreateVirtualItemsSource` works with the
-`IOutput` of a `ViewModelBase`.
+The control is in `MorseCode.Controls.UI.Avalonia`, which targets `net8.0` and `net10.0`, as
+Avalonia 12 does. Reference it from the project that holds your views.
+
+`CreateVirtualItemsSource`, `IVirtualItemsSource`, `VirtualRows`, `ReportedRange`, and `ItemRange`
+are in `MorseCode.Controls.ViewModels`. Reference it from the project that holds your view models.
+It has the same targets as `MorseCode.Mvvm`, and it depends on SodaFlow,
+`SodaFlow.Bindable.ObjectModel`, `SodaFlow.Collections`, and `MorseCode.Mvvm` 0.3.0 or later. The
+source is made of SodaFlow bindable values, and `CreateVirtualItemsSource` works with the `IOutput`
+of a `ViewModelBase`.
+
+The control package depends on the view model package. An app that keeps its views and its view
+models in one project needs only the first.

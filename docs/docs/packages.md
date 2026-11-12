@@ -10,7 +10,8 @@ The packages version independently, and all of them are pre-1.0.
 | --- | --- | --- |
 | `MorseCode.Mvvm` | You write view models on SodaFlow. | `SodaFlow.Bindable.ObjectModel`, `MorseCode.StagedConstruction` |
 | `MorseCode.StagedConstruction` | You want to build immutable objects in ordered stages. | Nothing |
-| `MorseCode.Controls.UI.Avalonia` | Your views are Avalonia, and bind to view models on SodaFlow. | `Avalonia`, `SodaFlow`, `SodaFlow.Bindable.ObjectModel`, `SodaFlow.Collections`, `SodaFlow.Functional`, `MorseCode.Mvvm` |
+| `MorseCode.Controls.ViewModels` | Your view models give their data to a control of this toolkit. | `SodaFlow`, `SodaFlow.Bindable.ObjectModel`, `SodaFlow.Collections`, `SodaFlow.Functional`, `MorseCode.Mvvm` |
+| `MorseCode.Controls.UI.Avalonia` | Your views are Avalonia, and bind to view models on SodaFlow. | `Avalonia`, `SodaFlow.Bindable.ObjectModel`, `SodaFlow.Functional`, `MorseCode.Controls.ViewModels` |
 | `MorseCode.Analyzers` | You want the build to report code that breaks the conventions MorseCode writes C# with. | Nothing |
 
 ## MorseCode.Mvvm
@@ -43,14 +44,35 @@ its handle. It runs in every project that has the package anywhere in its depend
 that references `MorseCode.Mvvm` or `MorseCode.Controls.UI.Avalonia` gets it too, with nothing to
 install. See [Continuation rules](continuation-rules.md).
 
+## MorseCode.Controls.ViewModels
+
+```bash
+dotnet add package MorseCode.Controls.ViewModels
+```
+
+What a view model gives to a control of this toolkit, with no dependency on a UI framework.
+Reference it from the project that holds your view models. It holds:
+
+- `CreateVirtualItemsSource` and `CreateVirtualItemsSourceByKey`, extension methods of the `IOutput`
+  of a `ViewModelBase`. They make the object a view model gives to `VirtualizingItemsControl`.
+- `IVirtualItemsSource` and `IVirtualItemsSource<TRow>`, the types of that object.
+- `VirtualRows`, `ReportedRange`, and `ItemRange`, the values that travel between the control and
+  the view model.
+
+See [VirtualizingItemsControl](virtualizing-items-control.md).
+
+It has the same targets as `MorseCode.Mvvm`, so a project of view models keeps the targets it has.
+`MorseCode.Controls.UI.Avalonia` depends on it, so a project of views gets it without asking.
+
 ## MorseCode.Controls.UI.Avalonia
 
 ```bash
 dotnet add package MorseCode.Controls.UI.Avalonia
 ```
 
-Avalonia controls for views that bind to view models on SodaFlow. Up to 0.2.1 this package was
-`MorseCode.Avalonia.Controls`. Its id, its assembly, and its namespace changed in 0.3.0. It holds:
+Avalonia controls for views that bind to view models on SodaFlow. Reference it from the project
+that holds your views. Up to 0.2.1 this package was `MorseCode.Avalonia.Controls`. Its id, its
+assembly, and its namespace changed in 0.3.0. It holds:
 
 - `ComboBox`, a drop-in replacement for Avalonia's, which applies a new list and a new selected
   item together. Use it in its place. See [ComboBox](combo-box.md).
@@ -58,10 +80,8 @@ Avalonia controls for views that bind to view models on SodaFlow. Up to 0.2.1 th
   type `Maybe<T>`, one-way and two-way, turning the control's `null` into `None` and back. See
   [MaybeConverter](maybe-converter.md).
 - `VirtualizingItemsControl`, which shows a long list over a SodaFlow `ReactiveCollection` and
-  builds the heavy view model of a row only when the row is on screen. See
-  [VirtualizingItemsControl](virtualizing-items-control.md).
-- `CreateVirtualItemsSource`, an extension method of the `IOutput` of a `ViewModelBase`. It makes the
-  object a view model gives to `VirtualizingItemsControl`. See
+  builds the heavy view model of a row only when the row is on screen. The view model builds what
+  the control binds to with `MorseCode.Controls.ViewModels`. See
   [VirtualizingItemsControl](virtualizing-items-control.md).
 
 It targets `net8.0` and `net10.0`, as Avalonia 12 does, rather than the older targets of the other
@@ -89,11 +109,12 @@ the packages of a project that uses it. It needs the .NET 7 SDK or later, or Vis
 
 ## Trimming and native AOT
 
-From 0.3.0, the .NET 8 builds of `MorseCode.StagedConstruction` and `MorseCode.Mvvm`, and both
-builds of `MorseCode.Controls.UI.Avalonia`, are marked as compatible with trimming and native AOT. The
-build of each package runs the .NET trim, AOT, and single-file analyzers and fails on any warning,
-so code that needs reflection can't reach a release unnoticed. The .NET Framework, .NET 6, and .NET
-Standard builds aren't marked, because those analyzers don't exist for them.
+From 0.3.0, the .NET 8 builds of `MorseCode.StagedConstruction`, `MorseCode.Mvvm`, and
+`MorseCode.Controls.ViewModels`, and both builds of `MorseCode.Controls.UI.Avalonia`, are marked as
+compatible with trimming and native AOT. The build of each package runs the .NET trim, AOT, and
+single-file analyzers and fails on any warning, so code that needs reflection can't reach a release
+unnoticed. The .NET Framework, .NET 6, and .NET Standard builds aren't marked, because those
+analyzers don't exist for them.
 
 The mark covers the code of these packages, not SodaFlow's. A native AOT publish of an app that uses
 them reports a few warnings from inside `SodaFlow.Core` 5, where it passes a value factory to
@@ -103,8 +124,9 @@ them reports a few warnings from inside `SodaFlow.Core` 5, where it passes a val
 
 A package of this repository states its dependency on another package of this repository, and from
 0.3.0 on its dependency on a SodaFlow package, as a range that ends before the next breaking
-version. `MorseCode.Mvvm` depends on `MorseCode.StagedConstruction` this way, and
-`MorseCode.Controls.UI.Avalonia` depends on `MorseCode.Mvvm` this way from 0.3.0 on.
+version. `MorseCode.Mvvm` depends on `MorseCode.StagedConstruction` this way,
+`MorseCode.Controls.ViewModels` on `MorseCode.Mvvm`, and `MorseCode.Controls.UI.Avalonia` on
+`MorseCode.Controls.ViewModels`.
 
 On its own, NuGet never picks a version past the end of a range. If your project asks for one
 directly, NuGet uses it and warns with NU1608, which a build that treats warnings as errors fails
