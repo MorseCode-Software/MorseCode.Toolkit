@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Avalonia.Controls.Primitives;
 using TUnit.Assertions;
 using TUnit.Assertions.Enums;
 using TUnit.Assertions.Extensions;
@@ -205,6 +206,41 @@ public sealed class VirtualizingItemsControlPanelTests
 
                 await Assert.That(Texts(shown: shown))
                     .IsEquivalentTo(expected: Rows(first: 0, count: 1), ordering: CollectionOrdering.Matching);
+            });
+
+    // The control cannot change the row in a container of this type, thus it replaces the item. The
+    // panel recycles the container of a replaced item at once, and makes it again at the next layout.
+    // A report between the two reads too few containers. The view model then drops rows that show, and
+    // the control asks for them again without end.
+    [Test]
+    [Arguments(0)]
+    [Arguments(10)]
+    public Task ARemovedKeyBringsTheRowsOnceWhenTheControlReplacesTheItems(int buffer) =>
+        TestApplication.Run(
+            test: async () =>
+            {
+                using RecipeModel model = new(total: 1000, retainedBeyondTheView: 512);
+
+                using ShownVirtual shown =
+                    new(
+                        model: model,
+                        buffer: buffer,
+                        panel: static () =>
+                            new RecyclingPanel(makeContainer: static () => new HeaderedContentControl()));
+
+                RecyclingPanel? panel = shown.List.ItemsPanelRoot as RecyclingPanel;
+                int recycled = panel?.Recycled ?? 0;
+                int before = model.RowsValues;
+
+                model.Remove(key: 4);
+                shown.Settle();
+
+                // The six positions from the key down got a different row, each by a replaced item.
+                await Assert.That((panel?.Recycled ?? 0) - recycled).IsEqualTo(expected: 6);
+                await Assert.That(model.RowsValues - before).IsEqualTo(expected: 1);
+
+                await Assert.That(shown.List.ReportedRange.Constructed)
+                    .IsEqualTo(expected: new ItemRange(First: 0, Count: 10 + buffer));
             });
 
     private static ShownVirtual Show(IVirtualItemsSource model, int buffer) =>
