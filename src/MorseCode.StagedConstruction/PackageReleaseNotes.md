@@ -154,6 +154,6 @@ Construction of immutable objects in ordered stages, with no access to a partly
 built object. It is part of the MorseCode toolkit, which holds the conventions
 that MorseCode Software builds its own applications with.
 
-Targets net472, net6.0, and netstandard2.0. No dependencies.
+Targets net472, net6.0, net8.0, and netstandard2.0. No dependencies.
 
 Source: https://github.com/MorseCode-Software/MorseCode.Toolkit

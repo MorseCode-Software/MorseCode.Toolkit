@@ -213,7 +213,7 @@ Building blocks for view models written in a functional reactive style on
 SodaFlow. It is part of the MorseCode toolkit, which holds the conventions that
 MorseCode Software builds its own applications with.
 
-Targets net472, net6.0, and netstandard2.0. Depends on SodaFlow.Bindable.ObjectModel and
+Targets net472, net6.0, net8.0, and netstandard2.0. Depends on SodaFlow.Bindable.ObjectModel and
 MorseCode.StagedConstruction.
 
 Source: https://github.com/MorseCode-Software/MorseCode.Toolkit
