@@ -2,7 +2,9 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Avalonia;
+using SodaFlow;
 using TUnit.Assertions;
+using TUnit.Assertions.Enums;
 using TUnit.Assertions.Extensions;
 using TUnit.Core;
 
@@ -106,6 +108,45 @@ public sealed class VirtualizingItemsControlVisibilityTests
                 await Assert.That(Part(reported: reported, position: 5)).IsEqualTo(expected: 0.25);
                 await Assert.That(reported.VisibilityOf(position: 6)).IsEqualTo(expected: 0.0);
             });
+
+    // The view model reads the rows that show from its source, with their type. They are the rows on the
+    // screen after each change of the view and of the collection.
+    [Test]
+    public Task TheRowsThatTheViewModelReadsAsVisibleAreTheRowsOnTheScreen() =>
+        TestApplication.Run(
+            test: static async () =>
+            {
+                using RecipeModel model = new(total: 1000, retainedBeyondTheView: 512);
+                using ShownVirtual shown = new(model: model, buffer: 10);
+
+                await TheVisibleRowsAreOnTheScreen(model: model, shown: shown);
+
+                // A row at each end shows in part.
+                shown.Scroller.Offset = new Vector(x: 0, y: 2007);
+                shown.Settle();
+
+                await Assert.That(model.VisibleRows.Sample().Count).IsEqualTo(expected: 11);
+                await TheVisibleRowsAreOnTheScreen(model: model, shown: shown);
+
+                // Each position gets the next key.
+                model.Remove(key: 0);
+                shown.Settle();
+
+                await Assert.That(model.VisibleRows.Sample()[index: 0].Position).IsEqualTo(expected: 101);
+                await TheVisibleRowsAreOnTheScreen(model: model, shown: shown);
+
+                shown.Scroller.Offset = new Vector(x: 0, y: 10000);
+                shown.Settle();
+
+                await Assert.That(model.VisibleRows.Sample()[index: 0].Position).IsEqualTo(expected: 501);
+                await TheVisibleRowsAreOnTheScreen(model: model, shown: shown);
+            });
+
+    private static async Task TheVisibleRowsAreOnTheScreen(RecipeModel model, ShownVirtual shown) =>
+        await Assert.That(model.VisibleRows.Sample().Select(selector: static row => row.Text))
+            .IsEquivalentTo(
+                expected: shown.Shown().Select(selector: static pair => pair.Text),
+                ordering: CollectionOrdering.Matching);
 
     // A part is a quotient of two areas, thus the last digits of it are not exact.
     private static double Part(ReportedRange reported, int position) =>
