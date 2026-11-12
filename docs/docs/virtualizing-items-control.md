@@ -91,8 +91,8 @@ Make a new list for each change.
 
 ### What the control reports
 
-The control writes a `ReportedRange` to the source. It holds two ranges, which always come from the
-same instant:
+The control writes a `ReportedRange` to the source. Everything in it comes from the same instant.
+It holds two ranges:
 
 | Range | What it is |
 | --- | --- |
@@ -118,6 +118,18 @@ Cell<ItemRange> onScreen = reported.Map(static range => range.Visible);
 `Visible` is exact with the default panel. A panel that makes containers for rows that are not on
 screen reports those too.
 
+`VisibilityOf` tells how much of one row is on screen, from 0.0 for none of it to 1.0 for all of
+it. It is the share of the row's area that nothing above the list clips, so a row that is half
+scrolled out gives 0.5. A position that is not in `Visible` gives 0.0.
+
+```csharp
+Cell<double> shareOfRowSeven = reported.Map(static range => range.VisibilityOf(position: 7));
+```
+
+Because that share changes with every pixel, the control reports at every step of a scroll. The two
+ranges change far less often. `CreateVirtualItemsSource` on a collection sends no rows for a report
+that leaves `Constructed` as it was.
+
 ### When the rows do not come from a collection
 
 Another overload leaves the rows to you. You supply one `Cell<VirtualRows>` that
@@ -134,7 +146,12 @@ IVirtualItemsSource source = output.CreateVirtualItemsSource(
 ```
 
 Build rows for `Constructed`, and stop at your own count. The range is inside the list as the
-control knew it, and your list can have changed since.
+control knew it, and your list can have changed since. Calm it first, or you will build the rows
+again at every step of a scroll:
+
+```csharp
+Cell<ItemRange> constructed = reported.Map(static range => range.Constructed).Calm();
+```
 
 Both overloads take an optional `Stream<Unit>` of clears. See
 [Scroll from the view model](#scroll-from-the-view-model).
