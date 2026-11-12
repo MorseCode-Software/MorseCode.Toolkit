@@ -52,7 +52,6 @@
         <Compile Include="MaybeConverterTests.cs"/>
         <Compile Include="MaybeSelectionModel.cs"/>
         <Compile Include="RecipeModel.cs"/>
-        <Compile Include="ReportedRangeTests.cs"/>
         <Compile Include="RecyclingPanel.cs"/>
         <Compile Include="ScrollRequestExtensionsTests.cs"/>
         <Compile Include="SelectionModel.cs"/>

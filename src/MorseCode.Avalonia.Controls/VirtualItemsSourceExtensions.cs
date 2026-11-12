@@ -229,7 +229,7 @@ public static class VirtualItemsSourceExtensions
     ///         stop at the count of the view model.
     ///     </para>
     ///     <para>
-    ///         The control reports at each step of a scroll, because the part of a row that shows
+    ///         The control reports at each step of a scroll, because the amount of a row that shows
     ///         changes then. Calm <see cref="ReportedRange.Constructed" /> before the rows are built
     ///         from it. If not, each step builds the rows again.
     ///     </para>

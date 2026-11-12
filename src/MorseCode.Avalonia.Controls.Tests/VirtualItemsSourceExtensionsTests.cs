@@ -328,12 +328,15 @@ public sealed class VirtualItemsSourceExtensionsTests
         using ViewModelBase owner = viewModel;
 
         ItemRange constructed = new(First: 5, Count: 15);
-        source.Range.Value = new ReportedRange(Visible: new ItemRange(First: 10, Count: 5), Constructed: constructed);
+        source.Range.Value = Reported(visible: new ItemRange(First: 10, Count: 5), constructed: constructed);
 
         List<VirtualRows> values = [];
         IListener listener = source.Rows.Cell.Updates().Listen(handler: values.Add);
 
-        source.Range.Value = new ReportedRange(Visible: new ItemRange(First: 11, Count: 5), Constructed: constructed);
+        // A different row shows, and then a different amount of a row.
+        ReportedRange next = Reported(visible: new ItemRange(First: 11, Count: 5), constructed: constructed);
+        source.Range.Value = next;
+        source.Range.Value = next with { FirstVisibilityAmount = 0.5 };
         listener.Unlisten();
 
         await Assert.That(values).IsEmpty();
@@ -364,7 +367,7 @@ public sealed class VirtualItemsSourceExtensionsTests
         using ViewModelBase keyOwner = keyViewModel;
 
         ReportedRange reported =
-            new(Visible: new ItemRange(First: 10, Count: 5), Constructed: new ItemRange(First: 5, Count: 15));
+            Reported(visible: new ItemRange(First: 10, Count: 5), constructed: new ItemRange(First: 5, Count: 15));
 
         source.Range.Value = reported;
         keySource.Range.Value = reported;
@@ -401,26 +404,30 @@ public sealed class VirtualItemsSourceExtensionsTests
         using ViewModelBase owner = viewModel;
 
         ItemRange visible = new(First: 10, Count: 5);
-        source.Range.Value = new ReportedRange(Visible: visible, Constructed: new ItemRange(First: 5, Count: 15));
+        source.Range.Value = Reported(visible: visible, constructed: new ItemRange(First: 5, Count: 15));
 
         List<IReadOnlyList<VirtualRow>> values = [];
         IListener listener = source.VisibleRows.Updates().Listen(handler: values.Add);
 
-        // A different part of a row shows.
+        // A different amount of the first row shows.
         source.Range.Value =
-            new ReportedRange(Visible: visible, Constructed: new ItemRange(First: 5, Count: 15))
-                .WithVisibility(parts: [0.5, 1.0, 1.0, 1.0, 1.0]);
+            Reported(visible: visible, constructed: new ItemRange(First: 5, Count: 15)) with
+            {
+                FirstVisibilityAmount = 0.5
+            };
 
         // The slice moves, and the rows that show stay.
-        source.Range.Value = new ReportedRange(Visible: visible, Constructed: new ItemRange(First: 4, Count: 17));
+        source.Range.Value =
+            Reported(visible: visible, constructed: new ItemRange(First: 4, Count: 17)) with
+            {
+                FirstVisibilityAmount = 0.5
+            };
 
         await Assert.That(values).IsEmpty();
 
         // A different row shows.
         source.Range.Value =
-            new ReportedRange(
-                Visible: new ItemRange(First: 11, Count: 5),
-                Constructed: new ItemRange(First: 4, Count: 17));
+            Reported(visible: new ItemRange(First: 11, Count: 5), constructed: new ItemRange(First: 4, Count: 17));
 
         listener.Unlisten();
 
@@ -446,9 +453,7 @@ public sealed class VirtualItemsSourceExtensionsTests
         using ViewModelBase owner = viewModel;
 
         source.Range.Value =
-            new ReportedRange(
-                Visible: new ItemRange(First: 10, Count: 5),
-                Constructed: new ItemRange(First: 5, Count: 15));
+            Reported(visible: new ItemRange(First: 10, Count: 5), constructed: new ItemRange(First: 5, Count: 15));
 
         await Assert.That(source.VisibleRows.Sample().Select(selector: static row => row.Position))
             .IsEquivalentTo(expected: [10, 11], ordering: CollectionOrdering.Matching);
@@ -456,9 +461,7 @@ public sealed class VirtualItemsSourceExtensionsTests
         // A view model can make a report in a test, and the positions that show can start before the
         // rows. Positions 3 and 4 have no row then.
         source.Range.Value =
-            new ReportedRange(
-                Visible: new ItemRange(First: 3, Count: 5),
-                Constructed: new ItemRange(First: 5, Count: 7));
+            Reported(visible: new ItemRange(First: 3, Count: 5), constructed: new ItemRange(First: 5, Count: 7));
 
         await Assert.That(source.VisibleRows.Sample().Select(selector: static row => row.Position))
             .IsEquivalentTo(expected: [5, 6, 7], ordering: CollectionOrdering.Matching);
@@ -522,7 +525,13 @@ public sealed class VirtualItemsSourceExtensionsTests
 
     // A report of a control with no positions on each side: it wants rows for the positions that show.
     private static ReportedRange Reported(int first, int count) =>
-        new(Visible: new ItemRange(First: first, Count: count), Constructed: new ItemRange(First: first, Count: count));
+        Reported(
+            visible: new ItemRange(First: first, Count: count),
+            constructed: new ItemRange(First: first, Count: count));
+
+    // A report in which each row that shows is there in full.
+    private static ReportedRange Reported(ItemRange visible, ItemRange constructed) =>
+        new(Visible: visible, Constructed: constructed, FirstVisibilityAmount: 1.0, LastVisibilityAmount: 1.0);
 
     // The value that the construction returns carries the result and the view model out.
     private static (T Result, ViewModelBase ViewModel) Make<T>(Func<ViewModelBase.IOutput, T> make) =>

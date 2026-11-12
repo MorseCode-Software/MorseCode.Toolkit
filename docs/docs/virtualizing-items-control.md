@@ -125,20 +125,23 @@ The source can hold more rows than `ConstructedRows`, because `Map` keeps the ro
 scrolled out. If you need every row that exists, collect them in `project` and drop them in
 `onEvicted`.
 
-`Visible` is exact with the default panel. A panel that makes containers for rows that are not on
-screen reports those too.
+`Visible` holds only rows that are really on screen. If a parent clips part of the list, the rows
+it hides are left out, even though the panel can still keep containers for them. A panel other than
+the default one is read as a list from top to bottom.
 
-`VisibilityOf` tells how much of one row is on screen, from 0.0 for none of it to 1.0 for all of
-it. It is the share of the row's area that nothing above the list clips, so a row that is half
-scrolled out gives 0.5. A position that is not in `Visible` gives 0.0.
+The rows sit in one line along the scroll direction, so every visible row is fully on screen
+except possibly the first and the last. The report carries those two as `FirstVisibilityAmount` and
+`LastVisibilityAmount`, each from 0.0 for none of the row to 1.0 for all of it. A row that is half
+scrolled out gives 0.5. When a single row is visible, the two amounts are the same number.
 
 ```csharp
-Cell<double> shareOfRowSeven = source.Reported.Map(static range => range.VisibilityOf(position: 7));
+Cell<double> firstRowShare = source.Reported.Map(static range => range.FirstVisibilityAmount);
 ```
 
-Because that share changes with every pixel, the control reports at every step of a scroll. The two
-ranges change far less often. `CreateVirtualItemsSource` on a collection sends no rows for a report
-that leaves `Constructed` as it was.
+An amount is measured along the scroll direction, against the part of the list that nothing above
+it clips. Because the amounts change with every pixel, the control reports at every step of a
+scroll. The two ranges change far less often. `CreateVirtualItemsSource` on a collection sends no
+rows for a report that leaves `Constructed` as it was.
 
 ### When the rows do not come from a collection
 
