@@ -155,6 +155,17 @@ Avalonia. It reports IL2091 inside SodaFlow.Core 5, which this package depends o
 SodaFlow.Core gives a value factory to Lazy<T>. That is SodaFlow code, which the mark of this
 package does not cover.
 
+New: an overload of CreateVirtualItemsSource for a list whose rows all exist, for a view model that
+wants only the virtualization of the row views. It takes a Cell of an IReadOnlyList of rows, where
+the type of a row is a class, so the list goes into VirtualRows without a copy, and an optional
+Stream of scroll positions and of clears. The count is the count of the list, and the rows start at
+position zero. It returns an IVirtualItemsSource of the row type, as the overloads for a collection
+do. VisibleRows is the rows of the list on screen. ConstructedRows is the rows of the list at the
+positions of Constructed, which here is a part of the list in Rows. Each changes only when a
+different row object is at one of its positions, so an edit elsewhere in the list changes neither.
+With 0.2.x, an app bound TotalCount and Rows to such a list. Without this overload, 0.3.0 would make
+it pass a sink of the report and a stream of positions that never fires.
+
 0.2.2
 
 Changed: a large change of TotalCount now raises one reset of the list, where it raised an

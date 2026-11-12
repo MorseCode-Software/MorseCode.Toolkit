@@ -5,22 +5,33 @@ using SodaFlow;
 namespace MorseCode.Avalonia.Controls;
 
 /// <summary>
-///     The source of a collection, with the rows that the view model can read. The view gets it as an
+///     A source with the rows that the view model can read. The view gets it as an
 ///     <see cref="IVirtualItemsSource" />, and the view model keeps it with the type of its rows.
 /// </summary>
-/// <typeparam name="TRow">The type of the row for a key.</typeparam>
+/// <remarks>
+///     The source of a collection and the source of a list that has all of its rows are of this type.
+/// </remarks>
+/// <typeparam name="TRow">The type of a row.</typeparam>
 [PublicAPI]
 // ReSharper disable once InheritdocConsiderUsage - The summary of IVirtualItemsSource does not say what the view model reads.
 public interface IVirtualItemsSource<TRow> : IVirtualItemsSource
     where TRow : class
 {
     /// <summary>
-    ///     Gets the rows that the source gives to the control, in sequence. These are the rows for
-    ///     <see cref="ReportedRange.Constructed" />.
+    ///     Gets the rows at the positions that the control wants rows for, in sequence. These are the
+    ///     rows for <see cref="ReportedRange.Constructed" />.
     /// </summary>
     /// <remarks>
-    ///     The list is the list in <see cref="IVirtualItemsSource.Rows" />, with the type of the rows.
-    ///     The source can keep more rows than these, for keys that left the range.
+    ///     <para>
+    ///         For the source of a collection, the list is the list in
+    ///         <see cref="IVirtualItemsSource.Rows" />, with the type of the rows. That source can keep
+    ///         more rows than these, for keys that left the range.
+    ///     </para>
+    ///     <para>
+    ///         For the source of a list that has all of its rows, the list is a part of the list in
+    ///         <see cref="IVirtualItemsSource.Rows" />. The cell changes only when a different row is
+    ///         at one of the positions.
+    ///     </para>
     /// </remarks>
     Cell<IReadOnlyList<TRow>> ConstructedRows { get; }
 

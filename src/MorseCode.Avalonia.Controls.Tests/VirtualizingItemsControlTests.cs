@@ -5,6 +5,9 @@ using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Threading;
+using MorseCode.Mvvm;
+using SodaFlow;
+using SodaFlow.Bindable.ObjectModel;
 using SodaFlow.Functional;
 using TUnit.Assertions;
 using TUnit.Assertions.Enums;
@@ -40,6 +43,54 @@ public sealed class VirtualizingItemsControlTests
                     .IsEquivalentTo(
                         expected: [.. Enumerable.Range(start: 0, count: 10).Select(static i => $"Row {i}")],
                         ordering: CollectionOrdering.Matching);
+            });
+
+    // A list that has all of its rows, from the overload for such a list. The control shows the rows of the
+    // first screen and no placeholder. It scrolls to a position that the view model asks for. Then it reports
+    // that it handled the request, which clears it. The source gives the view model the rows on the screen.
+    [Test]
+    public Task AWholeListShowsItsRowsAndScrollsToARequest() =>
+        TestApplication.Run(
+            test: static async () =>
+            {
+                StreamSink<int> requests = Stream.CreateSink<int>();
+
+                IReadOnlyList<VirtualRow> rows =
+                [
+                    .. Enumerable.Range(start: 0, count: 600)
+                        .Select(selector: static position => new VirtualRow(Position: position))
+                ];
+
+                (IVirtualItemsSource<VirtualRow> source, ViewModelBase viewModel) =
+                    ViewModelBase.CreateBase(
+                        bindingScheduler: BindingScheduler.Immediate,
+                        continuation: (output, construct) =>
+                            construct.Construct(
+                                constructor: viewModelBase =>
+                                    (output.CreateVirtualItemsSource(
+                                        rows: Cell.Constant(rows),
+                                        scrollRequests: requests), viewModelBase)));
+
+                using ViewModelBase owner = viewModel;
+                using ShownVirtual shown = new(model: source, buffer: 0);
+
+                await Assert.That(Texts(shown: shown))
+                    .IsEquivalentTo(
+                        expected: [.. Enumerable.Range(start: 0, count: 10).Select(static i => $"Row {i}")],
+                        ordering: CollectionOrdering.Matching);
+
+                await Assert.That(source.VisibleRows.Sample().Select(selector: static row => row.Text))
+                    .IsEquivalentTo(expected: Texts(shown: shown), ordering: CollectionOrdering.Matching);
+
+                requests.Send(a: 300);
+                shown.Settle();
+
+                await Assert.That(Texts(shown: shown)).Contains(expected: "Row 300");
+                await Assert.That(Texts(shown: shown)).DoesNotContain(expected: Placeholder);
+                await Assert.That(source.ScrollRequest.Value).IsEqualTo(expected: Maybe<int>.None);
+
+                await Assert.That(source.VisibleRows.Sample().Select(selector: static row => row.Text))
+                    .IsEquivalentTo(expected: Texts(shown: shown), ordering: CollectionOrdering.Matching);
             });
 
     [Test]

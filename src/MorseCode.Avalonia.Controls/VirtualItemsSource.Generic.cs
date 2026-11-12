@@ -6,10 +6,10 @@ using SodaFlow.Functional;
 namespace MorseCode.Avalonia.Controls;
 
 /// <summary>
-///     The source of a collection. It has the values of an <see cref="IVirtualItemsSource" />, and the
-///     cells that the view model reads.
+///     A source with the type of its rows. It has the values of an <see cref="IVirtualItemsSource" />,
+///     and the cells that the view model reads.
 /// </summary>
-/// <typeparam name="TRow">The type of the row for a key.</typeparam>
+/// <typeparam name="TRow">The type of a row.</typeparam>
 // ReSharper disable once InheritdocConsiderUsage - The summary of IVirtualItemsSource does not say how this class makes the source.
 internal sealed class VirtualItemsSource<TRow>(
     in IVirtualItemsSource values,

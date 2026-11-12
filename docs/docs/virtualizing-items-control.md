@@ -167,7 +167,33 @@ again at every step of a scroll:
 Cell<ItemRange> constructed = reported.Map(static range => range.Constructed).Calm();
 ```
 
-Both overloads take an optional `Stream<Unit>` of clears. See
+### When every row already exists
+
+If your view model already holds every row, and you want only the virtualization of the row views,
+pass the list itself:
+
+```csharp
+IVirtualItemsSource<CourseRow> source = output.CreateVirtualItemsSource(rows: courses);
+```
+
+`courses` is a `Cell<IReadOnlyList<CourseRow>>`. The row type must be a class, so the list goes to
+the control without a copy. The count is the count of the list, and the rows start at position 0.
+`scrollRequests` is optional on this overload: pass a `Stream<int>` of positions if the view model
+scrolls. As with the others, don't change a list after you hand it over. Send a new one.
+
+No row waits for the report here, because the control has them all. The source still keeps the
+report, and it carries the type of your rows just as the source of a collection does. Your view
+model reads `VisibleRows`, the two amounts, and `Reported` from it in the same way.
+
+`ConstructedRows` differs. The control was given the whole list, so here that cell holds the part
+of the list at the positions of `Constructed`, not the list in `Rows`. `VisibleRows` and
+`ConstructedRows` change only when a different row object sits at one of their positions. An edit
+elsewhere in the list sends a new list and leaves both cells as they were.
+
+If you build the rows for `Constructed` instead, use the overload above, where the sink for the
+report is required.
+
+Each overload takes an optional `Stream<Unit>` of clears. See
 [Scroll from the view model](#scroll-from-the-view-model).
 
 ## The view
@@ -212,7 +238,7 @@ position makes it `Some(position)`, and a report of that same position clears it
 it is an `Accum` over the positions, the clears, and the reports. You don't make
 the sink for the reports, because it is always the same.
 
-Both overloads take an optional `Stream<Unit>` of clears. Each firing of it sets the request to
+Every overload takes an optional `Stream<Unit>` of clears. Each firing of it sets the request to
 `None`, so the view model can withdraw a request that the control didn't use yet. When a request
 and a clear come in one transaction, the request wins.
 

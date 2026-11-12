@@ -96,6 +96,198 @@ public sealed class VirtualItemsSourceExtensionsTests
         await Assert.That(source.ScrollRequest.Value).IsEqualTo(expected: Maybe<int>.None);
     }
 
+    // A list that has all of its rows. The count is the count of the list, and the rows start at position zero.
+    // The list goes into the rows without a copy. A report from the control changes none of them.
+    [Test]
+    public async Task AWholeListGivesItsRowsFromPositionZeroWithItsCount()
+    {
+        IReadOnlyList<VirtualRow> first =
+            [new(Position: 0), new(Position: 1), new(Position: 2)];
+
+        CellSink<IReadOnlyList<VirtualRow>> rows = Cell.CreateSink(initialValue: first);
+
+        (IVirtualItemsSource source, ViewModelBase viewModel) =
+            Make(make: output => output.CreateVirtualItemsSource(rows: rows));
+
+        using ViewModelBase owner = viewModel;
+
+        await Assert.That(source.Rows.Value.TotalCount).IsEqualTo(expected: 3);
+        await Assert.That(source.Rows.Value.Offset).IsEqualTo(expected: 0);
+        await Assert.That(source.Rows.Value.Items).IsSameReferenceAs(expected: first);
+
+        IReadOnlyList<VirtualRow> second =
+        [
+            .. Enumerable.Range(start: 0, count: 5)
+                .Select(selector: static position => new VirtualRow(Position: position))
+        ];
+
+        rows.Send(a: second);
+        source.Range.Value = Reported(first: 1, count: 2);
+
+        await Assert.That(source.Rows.Value.TotalCount).IsEqualTo(expected: 5);
+        await Assert.That(source.Rows.Value.Offset).IsEqualTo(expected: 0);
+        await Assert.That(source.Rows.Value.Items).IsSameReferenceAs(expected: second);
+    }
+
+    // The stream of scroll positions is optional for a list that has all of its rows. Without one, the source
+    // never asks for a scroll.
+    [Test]
+    public async Task AWholeListAsksForAScrollOnlyWithAStreamOfPositions()
+    {
+        StreamSink<int> requests = Stream.CreateSink<int>();
+        Cell<IReadOnlyList<VirtualRow>> rows = Cell.Constant<IReadOnlyList<VirtualRow>>([new VirtualRow(Position: 0)]);
+
+        (IVirtualItemsSource withRequests, ViewModelBase first) =
+            Make(make: output => output.CreateVirtualItemsSource(rows: rows, scrollRequests: requests));
+
+        (IVirtualItemsSource withoutRequests, ViewModelBase second) =
+            Make(make: output => output.CreateVirtualItemsSource(rows: rows));
+
+        using ViewModelBase firstOwner = first;
+        using ViewModelBase secondOwner = second;
+
+        requests.Send(a: 0);
+
+        await Assert.That(withRequests.ScrollRequest.Value).IsEqualTo(expected: Maybe<int>.Some(value: 0));
+        await Assert.That(withoutRequests.ScrollRequest.Value).IsEqualTo(expected: Maybe<int>.None);
+    }
+
+    // The source of a list that has all of its rows has the type of the rows. The view model reads the
+    // report of the control, and the rows of the list at the positions of the report.
+    [Test]
+    public async Task AWholeListSourceGivesTheViewModelTheReportAndItsRows()
+    {
+        IReadOnlyList<VirtualRow> rows = Rows(count: 100);
+
+        (IVirtualItemsSource<VirtualRow> source, ViewModelBase viewModel) =
+            Make(make: output => output.CreateVirtualItemsSource(rows: Cell.Constant(rows)));
+
+        using ViewModelBase owner = viewModel;
+
+        await Assert.That(source.ConstructedRows.Sample()).IsEmpty();
+        await Assert.That(source.VisibleRows.Sample()).IsEmpty();
+
+        ReportedRange reported =
+            new(
+                Visible: new ItemRange(First: 10, Count: 5),
+                Constructed: new ItemRange(First: 5, Count: 15),
+                FirstVisibilityAmount: 0.25,
+                LastVisibilityAmount: 0.75);
+
+        source.Range.Value = reported;
+
+        await Assert.That(source.Reported.Sample()).IsEqualTo(expected: reported);
+        await Assert.That(source.FirstVisibilityAmount.Sample()).IsEqualTo(expected: 0.25);
+        await Assert.That(source.LastVisibilityAmount.Sample()).IsEqualTo(expected: 0.75);
+
+        // The control has each row. The constructed rows are only the rows at the positions of the report.
+        await Assert.That(source.Rows.Value.Items).IsSameReferenceAs(expected: rows);
+
+        await Assert.That(source.ConstructedRows.Sample().Select(selector: static row => row.Position))
+            .IsEquivalentTo(expected: Enumerable.Range(start: 5, count: 15), ordering: CollectionOrdering.Matching);
+
+        await Assert.That(source.VisibleRows.Sample().Select(selector: static row => row.Position))
+            .IsEquivalentTo(expected: [10, 11, 12, 13, 14], ordering: CollectionOrdering.Matching);
+
+        // The rows are the objects of the list, and not copies.
+        await Assert.That(source.ConstructedRows.Sample()[index: 0]).IsSameReferenceAs(expected: rows[index: 5]);
+        await Assert.That(source.VisibleRows.Sample()[index: 0]).IsSameReferenceAs(expected: rows[index: 10]);
+    }
+
+    // The control reports at each step of a scroll, and the list can change at a position that the report
+    // does not have. The rows of the report change only when a different row is at one of its positions.
+    // The cell of an amount changes only when the amount is a different number.
+    [Test]
+    public async Task TheRowsOfAWholeListChangeOnlyWhenADifferentRowIsAtAPositionOfTheReport()
+    {
+        CellSink<IReadOnlyList<VirtualRow>> rows = Cell.CreateSink(initialValue: Rows(count: 100));
+
+        (IVirtualItemsSource<VirtualRow> source, ViewModelBase viewModel) =
+            Make(make: output => output.CreateVirtualItemsSource(rows: rows));
+
+        using ViewModelBase owner = viewModel;
+
+        ItemRange visible = new(First: 10, Count: 5);
+        ItemRange constructed = new(First: 5, Count: 15);
+        source.Range.Value = Reported(visible: visible, constructed: constructed);
+
+        List<IReadOnlyList<VirtualRow>> constructedValues = [];
+        List<IReadOnlyList<VirtualRow>> visibleValues = [];
+        List<double> amounts = [];
+        List<double> lastAmounts = [];
+        IListener constructedListener = source.ConstructedRows.Updates().Listen(handler: constructedValues.Add);
+        IListener visibleListener = source.VisibleRows.Updates().Listen(handler: visibleValues.Add);
+        IListener amountListener = source.FirstVisibilityAmount.Updates().Listen(handler: amounts.Add);
+        IListener lastAmountListener = source.LastVisibilityAmount.Updates().Listen(handler: lastAmounts.Add);
+
+        // A different amount of the first row shows. The cell of the amount changes, and the rows do not.
+        source.Range.Value =
+            Reported(visible: visible, constructed: constructed) with { FirstVisibilityAmount = 0.5 };
+
+        // A new list, with a different row at a position that the report does not have.
+        rows.Send(a: WithANewRowAt(rows: rows.Sample(), position: 50));
+
+        await Assert.That(constructedValues).IsEmpty();
+        await Assert.That(visibleValues).IsEmpty();
+
+        // The control wants rows for more positions, and the rows that show stay. The amount is the same
+        // number.
+        source.Range.Value =
+            Reported(visible: visible, constructed: new ItemRange(First: 4, Count: 17)) with
+            {
+                FirstVisibilityAmount = 0.5
+            };
+
+        await Assert.That(constructedValues.Count).IsEqualTo(expected: 1);
+        await Assert.That(visibleValues).IsEmpty();
+        await Assert.That(amounts).IsEquivalentTo(expected: [0.5], ordering: CollectionOrdering.Matching);
+        await Assert.That(lastAmounts).IsEmpty();
+
+        // A new list, with a different row at a position that shows. A row is a record, and the new row
+        // is equal to the row that it replaces. Thus, this fails if the cells compare the rows as values.
+        rows.Send(a: WithANewRowAt(rows: rows.Sample(), position: 12));
+
+        constructedListener.Unlisten();
+        visibleListener.Unlisten();
+        amountListener.Unlisten();
+        lastAmountListener.Unlisten();
+
+        await Assert.That(constructedValues.Count).IsEqualTo(expected: 2);
+        await Assert.That(visibleValues.Count).IsEqualTo(expected: 1);
+        await Assert.That(visibleValues[0][index: 2]).IsSameReferenceAs(expected: rows.Sample()[index: 12]);
+        await Assert.That(constructedValues[1][index: 8]).IsSameReferenceAs(expected: rows.Sample()[index: 12]);
+    }
+
+    // The report of the control and the list can be from different instants. A report of positions that
+    // the list does not have gives the rows that there are.
+    [Test]
+    public async Task TheRowsOfAWholeListStopAtTheEndOfTheList()
+    {
+        CellSink<IReadOnlyList<VirtualRow>> rows = Cell.CreateSink(initialValue: Rows(count: 12));
+
+        (IVirtualItemsSource<VirtualRow> source, ViewModelBase viewModel) =
+            Make(make: output => output.CreateVirtualItemsSource(rows: rows));
+
+        using ViewModelBase owner = viewModel;
+
+        source.Range.Value =
+            Reported(visible: new ItemRange(First: 10, Count: 5), constructed: new ItemRange(First: 5, Count: 15));
+
+        await Assert.That(source.ConstructedRows.Sample().Select(selector: static row => row.Position))
+            .IsEquivalentTo(expected: [5, 6, 7, 8, 9, 10, 11], ordering: CollectionOrdering.Matching);
+
+        await Assert.That(source.VisibleRows.Sample().Select(selector: static row => row.Position))
+            .IsEquivalentTo(expected: [10, 11], ordering: CollectionOrdering.Matching);
+
+        // The list loses rows before the control reports again.
+        rows.Send(a: Rows(count: 7));
+
+        await Assert.That(source.ConstructedRows.Sample().Select(selector: static row => row.Position))
+            .IsEquivalentTo(expected: [5, 6], ordering: CollectionOrdering.Matching);
+
+        await Assert.That(source.VisibleRows.Sample()).IsEmpty();
+    }
+
     [Test]
     public async Task ACollectionGivesItsCountAndOnlyTheRowsOfTheRangeAtTheirOffset()
     {
@@ -489,6 +681,7 @@ public sealed class VirtualItemsSourceExtensionsTests
         StreamSink<int> requests = Stream.CreateSink<int>();
         ReactiveCollection<int, int, int> collection = Collection(total: 1);
         CellSink<ReportedRange> range = Cell.CreateSink(initialValue: ReportedRange.Empty);
+        Cell<IReadOnlyList<VirtualRow>> wholeList = Cell.Constant<IReadOnlyList<VirtualRow>>([]);
 
         // The nulls are typed variables and not arguments with a null-forgiving operator, which the
         // named argument order check of MorseCode.Analyzers cannot place in the middle of a call.
@@ -499,6 +692,7 @@ public sealed class VirtualItemsSourceExtensionsTests
         CellSink<ReportedRange> noRange = null!;
         Stream<int> noRequests = null!;
         ViewModelBase.IOutput noOutput = null!;
+        Cell<IReadOnlyList<VirtualRow>> noWholeList = null!;
 
         // ReSharper restore NullableWarningSuppressionIsUsed
 
@@ -530,12 +724,17 @@ public sealed class VirtualItemsSourceExtensionsTests
             Catch(action: () => MakeAndRefuse(make: output => output.CreateVirtualItemsSource(
                 rows: Cell.Constant(VirtualRows.Empty),
                 reportedRange: noRange,
-                scrollRequests: requests)))
+                scrollRequests: requests))),
+            Catch(action: () => noOutput.CreateVirtualItemsSource(rows: wholeList)),
+            Catch(action: () => MakeAndRefuse(make: output => output.CreateVirtualItemsSource(rows: noWholeList)))
         ];
 
         await Assert.That(refused.Select(selector: static exception => (exception as ArgumentNullException)?.ParamName ?? string.Empty))
             .IsEquivalentTo(
-                expected: ["output", "collection", "project", "scrollRequests", "rows", "reportedRange"],
+                expected:
+                [
+                    "output", "collection", "project", "scrollRequests", "rows", "reportedRange", "output", "rows"
+                ],
                 ordering: CollectionOrdering.Matching);
     }
 
@@ -559,6 +758,17 @@ public sealed class VirtualItemsSourceExtensionsTests
     // The exception of the make function leaves the construction, and the base releases its registrations.
     private static void MakeAndRefuse(Func<ViewModelBase.IOutput, IVirtualItemsSource> make) =>
         Make(make: make).ViewModel.Dispose();
+
+    // A list that has all of its rows. The row of a position has that position.
+    private static IReadOnlyList<VirtualRow> Rows(int count) =>
+    [
+        .. Enumerable.Range(start: 0, count: count)
+            .Select(selector: static position => new VirtualRow(Position: position))
+    ];
+
+    // The same rows in a new list, with a new object for the row of one position.
+    private static IReadOnlyList<VirtualRow> WithANewRowAt(IEnumerable<VirtualRow> rows, int position) =>
+        [.. rows.Select(selector: row => row.Position == position ? new VirtualRow(Position: position) : row)];
 
     private static ReactiveCollection<int, int, int> Collection(int total) =>
         Collection(keys: Enumerable.Range(start: 0, count: total));
