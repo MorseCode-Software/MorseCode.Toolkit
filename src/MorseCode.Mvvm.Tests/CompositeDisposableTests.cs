@@ -117,12 +117,14 @@ public sealed class CompositeDisposableTests
                 ]);
 
         Exception caught = Catch(action: composite.Dispose);
+        Exception[] both = caught is AggregateException aggregate ? [.. aggregate.InnerExceptions] : [];
 
         await Assert.That(caught).IsTypeOf<AggregateException>();
 
-        await Assert
-            .That((caught as AggregateException)?.InnerExceptions)
-            .IsEquivalentTo(expected: [first, second], ordering: CollectionOrdering.Matching);
+        // The exceptions must be the same objects, and IsEquivalentTo compares only the members of two exceptions.
+        await Assert.That(both.Length).IsEqualTo(expected: 2);
+        await Assert.That(both[0]).IsSameReferenceAs(expected: first);
+        await Assert.That(both[1]).IsSameReferenceAs(expected: second);
 
         await Assert.That(log).IsEquivalentTo(expected: ["B"], ordering: CollectionOrdering.Matching);
     }

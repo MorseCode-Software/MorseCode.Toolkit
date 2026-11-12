@@ -154,12 +154,14 @@ public sealed class ViewModelBaseTests
                 });
 
         Exception caught = Catch(action: viewModel.Dispose);
+        Exception[] both = caught is AggregateException aggregate ? [.. aggregate.InnerExceptions] : [];
 
         await Assert.That(caught).IsTypeOf<AggregateException>();
 
-        await Assert
-            .That((caught as AggregateException)?.InnerExceptions)
-            .IsEquivalentTo(expected: [second, first], ordering: CollectionOrdering.Matching);
+        // The exceptions must be the same objects, and IsEquivalentTo compares only the members of two exceptions.
+        await Assert.That(both.Length).IsEqualTo(expected: 2);
+        await Assert.That(both[0]).IsSameReferenceAs(expected: second);
+        await Assert.That(both[1]).IsSameReferenceAs(expected: first);
     }
 
     // Before the seal, the composite read the registrations in Dispose. Thus, Dispose released an
@@ -377,11 +379,14 @@ public sealed class ViewModelBaseTests
                             return construct.Construct<ViewModelBase>(constructor: _ => throw failure);
                         }));
 
+        Exception[] both = caught is AggregateException aggregate ? [.. aggregate.InnerExceptions] : [];
+
         await Assert.That(caught).IsTypeOf<AggregateException>();
 
-        await Assert
-            .That((caught as AggregateException)?.InnerExceptions)
-            .IsEquivalentTo(expected: [failure, releaseFailure], ordering: CollectionOrdering.Matching);
+        // The exceptions must be the same objects, and IsEquivalentTo compares only the members of two exceptions.
+        await Assert.That(both.Length).IsEqualTo(expected: 2);
+        await Assert.That(both[0]).IsSameReferenceAs(expected: failure);
+        await Assert.That(both[1]).IsSameReferenceAs(expected: releaseFailure);
 
         // The output closes before the release runs. Thus, it is closed also when the release throws.
         Exception late =
