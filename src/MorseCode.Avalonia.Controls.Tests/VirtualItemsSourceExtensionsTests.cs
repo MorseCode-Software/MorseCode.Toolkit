@@ -328,12 +328,15 @@ public sealed class VirtualItemsSourceExtensionsTests
         using ViewModelBase owner = viewModel;
 
         ItemRange constructed = new(First: 5, Count: 15);
-        source.Range.Value = new ReportedRange(Visible: new ItemRange(First: 10, Count: 5), Constructed: constructed);
+        source.Range.Value = Reported(visible: new ItemRange(First: 10, Count: 5), constructed: constructed);
 
         List<VirtualRows> values = [];
         IListener listener = source.Rows.Cell.Updates().Listen(handler: values.Add);
 
-        source.Range.Value = new ReportedRange(Visible: new ItemRange(First: 11, Count: 5), Constructed: constructed);
+        // A different row shows, and then a different amount of a row.
+        ReportedRange next = Reported(visible: new ItemRange(First: 11, Count: 5), constructed: constructed);
+        source.Range.Value = next;
+        source.Range.Value = next with { FirstVisibilityAmount = 0.5 };
         listener.Unlisten();
 
         await Assert.That(values).IsEmpty();
@@ -367,7 +370,7 @@ public sealed class VirtualItemsSourceExtensionsTests
         using ViewModelBase keyOwner = keyViewModel;
 
         ReportedRange reported =
-            new(Visible: new ItemRange(First: 10, Count: 5), Constructed: new ItemRange(First: 5, Count: 15));
+            Reported(visible: new ItemRange(First: 10, Count: 5), constructed: new ItemRange(First: 5, Count: 15));
 
         source.Range.Value = reported;
         keySource.Range.Value = reported;
@@ -437,7 +440,13 @@ public sealed class VirtualItemsSourceExtensionsTests
 
     // A report of a control with no positions on each side: it wants rows for the positions that show.
     private static ReportedRange Reported(int first, int count) =>
-        new(Visible: new ItemRange(First: first, Count: count), Constructed: new ItemRange(First: first, Count: count));
+        Reported(
+            visible: new ItemRange(First: first, Count: count),
+            constructed: new ItemRange(First: first, Count: count));
+
+    // A report in which each row that shows is there in full.
+    private static ReportedRange Reported(ItemRange visible, ItemRange constructed) =>
+        new(Visible: visible, Constructed: constructed, FirstVisibilityAmount: 1.0, LastVisibilityAmount: 1.0);
 
     // The value that the construction returns carries the result and the view model out.
     private static (T Result, ViewModelBase ViewModel) Make<T>(Func<ViewModelBase.IOutput, T> make) =>

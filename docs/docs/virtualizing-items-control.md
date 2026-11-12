@@ -91,8 +91,8 @@ Make a new list for each change.
 
 ### What the control reports
 
-The control writes a `ReportedRange` to the source. It holds two ranges, which always come from the
-same instant:
+The control writes a `ReportedRange` to the source. Everything in it comes from the same instant.
+It holds two ranges:
 
 | Range | What it is |
 | --- | --- |
@@ -115,8 +115,23 @@ IVirtualItemsSource source = output.CreateVirtualItemsSource(
 Cell<ItemRange> onScreen = reported.Map(static range => range.Visible);
 ```
 
-`Visible` is exact with the default panel. A panel that makes containers for rows that are not on
-screen reports those too.
+`Visible` holds only rows that are really on screen. If a parent clips part of the list, the rows
+it hides are left out, even though the panel can still keep containers for them. A panel other than
+the default one is read as a list from top to bottom.
+
+The rows sit in one line along the scroll direction, so every visible row is fully on screen
+except possibly the first and the last. The report carries those two as `FirstVisibilityAmount` and
+`LastVisibilityAmount`, each from 0.0 for none of the row to 1.0 for all of it. A row that is half
+scrolled out gives 0.5. When a single row is visible, the two amounts are the same number.
+
+```csharp
+Cell<double> firstRowShare = reported.Map(static range => range.FirstVisibilityAmount);
+```
+
+An amount is measured along the scroll direction, against the part of the list that nothing above
+it clips. Because the amounts change with every pixel, the control reports at every step of a
+scroll. The two ranges change far less often. `CreateVirtualItemsSource` on a collection sends no
+rows for a report that leaves `Constructed` as it was.
 
 ### When the rows do not come from a collection
 
@@ -134,7 +149,12 @@ IVirtualItemsSource source = output.CreateVirtualItemsSource(
 ```
 
 Build rows for `Constructed`, and stop at your own count. The range is inside the list as the
-control knew it, and your list can have changed since.
+control knew it, and your list can have changed since. Calm it first, or you will build the rows
+again at every step of a scroll:
+
+```csharp
+Cell<ItemRange> constructed = reported.Map(static range => range.Constructed).Calm();
+```
 
 Both overloads take an optional `Stream<Unit>` of clears. See
 [Scroll from the view model](#scroll-from-the-view-model).

@@ -209,6 +209,11 @@ public static class VirtualItemsSourceExtensions
     ///         as the control knew it at the report, and the count can be different by then. Thus,
     ///         stop at the count of the view model.
     ///     </para>
+    ///     <para>
+    ///         The control reports at each step of a scroll, because the amount of a row that shows
+    ///         changes then. Calm <see cref="ReportedRange.Constructed" /> before the rows are built
+    ///         from it. If not, each step builds the rows again.
+    ///     </para>
     /// </remarks>
     /// <param name="output">The output of the view model. The source makes its values with the factory of the output.</param>
     /// <param name="rows">The rows for some of the positions, with the position of the first and the number of positions in the whole list.</param>

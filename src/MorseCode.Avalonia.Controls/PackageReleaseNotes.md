@@ -117,6 +117,16 @@ empty list, and a list that is read at its end while rows arrive, such as a log.
 with its own rows, the control now reports as soon as it sees a new count, where it waited for a
 container before. With the default panel the row then arrives before the next layout.
 
+New: ReportedRange has FirstVisibilityAmount and LastVisibilityAmount, which say how much of the
+first and of the last visible row is on screen, from 0.0 for none of it to 1.0 for all of it. Every
+row between those two is fully on screen, because the rows sit in one line along the scroll
+direction. An amount is measured along that direction, against the part of the list that nothing
+above it clips. The control reports at every step of a scroll for that, where it reported once for
+each row before. A source made from a collection sends no rows for a report that leaves Constructed
+as it was. A view model with its own rows should calm Constructed before it builds rows from it.
+Measured with no screen, a scroll step that brings no new row takes about 0.07 milliseconds and
+4 KB more than before, and a step that brings a row takes the same time as before.
+
 The package now depends on SodaFlow, SodaFlow.Bindable.ObjectModel, SodaFlow.Collections, and
 MorseCode.Mvvm 0.3.0 or later. To move from 0.2.x: build the source in the view model, expose it as
 an IVirtualItemsSource, and replace the bindings in the view with Source="{Binding Source}".

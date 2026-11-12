@@ -64,6 +64,7 @@
         <Compile Include="VirtualizingItemsControlPanelTests.cs"/>
         <Compile Include="VirtualizingItemsControlRecipeTests.cs"/>
         <Compile Include="VirtualizingItemsControlTests.cs"/>
+        <Compile Include="VirtualizingItemsControlVisibilityTests.cs"/>
         <Compile Include="VirtualModel.cs"/>
         <Compile Include="VirtualRow.cs"/>
         <Compile Include="VirtualItemListTests.cs"/>

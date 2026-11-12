@@ -33,12 +33,12 @@ public interface IVirtualItemsSource
     IOneWayBindableValue<VirtualRows> Rows { get; }
 
     /// <summary>
-    ///     Gets the value that the control writes: the positions that show, and the positions that it
-    ///     wants rows for.
+    ///     Gets the value that the control writes: the positions that show, how much of the first and of
+    ///     the last of them shows, and the positions that it wants rows for.
     /// </summary>
     /// <remarks>
-    ///     A view model that makes its own rows builds them for <see cref="ReportedRange.Constructed" />,
-    ///     and stops at its own count.
+    ///     The control writes at each step of a scroll. A view model that makes its own rows calms
+    ///     <see cref="ReportedRange.Constructed" />, builds the rows for it, and stops at its own count.
     /// </remarks>
     IOneWayToSourceBindableValue<ReportedRange> Range { get; }
 

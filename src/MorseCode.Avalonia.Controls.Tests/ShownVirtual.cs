@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Presenters;
 using Avalonia.Controls.Templates;
+using Avalonia.Layout;
 using Avalonia.VisualTree;
 using SodaFlow.Functional;
 
@@ -162,6 +164,34 @@ internal sealed class ShownVirtual : IDisposable
     ///     does when the user closes a tab.
     /// </summary>
     public void Remove() => this.window.Content = null;
+
+    /// <summary>
+    ///     Moves the control into a box of the given height that clips it, and runs the layout. The
+    ///     control keeps the height of the window. Thus, a control above the list hides the rows outside
+    ///     the box, and the scroll viewer of the list does not.
+    /// </summary>
+    /// <param name="height">The height of the box.</param>
+    /// <param name="hiddenAtTheTop">The height of the part of the list that is above the box.</param>
+    public void ClipTo(int height, int hiddenAtTheTop)
+    {
+        this.window.Content = null;
+
+        // By default, a control that is higher than its place goes to the center of the place.
+        this.List.Height = this.window.Height;
+        this.List.VerticalAlignment = VerticalAlignment.Top;
+        this.List.Margin = new Thickness(left: 0, top: -hiddenAtTheTop, right: 0, bottom: 0);
+
+        this.window.Content =
+            new Border
+            {
+                Height = height,
+                VerticalAlignment = VerticalAlignment.Top,
+                ClipToBounds = true,
+                Child = this.List
+            };
+
+        this.Settle();
+    }
 
     /// <summary>
     ///     Puts the control back into the window, and runs the layout.
