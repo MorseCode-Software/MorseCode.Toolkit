@@ -107,24 +107,11 @@ public static class VirtualItemsSourceExtensions
                         f: static (first, items, keys) =>
                             new VirtualRows(TotalCount: keys.Count, Offset: first, Items: items));
 
-                // The place of the rows that show in the rows of the slice. The control reports at each
-                // step of a scroll, and most steps do not move the place. The calm stops those steps.
+                // The place of the rows that show in the rows of the slice.
                 Cell<ItemRange> shown =
                     range.Map(
-                            f: static reported =>
-                                reported.Visible with
-                                {
-                                    First = reported.Visible.First - reported.Constructed.First
-                                })
-                        .Calm();
-
-                // The slice can move while the rows that show stay. The second calm stops a value
-                // that has the same rows.
-                Cell<IReadOnlyList<TRow>> visibleRows =
-                    shown.Lift(c2: mapped.Items, f: static (place, items) => RowsAt(items: items, place: place))
-                        .Calm(
-                            areEqual: static (left, right) =>
-                                left.SequenceEqual(second: right, comparer: ReferenceEqualityComparer.Instance));
+                        f: static reported =>
+                            reported.Visible with { First = reported.Visible.First - reported.Constructed.First });
 
                 return new VirtualItemsSource<TRow>(
                     values: Build(
@@ -134,7 +121,7 @@ public static class VirtualItemsSourceExtensions
                         scrollRequests: scrollRequests,
                         clears: clears),
                     constructedRows: mapped.Items,
-                    visibleRows: visibleRows,
+                    visibleRows: RowsAt(items: mapped.Items, place: shown),
                     firstVisibilityAmount: range.Map(f: static reported => reported.FirstVisibilityAmount).Calm(),
                     lastVisibilityAmount: range.Map(f: static reported => reported.LastVisibilityAmount).Calm(),
                     reported: range);
@@ -275,13 +262,13 @@ public static class VirtualItemsSourceExtensions
     /// <remarks>
     ///     <para>
     ///         The count of the control is the count of the list, and the rows start at position zero. The
-    ///         source keeps what the control reports, and nothing reads it, because the list has each row.
-    ///         A view model that makes its rows for the report uses the overload that takes a sink of the
-    ///         report.
+    ///         control has each row, thus no row waits for the report. The source keeps the report, and
+    ///         the view model can read it, with the rows at its positions, from the source.
     ///     </para>
     ///     <para>
-    ///         The sink is not optional on that overload, because there a report that goes nowhere is a
-    ///         list whose rows never load. Here no sink is correct, thus this is an overload of its own.
+    ///         A view model that makes its rows for the report uses the overload that takes a sink of the
+    ///         report. The sink is not optional there, because a report that goes nowhere is a list whose
+    ///         rows never load. Here the source has the sink, thus this is an overload of its own.
     ///     </para>
     /// </remarks>
     /// <typeparam name="TRow">
@@ -291,11 +278,15 @@ public static class VirtualItemsSourceExtensions
     /// <param name="rows">All the rows of the list, in their order.</param>
     /// <param name="scrollRequests">The positions to scroll to. None by default.</param>
     /// <param name="clears">The events that withdraw a request that the control did not use yet. None by default.</param>
-    /// <returns>The source. Expose it on the view model, and bind <see cref="VirtualizingItemsControl.Source" /> to it.</returns>
+    /// <returns>
+    ///     The source. Expose it on the view model as an <see cref="IVirtualItemsSource" />, and bind
+    ///     <see cref="VirtualizingItemsControl.Source" /> to it. The view model reads the rows that show
+    ///     from it.
+    /// </returns>
     /// <exception cref="ArgumentNullException">
     ///     <paramref name="output" /> or <paramref name="rows" /> is null.
     /// </exception>
-    public static IVirtualItemsSource CreateVirtualItemsSource<TRow>(
+    public static IVirtualItemsSource<TRow> CreateVirtualItemsSource<TRow>(
         this ViewModelBase.IOutput output,
         Cell<IReadOnlyList<TRow>> rows,
         Stream<int>? scrollRequests = null,
@@ -307,13 +298,36 @@ public static class VirtualItemsSourceExtensions
 
         return Transaction.Run(
             f: () =>
-                Build(
-                    bindableFactory: output.BindableFactory,
-                    rows: rows.Map(f: static list => new VirtualRows(TotalCount: list.Count, Offset: 0, Items: list)),
-                    reportedRange: Cell.CreateSink(initialValue: ReportedRange.Empty),
-                    scrollRequests: scrollRequests ?? Stream.Never<int>(),
-                    clears: clears));
+            {
+                CellSink<ReportedRange> range = Cell.CreateSink(initialValue: ReportedRange.Empty);
+
+                // The rows start at position zero. Thus, a range of the report is a place in the list.
+                return new VirtualItemsSource<TRow>(
+                    values: Build(
+                        bindableFactory: output.BindableFactory,
+                        rows: rows.Map(
+                            f: static list => new VirtualRows(TotalCount: list.Count, Offset: 0, Items: list)),
+                        reportedRange: range,
+                        scrollRequests: scrollRequests ?? Stream.Never<int>(),
+                        clears: clears),
+                    constructedRows: RowsAt(items: rows, place: range.Map(f: static reported => reported.Constructed)),
+                    visibleRows: RowsAt(items: rows, place: range.Map(f: static reported => reported.Visible)),
+                    firstVisibilityAmount: range.Map(f: static reported => reported.FirstVisibilityAmount).Calm(),
+                    lastVisibilityAmount: range.Map(f: static reported => reported.LastVisibilityAmount).Calm(),
+                    reported: range);
+            });
     }
+
+    // The rows of a place in a list, where the two change. The control reports at each step of a scroll,
+    // and most steps do not move the place. The first calm stops those steps. The list can change while
+    // the rows of the place stay. The second calm stops a value that has the same rows.
+    private static Cell<IReadOnlyList<TRow>> RowsAt<TRow>(Cell<IReadOnlyList<TRow>> items, Cell<ItemRange> place)
+        where TRow : class =>
+        place.Calm()
+            .Lift(c2: items, f: static (range, list) => RowsAt(items: list, place: range))
+            .Calm(
+                areEqual: static (left, right) =>
+                    left.SequenceEqual(second: right, comparer: ReferenceEqualityComparer.Instance));
 
     // The rows of a place in a list. The place stops at the two ends of the list. The report of the
     // control and the rows of the slice can be from different instants.
