@@ -23,7 +23,7 @@ internal sealed class RecipeModel : IVirtualItemsSource, IDisposable
     private readonly StreamSink<CollectionEdit<int, RecipeId, RecipeState>> edits =
         Stream.CreateSink<CollectionEdit<int, RecipeId, RecipeState>>();
 
-    private readonly IVirtualItemsSource source;
+    private readonly IVirtualItemsSource<VirtualRow> source;
     private readonly ViewModelBase viewModel;
 
     // SodaFlow holds a listener weakly, so this field keeps the listener alive.
@@ -63,7 +63,7 @@ internal sealed class RecipeModel : IVirtualItemsSource, IDisposable
                 {
                     StreamSink<int> requests = Stream.CreateSink<int>();
 
-                    IVirtualItemsSource made =
+                    IVirtualItemsSource<VirtualRow> made =
                         output.CreateVirtualItemsSource(
                             collection: collection,
                             project: key =>
@@ -96,6 +96,18 @@ internal sealed class RecipeModel : IVirtualItemsSource, IDisposable
 
     /// <inheritdoc />
     public IOneWayToSourceBindableValue<Maybe<int>> ScrollHandled => this.source.ScrollHandled;
+
+    /// <summary>
+    ///     Gets the rows at the positions that show, as the view model reads them from its source.
+    /// </summary>
+    public Cell<IReadOnlyList<VirtualRow>> VisibleRows => this.source.VisibleRows;
+
+    /// <summary>
+    ///     Gets how much of the first and of the last of the <see cref="VisibleRows" /> shows, as the
+    ///     view model reads the two numbers from its source.
+    /// </summary>
+    public (double First, double Last) VisibilityAmounts =>
+        (this.source.FirstVisibilityAmount.Sample(), this.source.LastVisibilityAmount.Sample());
 
     /// <summary>
     ///     Gets the action that asks the view to scroll to a position.

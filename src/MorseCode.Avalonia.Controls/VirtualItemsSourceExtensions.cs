@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using JetBrains.Annotations;
 using MorseCode.Mvvm;
 using SodaFlow;
@@ -46,24 +48,22 @@ public static class VirtualItemsSourceExtensions
     /// <param name="clears">The events that withdraw a request that the control did not use yet. None by default.</param>
     /// <param name="retainedBeyondTheView">The number of keys that left the slice, for which the map keeps a row.</param>
     /// <param name="onEvicted">Receives a row that the map removed. Release its resources here.</param>
-    /// <param name="reportedRange">
-    ///     The cell that receives what the control reports. Give one to read the positions that show. By
-    ///     default, the source makes its own.
-    /// </param>
-    /// <returns>The source. Expose it on the view model, and bind <see cref="VirtualizingItemsControl.Source" /> to it.</returns>
+    /// <returns>
+    ///     The source. Expose it on the view model as an <see cref="IVirtualItemsSource" />, and bind
+    ///     <see cref="VirtualizingItemsControl.Source" /> to it. The view model reads its rows from it.
+    /// </returns>
     /// <exception cref="ArgumentNullException">
     ///     <paramref name="output" />, <paramref name="collection" />, <paramref name="project" />,
     ///     or <paramref name="scrollRequests" /> is null.
     /// </exception>
-    public static IVirtualItemsSource CreateVirtualItemsSource<TKey, TIdentity, TState, TRow>(
+    public static IVirtualItemsSource<TRow> CreateVirtualItemsSource<TKey, TIdentity, TState, TRow>(
         this ViewModelBase.IOutput output,
         ReactiveCollection<TKey, TIdentity, TState> collection,
         Func<TKey, TRow> project,
         Stream<int> scrollRequests,
         Stream<Unit>? clears = null,
         int retainedBeyondTheView = MappedItems.DefaultRetainedBeyondTheView,
-        Action<TRow>? onEvicted = null,
-        CellSink<ReportedRange>? reportedRange = null)
+        Action<TRow>? onEvicted = null)
         where TKey : notnull
         where TIdentity : notnull
         where TRow : class
@@ -77,8 +77,7 @@ public static class VirtualItemsSourceExtensions
         return Transaction.Run(
             f: () =>
             {
-                CellSink<ReportedRange> range =
-                    reportedRange ?? Cell.CreateSink(initialValue: ReportedRange.Empty);
+                CellSink<ReportedRange> range = Cell.CreateSink(initialValue: ReportedRange.Empty);
 
                 // The offset and the limit are two views of the one cell. Thus, the slice always reads
                 // both values of the same report. The limit also has the positions that the control
@@ -108,18 +107,43 @@ public static class VirtualItemsSourceExtensions
                         f: static (first, items, keys) =>
                             new VirtualRows(TotalCount: keys.Count, Offset: first, Items: items));
 
-                return Build(
-                    bindableFactory: output.BindableFactory,
-                    rows: rows,
-                    reportedRange: range,
-                    scrollRequests: scrollRequests,
-                    clears: clears);
+                // The place of the rows that show in the rows of the slice. The control reports at each
+                // step of a scroll, and most steps do not move the place. The calm stops those steps.
+                Cell<ItemRange> shown =
+                    range.Map(
+                            f: static reported =>
+                                reported.Visible with
+                                {
+                                    First = reported.Visible.First - reported.Constructed.First
+                                })
+                        .Calm();
+
+                // The slice can move while the rows that show stay. The second calm stops a value
+                // that has the same rows.
+                Cell<IReadOnlyList<TRow>> visibleRows =
+                    shown.Lift(c2: mapped.Items, f: static (place, items) => RowsAt(items: items, place: place))
+                        .Calm(
+                            areEqual: static (left, right) =>
+                                left.SequenceEqual(second: right, comparer: ReferenceEqualityComparer.Instance));
+
+                return new VirtualItemsSource<TRow>(
+                    values: Build(
+                        bindableFactory: output.BindableFactory,
+                        rows: rows,
+                        reportedRange: range,
+                        scrollRequests: scrollRequests,
+                        clears: clears),
+                    constructedRows: mapped.Items,
+                    visibleRows: visibleRows,
+                    firstVisibilityAmount: range.Map(f: static reported => reported.FirstVisibilityAmount).Calm(),
+                    lastVisibilityAmount: range.Map(f: static reported => reported.LastVisibilityAmount).Calm(),
+                    reported: range);
             });
     }
 
     /// <summary>
     ///     Makes the source of a collection, as
-    ///     <see cref="CreateVirtualItemsSource{TKey,TIdentity,TState,TRow}(ViewModelBase.IOutput,ReactiveCollection{TKey,TIdentity,TState},Func{TKey,TRow},Stream{int},Stream{Unit},int,Action{TRow},CellSink{ReportedRange})" />
+    ///     <see cref="CreateVirtualItemsSource{TKey,TIdentity,TState,TRow}(ViewModelBase.IOutput,ReactiveCollection{TKey,TIdentity,TState},Func{TKey,TRow},Stream{int},Stream{Unit},int,Action{TRow})" />
     ///     does, with scroll requests by key and not by position.
     /// </summary>
     /// <remarks>
@@ -147,24 +171,22 @@ public static class VirtualItemsSourceExtensions
     /// <param name="clears">The events that withdraw a request that the control did not use yet. None by default.</param>
     /// <param name="retainedBeyondTheView">The number of keys that left the slice, for which the map keeps a row.</param>
     /// <param name="onEvicted">Receives a row that the map removed. Release its resources here.</param>
-    /// <param name="reportedRange">
-    ///     The cell that receives what the control reports. Give one to read the positions that show. By
-    ///     default, the source makes its own.
-    /// </param>
-    /// <returns>The source. Expose it on the view model, and bind <see cref="VirtualizingItemsControl.Source" /> to it.</returns>
+    /// <returns>
+    ///     The source. Expose it on the view model as an <see cref="IVirtualItemsSource" />, and bind
+    ///     <see cref="VirtualizingItemsControl.Source" /> to it. The view model reads its rows from it.
+    /// </returns>
     /// <exception cref="ArgumentNullException">
     ///     <paramref name="output" />, <paramref name="collection" />, <paramref name="project" />,
     ///     or <paramref name="scrollRequests" /> is null.
     /// </exception>
-    public static IVirtualItemsSource CreateVirtualItemsSourceByKey<TKey, TIdentity, TState, TRow>(
+    public static IVirtualItemsSource<TRow> CreateVirtualItemsSourceByKey<TKey, TIdentity, TState, TRow>(
         this ViewModelBase.IOutput output,
         ReactiveCollection<TKey, TIdentity, TState> collection,
         Func<TKey, TRow> project,
         Stream<TKey> scrollRequests,
         Stream<Unit>? clears = null,
         int retainedBeyondTheView = MappedItems.DefaultRetainedBeyondTheView,
-        Action<TRow>? onEvicted = null,
-        CellSink<ReportedRange>? reportedRange = null)
+        Action<TRow>? onEvicted = null)
         where TKey : notnull
         where TIdentity : notnull
         where TRow : class
@@ -189,8 +211,7 @@ public static class VirtualItemsSourceExtensions
                     scrollRequests: positions,
                     clears: clears,
                     retainedBeyondTheView: retainedBeyondTheView,
-                    onEvicted: onEvicted,
-                    reportedRange: reportedRange);
+                    onEvicted: onEvicted);
             });
     }
 
@@ -245,6 +266,16 @@ public static class VirtualItemsSourceExtensions
                     reportedRange: reportedRange,
                     scrollRequests: scrollRequests,
                     clears: clears));
+    }
+
+    // The rows of a place in a list. The place stops at the two ends of the list. The report of the
+    // control and the rows of the slice can be from different instants.
+    private static IReadOnlyList<TRow> RowsAt<TRow>(IReadOnlyList<TRow> items, ItemRange place)
+    {
+        int first = Math.Clamp(value: place.First, min: 0, max: items.Count);
+        int end = Math.Clamp(value: place.First + place.Count, min: first, max: items.Count);
+
+        return [.. items.Skip(count: first).Take(count: end - first)];
     }
 
     private static VirtualItemsSource Build(
