@@ -6,6 +6,7 @@ using Avalonia.Controls.Presenters;
 using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Templates;
 using Avalonia.Interactivity;
+using Avalonia.Layout;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using JetBrains.Annotations;
@@ -146,7 +147,7 @@ public class VirtualizingItemsControl : ItemsControl
         this.ContainerPrepared += (_, _) => this.RequestReport();
         this.ContainerClearing += (_, _) => this.RequestReport();
 
-        // The part of a row that shows changes with each scroll and with each change of a size, and no
+        // The amount of a row that shows changes with each scroll and with each change of a size, and no
         // container changes then. A layout is the one event that each of those has.
         this.LayoutUpdated += (_, _) => this.RequestReport();
     }
@@ -598,61 +599,96 @@ public class VirtualizingItemsControl : ItemsControl
         }
 
         // A container can be older than the count. Each range stays inside the list.
-        int visibleEnd = Math.Min(val1: count, val2: last + 1);
-        int visibleStart = Math.Min(val1: first, val2: visibleEnd);
-        int buffer = Math.Max(val1: 0, val2: this.bufferFor(arg: visibleEnd - visibleStart));
+        int containersEnd = Math.Min(val1: count, val2: last + 1);
+        int containersStart = Math.Min(val1: first, val2: containersEnd);
+        int buffer = Math.Max(val1: 0, val2: this.bufferFor(arg: containersEnd - containersStart));
 
         // The sum stops at the largest number.
-        int wantedEnd = buffer > int.MaxValue - visibleEnd ? int.MaxValue : visibleEnd + buffer;
-        int start = Math.Max(val1: 0, val2: visibleStart - buffer);
+        int wantedEnd = buffer > int.MaxValue - containersEnd ? int.MaxValue : containersEnd + buffer;
+        int start = Math.Max(val1: 0, val2: containersStart - buffer);
         int end = Math.Min(val1: count, val2: wantedEnd);
 
+        (ItemRange visible, double firstAmount, double lastAmount) =
+            this.PositionsThatShow(first: containersStart, end: containersEnd);
+
         return new ReportedRange(
-            Visible: new ItemRange(First: visibleStart, Count: visibleEnd - visibleStart),
-            Constructed: new ItemRange(First: start, Count: end - start))
+            Visible: visible,
+            Constructed: new ItemRange(First: start, Count: end - start),
+            FirstVisibilityAmount: firstAmount,
+            LastVisibilityAmount: lastAmount)
         {
-            Ahead = wantedEnd - end,
-            Parts = this.PartsThatShow(first: visibleStart, count: visibleEnd - visibleStart)
+            Ahead = wantedEnd - end
         };
     }
 
-    // Finds how much of each position that shows is in the viewport.
-    private ReportedRange.VisibleParts PartsThatShow(int first, int count)
+    // Finds the positions with a container that are in the viewport. It also finds how much of the
+    // first and of the last of them is in it. The panel can keep a container for a row that a control
+    // above the list hides. Thus, a container is not always a row that shows. The rows are in one line
+    // in the direction of the scroll, thus each row between the first and the last shows in full.
+    private (ItemRange Visible, double First, double Last) PositionsThatShow(int first, int end)
     {
-        if (count == 0 || this.ItemsPanelRoot is not { } panel)
+        if (this.ItemsPanelRoot is not { } panel)
         {
-            return default;
+            return (Visible: ItemRange.Empty, First: 0.0, Last: 0.0);
         }
 
         Rect viewport = ViewportOf(visual: panel);
-        double[] parts = new double[count];
 
-        for (int index = 0; index < count; index++)
+        // A panel that is not the default one is read as a list from top to bottom.
+        bool isHorizontal = panel is VirtualizingStackPanel { Orientation: Orientation.Horizontal };
+
+        double firstAmount = 0.0;
+
+        while (first < end && (firstAmount = Amount(position: first)) <= 0.0)
         {
-            // A position with no container at this instant gets its container at the next layout, and
-            // that layout brings the next report.
-            parts[index] =
-                this.ContainerFromIndex(index: first + index) is { } container
-                    ? PartOf(bounds: container.Bounds, viewport: viewport)
-                    : 1.0;
+            first++;
         }
 
-        return ReportedRange.VisibleParts.From(parts: parts);
+        if (first == end)
+        {
+            return (Visible: ItemRange.Empty, First: 0.0, Last: 0.0);
+        }
+
+        double lastAmount = firstAmount;
+
+        while (end - 1 > first && (lastAmount = Amount(position: end - 1)) <= 0.0)
+        {
+            end--;
+        }
+
+        // One position is the first and the last.
+        return (
+            Visible: new ItemRange(First: first, Count: end - first),
+            First: firstAmount,
+            Last: end - 1 == first ? firstAmount : lastAmount);
+
+        double Amount(int position) =>
+            this.AmountAt(position: position, viewport: viewport, isHorizontal: isHorizontal);
     }
 
-    // The part of the area of a container that is in the viewport.
-    private static double PartOf(Rect bounds, Rect viewport)
-    {
-        double area = bounds.Width * bounds.Height;
+    // A position with no container at this instant gets its container at the next layout, and that
+    // layout brings the next report.
+    private double AmountAt(int position, Rect viewport, bool isHorizontal) =>
+        this.ContainerFromIndex(index: position) is { } container
+            ? AmountOf(bounds: container.Bounds, viewport: viewport, isHorizontal: isHorizontal)
+            : 1.0;
 
-        if (area <= 0)
+    // The part of a container, in the direction of the scroll, that is in the viewport.
+    private static double AmountOf(Rect bounds, Rect viewport, bool isHorizontal)
+    {
+        (double start, double length, double from, double to) =
+            isHorizontal
+                ? (bounds.X, bounds.Width, viewport.X, viewport.Right)
+                : (bounds.Y, bounds.Height, viewport.Y, viewport.Bottom);
+
+        if (length <= 0)
         {
             return 0.0;
         }
 
-        Rect shown = bounds.Intersect(rect: viewport);
+        double shown = Math.Min(val1: start + length, val2: to) - Math.Max(val1: start, val2: from);
 
-        return Math.Min(val1: 1.0, val2: shown.Width * shown.Height / area);
+        return Math.Clamp(value: shown / length, min: 0.0, max: 1.0);
     }
 
     // The part of a visual that the visuals above it do not clip, in the coordinates of the visual. This
@@ -696,8 +732,9 @@ public class VirtualizingItemsControl : ItemsControl
         {
             int wanted = Math.Min(val1: count, val2: buffer);
 
-            return new ReportedRange(Visible: ItemRange.Empty, Constructed: new ItemRange(First: 0, Count: wanted))
+            return ReportedRange.Empty with
             {
+                Constructed = new ItemRange(First: 0, Count: wanted),
                 Ahead = buffer - wanted
             };
         }
