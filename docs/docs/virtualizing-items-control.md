@@ -21,10 +21,10 @@ The control has a position for every item in the whole list. That gives you a sc
 right length, a scroll area of the right size, and a working `ScrollIntoView`, as with any list.
 
 Avalonia's `VirtualizingStackPanel` makes containers only for the positions that are on screen.
-The control watches those containers and reports their positions, widened by `Buffer` positions on
-each side. Your view model turns that range into rows and hands them back: the rows, and the
-position of the first one. The control shows each row at its position. A position that has no row
-yet shows the `PlaceholderTemplate` instead, until the rows arrive.
+The control watches those containers and reports two ranges in one value: the positions on screen,
+and a wider range that it wants rows for. Your view model turns the wider range into rows and hands
+them back: the rows, and the position of the first one. The control shows each row at its position.
+A position that has no row yet shows the `PlaceholderTemplate` instead, until the rows arrive.
 
 ```text
  panel realizes containers ──► range ──► view model: Slice, then Map
@@ -40,7 +40,7 @@ halves are there:
 | Value | Direction | What it is |
 | --- | --- | --- |
 | `Rows` | view model to control | The rows for some of the positions, the position of the first, and the number of positions in the whole list. |
-| `VisibleRange` | control to view model | The positions on screen, with `Buffer` more on each side. |
+| `Range` | control to view model | The positions on screen, and the wider range that the control wants rows for. |
 | `ScrollRequest` | view model to control | The position that the view model wants to show, or none. |
 | `ScrollHandled` | control to view model | The position of the request that the control handled. |
 
@@ -60,7 +60,7 @@ returns to a tree, the control reads the source again and catches up with whatev
 ## The view model
 
 `CreateVirtualItemsSource` makes the source from a `ReactiveCollection`. It slices the collection
-with the range that the control reports, builds the rows with `Map`, and counts the keys. It is an extension method of the `IOutput` that `ViewModelBase` gives your constructor,
+with the range that the control wants rows for, builds the rows with `Map`, and counts the keys. It is an extension method of the `IOutput` that `ViewModelBase` gives your constructor,
 in `MorseCode.Avalonia.Controls`:
 
 ```csharp
@@ -89,20 +89,52 @@ that `Map` gives, passed on without a copy. The control reads that list when it 
 receives the value, so a list that you build yourself must never change after you hand it over.
 Make a new list for each change.
 
+### What the control reports
+
+The control writes a `ReportedRange` to the source. It holds two ranges, which always come from the
+same instant:
+
+| Range | What it is |
+| --- | --- |
+| `Visible` | The positions on screen. A row that is only partly on screen counts. |
+| `Constructed` | The positions that the control wants rows for: the visible ones, and more on each side, so that a scroll finds its rows ready. |
+
+Both ranges stay inside the list. `CreateVirtualItemsSource` builds the rows of `Constructed` for
+you. If your view model wants to know what the user sees, hand it a cell of your own and read
+`Visible` from it:
+
+```csharp
+CellSink<ReportedRange> reported = Cell.CreateSink(ReportedRange.Empty);
+
+IVirtualItemsSource source = output.CreateVirtualItemsSource(
+    collection: collection,
+    project: key => new RowViewModel(key),
+    scrollRequests: scrollTo,
+    reportedRange: reported);
+
+Cell<ItemRange> onScreen = reported.Map(static range => range.Visible);
+```
+
+`Visible` is exact with the default panel. A panel that makes containers for rows that are not on
+screen reports those too.
+
 ### When the rows do not come from a collection
 
 Another overload leaves the rows to you. You supply one `Cell<VirtualRows>` that
-holds the count, the offset, and the rows, and a `CellSink<ItemRange>` that receives the range.
-Make that cell from one lift, so the three always agree:
+holds the count, the offset, and the rows, and a `CellSink<ReportedRange>` that receives what the
+control reports. Make that cell from one lift, so the three always agree:
 
 ```csharp
-CellSink<ItemRange> range = Cell.CreateSink(ItemRange.Empty);
+CellSink<ReportedRange> reported = Cell.CreateSink(ReportedRange.Empty);
 
 IVirtualItemsSource source = output.CreateVirtualItemsSource(
     rows: rows,
-    visibleRange: range,
+    reportedRange: reported,
     scrollRequests: scrollTo);
 ```
+
+Build rows for `Constructed`, and stop at your own count. The range is inside the list as the
+control knew it, and your list can have changed since.
 
 ### When every row already exists
 
@@ -115,11 +147,13 @@ IVirtualItemsSource source = output.CreateVirtualItemsSource(rows: courses);
 
 `courses` is a `Cell<IReadOnlyList<TRow>>`, where `TRow` is a class, so the list goes to the control
 without a copy. The count is the count of the list, and the rows start at position 0. The control
-still reports a range, and the source keeps it where nothing reads it, since every row is there
-already. `scrollRequests` is optional on this overload: pass a `Stream<int>` of positions if the
-view model scrolls. As with the others, don't change a list after you hand it over. Send a new one.
+still reports what it shows, and the source keeps that report where nothing reads it, since every
+row is there already. `scrollRequests` is optional on this overload: pass a `Stream<int>` of
+positions if the view model scrolls. As with the others, don't change a list after you hand it
+over. Send a new one.
 
-If you build the rows for the range instead, use the overload above, where the range is required.
+If you build the rows for `Constructed` instead, use the overload above, where the sink for the
+report is required.
 
 Each overload takes an optional `Stream<Unit>` of clears. See
 [Scroll from the view model](#scroll-from-the-view-model).
@@ -129,8 +163,7 @@ Each overload takes an optional `Stream<Unit>` of clears. See
 ```xml
 <UserControl xmlns:mc="clr-namespace:MorseCode.Avalonia.Controls;assembly=MorseCode.Avalonia.Controls">
 
-    <mc:VirtualizingItemsControl Source="{Binding Source}"
-                                 Buffer="10">
+    <mc:VirtualizingItemsControl Source="{Binding Source}">
         <mc:VirtualizingItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:IRowViewModel">
                 <local:RowView />
@@ -150,7 +183,6 @@ Each overload takes an optional `Stream<Unit>` of clears. See
 | Property | What it does |
 | --- | --- |
 | `Source` | The one object that the control reads from and reports to. |
-| `Buffer` | How many positions to add on each side of the range that it reports. The default is 10. |
 | `PlaceholderTemplate` | What a position shows until its row arrives. |
 | `ItemTemplate` | What a row shows, as on any items control. |
 
@@ -218,6 +250,31 @@ by `int` would make the two overloads indistinguishable.
 - The tests of the control use these methods with a real SodaFlow graph, including a request made
   before the view binds. The graph of the request has tests of its own.
 
+### Bind the row view to its row
+
+When the rows change, the control keeps the container at each position and hands it the new row.
+It does not ask Avalonia for a new container. A XAML `DataTemplate` keeps the view it already
+built and gives it the new row as its `DataContext`, so everything the view shows has to come from
+a binding. That is how a XAML view normally works, so most views need no change.
+
+The control does this to keep the list where it is. A panel that loses every container on screen
+has to estimate its position from an average row height, and after a jump that estimate can be a
+different part of the list.
+
+It has these consequences:
+
+- A `FuncDataTemplate` created with `supportsRecycling: true` reuses its view in the same way, so
+  it must also read from the data context. One that sets values while it builds the view goes on
+  showing the old row. With the default, `supportsRecycling: false`, the template builds a new view
+  for every row, and values set while building are correct.
+- State that lives in the view and is not bound stays with the position, not with the row. Focus is
+  the common case: after a row is removed above it, the focused container shows the next row.
+- `ContainerPrepared` fires when Avalonia makes a container for a position. It does not fire when
+  the row at a position changes.
+
+An item that is itself a `Control` is its own container, so the control cannot hand it a different
+item. Avalonia replaces the container of such a position, as it does in any `ItemsControl`.
+
 ### Give the placeholder the height of a row
 
 Avalonia fills the screen with whatever height the rows have. A placeholder with no height looks
@@ -226,6 +283,20 @@ view model would build rows nobody can see. Make the placeholder about as high a
 
 If rows differ in height, use a typical height. Avalonia corrects its estimate as real rows
 arrive.
+
+### The control decides how far ahead to ask
+
+The control asks for rows beyond the screen, so that a scroll finds them ready. It asks for one
+screen of positions on each side, and never fewer than 10. A scroll shows no placeholder when its
+step is no longer than that, so a step of one screen, such as Page Down, shows none at any window
+size. There is no setting for it.
+
+A row that is added at an end of the list that is on screen does not show as a placeholder first.
+A source made from a collection delivers the row together with the new count, because its slice
+reaches past the end of the list. A list that is read at its end while rows arrive, such as a log,
+is the usual case. A view model that builds its own rows gets there in two steps: the control
+reports again as soon as it sees the new count, and the view model answers with the row. With the
+default panel that happens before the next layout.
 
 ### The control uses the style of `ListBox`
 
@@ -241,15 +312,15 @@ The control gives Avalonia its own list, one position per item. Setting `ItemsSo
 ## What to expect
 
 - **A fast scroll can show placeholders for a moment.** The range goes to the view model, the
-  graph runs, and the rows come back through the binding scheduler. That takes a little time. A
-  larger `Buffer` asks for rows further ahead and hides it.
+  graph runs, and the rows come back through the binding scheduler. That takes a little time. The
+  control asks one screen ahead, so only a step longer than a screen shows them.
 - **Rows are built on the thread that sends the range.** The view sends it from the UI thread.
   `Map` runs inside the transaction, so a row that is heavy to build holds up that one transaction.
 - **Selection is not part of the control.** It is an `ItemsControl` with no selected item. If you
   need selection, keep it in the view model, by key, and show it from the row.
-- **An insert above the visible rows moves rows.** The control shows each row at its new position, as
-  a replacement of the rows, so Avalonia does not keep the scroll position on the row that was on
-  screen.
+- **An insert above the visible rows moves rows.** The control shows each row at its new position,
+  in the container that is already there. The scroll position stays, and the rows on screen shift
+  by one. Avalonia does not keep the scroll position on the row that was on screen.
 - **A change of the count by more than 512 positions resets the list.** Avalonia clears its
   containers and makes them again, which is cheaper than an event for every position.
 

@@ -55,7 +55,9 @@
     <ItemGroup>
         <Compile Include="ComboBox.cs"/>
         <Compile Include="IVirtualItemsSource.cs"/>
+        <Compile Include="ItemChange.cs"/>
         <Compile Include="ItemRange.cs"/>
+        <Compile Include="ReportedRange.cs"/>
         <Compile Include="MaybeConversion.cs"/>
         <Compile Include="MaybeConverter.cs"/>
         <Compile Include="MaybeConverter.Generic.cs"/>

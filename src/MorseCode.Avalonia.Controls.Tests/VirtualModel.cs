@@ -9,7 +9,7 @@ namespace MorseCode.Avalonia.Controls.Tests;
 
 /// <summary>
 ///     A source for a <see cref="VirtualizingItemsControl" />. It does what a <c>Slice</c> followed by
-///     a <c>Map</c> does. It builds a row for each position of the range that the view writes, and for
+///     a <c>Map</c> does. It builds a row for each position that the view wants a row for, and for
 ///     no other position. It keeps its own record of each write, so a test can check the protocol of
 ///     the control without the graph of a view model.
 /// </summary>
@@ -38,21 +38,21 @@ internal sealed class VirtualModel : IVirtualItemsSource
     {
         BindableFactory factory = new(bindingScheduler: BindingScheduler.Immediate);
 
-        StreamSink<ItemRange> rangeWrites = Stream.CreateSink<ItemRange>();
+        StreamSink<ReportedRange> rangeWrites = Stream.CreateSink<ReportedRange>();
         StreamSink<Maybe<int>> handledWrites = Stream.CreateSink<Maybe<int>>();
 
         this.totalCount = Cell.CreateSink(initialValue: total);
 
         // The model is a graph and sends nothing from a listener. The rows are a function of the range,
         // the count, and the releases, thus they answer in the same transaction as the write.
-        Cell<ItemRange> range = rangeWrites.Hold(initialValue: ItemRange.Empty);
+        Cell<ReportedRange> range = rangeWrites.Hold(initialValue: ReportedRange.Empty);
         Cell<int> released = this.releases.Map(f: _ => ++this.releaseCount).Hold(initialValue: 0);
 
         Cell<VirtualRows> rowsCell =
             range.Lift(
                 c2: this.totalCount,
                 c3: released,
-                f: (visible, count, _) => this.Answer(visible: visible, count: count));
+                f: (reported, count, _) => this.Answer(wanted: reported.Constructed, count: count));
 
         // A report of the position that the request holds clears it, unless the model keeps it.
         this.request =
@@ -70,8 +70,8 @@ internal sealed class VirtualModel : IVirtualItemsSource
         this.Rows = factory.CreateOneWay(cell: rowsCell);
         this.ScrollRequest = factory.CreateOneWay(cell: this.request);
 
-        this.VisibleRange =
-            factory.CreateOneWayToSource(editsStreamSink: rangeWrites, initialValue: ItemRange.Empty);
+        this.Range =
+            factory.CreateOneWayToSource(editsStreamSink: rangeWrites, initialValue: ReportedRange.Empty);
 
         this.ScrollHandled =
             factory.CreateOneWayToSource(editsStreamSink: handledWrites, initialValue: Maybe<int>.None);
@@ -84,7 +84,7 @@ internal sealed class VirtualModel : IVirtualItemsSource
     public IOneWayBindableValue<VirtualRows> Rows { get; }
 
     /// <inheritdoc />
-    public IOneWayToSourceBindableValue<ItemRange> VisibleRange { get; }
+    public IOneWayToSourceBindableValue<ReportedRange> Range { get; }
 
     /// <inheritdoc />
     public IOneWayBindableValue<Maybe<int>> ScrollRequest { get; }
@@ -105,12 +105,18 @@ internal sealed class VirtualModel : IVirtualItemsSource
     public bool KeepsHandledRequest { get; init; }
 
     /// <summary>
+    ///     Gets or sets whether the model makes a new row object for each position at each answer. The
+    ///     docs do not tell a view model to keep its row objects.
+    /// </summary>
+    public bool MakesNewRows { get; init; }
+
+    /// <summary>
     ///     Gets each value that the view wrote as the position that it handled, in sequence.
     /// </summary>
     public List<Maybe<int>> ScrollWrites { get; } = [];
 
     /// <summary>
-    ///     Gets each range that the view wrote, in sequence.
+    ///     Gets the range that the view wanted rows for at each write, in sequence.
     /// </summary>
     public List<ItemRange> Writes { get; } = [];
 
@@ -150,9 +156,9 @@ internal sealed class VirtualModel : IVirtualItemsSource
     // Names the type once, so that a lambda that changes the request reads as a value.
     private static Func<Maybe<int>, Maybe<int>> Change(Func<Maybe<int>, Maybe<int>> f) => f;
 
-    private void RecordRange(ItemRange value)
+    private void RecordRange(ReportedRange value)
     {
-        this.Writes.Add(item: value);
+        this.Writes.Add(item: value.Constructed);
 
         // A view that reports without end is a defect. Without this check, it hangs the test run.
         if (this.Writes.Count > 200)
@@ -163,7 +169,7 @@ internal sealed class VirtualModel : IVirtualItemsSource
         }
     }
 
-    private VirtualRows Answer(ItemRange visible, int count)
+    private VirtualRows Answer(ItemRange wanted, int count)
     {
         // The count is always current. Only the rows are late.
         if (this.isHeld)
@@ -171,16 +177,16 @@ internal sealed class VirtualModel : IVirtualItemsSource
             return this.lastRows with { TotalCount = count };
         }
 
-        int first = visible.First;
-        int end = Math.Min(val1: first + visible.Count, val2: count);
+        int first = wanted.First;
+        int end = Math.Min(val1: first + wanted.Count, val2: count);
         List<object?> items = [];
 
         for (int position = first; position < end; position++)
         {
-            if (!this.rows.TryGetValue(key: position, value: out VirtualRow? row))
+            if (this.MakesNewRows || !this.rows.TryGetValue(key: position, value: out VirtualRow? row))
             {
                 row = new VirtualRow(Position: position);
-                this.rows.Add(key: position, value: row);
+                this.rows[key: position] = row;
                 this.Built.Add(item: position);
             }
 

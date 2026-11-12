@@ -12,14 +12,21 @@ namespace MorseCode.Avalonia.Controls;
 ///     <see cref="RowPlaceholder" />.
 /// </summary>
 /// <remarks>
-///     This list builds nothing and keeps nothing but the rows. Thus, a list of a
-///     million positions costs no more than the rows.
+///     <para>
+///         This list builds nothing and keeps nothing but the rows. Thus, a list of a
+///         million positions costs no more than the rows.
+///     </para>
+///     <para>
+///         An update raises an event only for a change of the length. For an event at
+///         a position, Avalonia builds the container of the position again. The control
+///         shows a changed item in the container that the position has.
+///     </para>
 /// </remarks>
 // ReSharper disable once InheritdocConsiderUsage - The summary of IList does not say what this list holds.
 internal sealed class VirtualItemList : IList, IReadOnlyList<object?>, INotifyCollectionChanged
 {
-    // More changed positions than this are cheaper for the panel as a reset than as one event for each
-    // position. A reset also clears the containers, thus the limit is well above any usual number of rows.
+    // A change of the length by more positions than this is a reset. A reset also clears the containers,
+    // thus the limit is well above any usual change.
     private const int ResetThreshold = 512;
 
     private VirtualRows rows = VirtualRows.Empty;
@@ -58,13 +65,18 @@ internal sealed class VirtualItemList : IList, IReadOnlyList<object?>, INotifyCo
     }
 
     /// <summary>
-    ///     Changes the length of the list and the rows, and tells the listeners
-    ///     which positions changed.
+    ///     Changes the length of the list and the rows, and tells the listeners how
+    ///     the length changed.
     /// </summary>
     /// <param name="newRows">
     ///     The rows, with the number of positions in the whole list. A negative number counts as zero.
     /// </param>
-    public void Update(VirtualRows newRows)
+    /// <returns>
+    ///     The positions that were in the list before and that hold a different item now. The
+    ///     list raises no event for them. After a reset there are none, because Avalonia then
+    ///     builds each container again.
+    /// </returns>
+    public IEnumerable<ItemChange> Update(VirtualRows newRows)
     {
         int newCount = Math.Max(val1: 0, val2: newRows.TotalCount);
         int oldCount = this.Count;
@@ -79,25 +91,11 @@ internal sealed class VirtualItemList : IList, IReadOnlyList<object?>, INotifyCo
         {
             this.Raise(args: new NotifyCollectionChangedEventArgs(action: NotifyCollectionChangedAction.Reset));
 
-            return;
+            return [];
         }
 
-        // A listener that reads the list while it handles an event sees the final state. Each event is
+        // A listener that reads the list while it handles an event sees the final state. The event is
         // still correct for its own positions, because it names a position and the item that is there.
-        List<int> changed =
-            ChangedPositions(
-                oldRows: oldRows,
-                oldCount: oldCount,
-                newRows: newRows,
-                newCount: newCount);
-
-        if (changed.Count > ResetThreshold)
-        {
-            this.Raise(args: new NotifyCollectionChangedEventArgs(action: NotifyCollectionChangedAction.Reset));
-
-            return;
-        }
-
         if (newCount > oldCount)
         {
             List<object?> added = [];
@@ -129,16 +127,21 @@ internal sealed class VirtualItemList : IList, IReadOnlyList<object?>, INotifyCo
                     startingIndex: newCount));
         }
 
-        foreach (int index in changed)
-        {
-            this.Raise(
-                args: new NotifyCollectionChangedEventArgs(
-                    action: NotifyCollectionChangedAction.Replace,
-                    newItem: ItemAt(rows: newRows, index: index),
-                    oldItem: ItemAt(rows: oldRows, index: index),
-                    index: index));
-        }
+        return Changes(oldRows: oldRows, oldCount: oldCount, newRows: newRows, newCount: newCount);
     }
+
+    /// <summary>
+    ///     Tells the listeners that the item of a position changed. Avalonia then builds the
+    ///     container of the position again.
+    /// </summary>
+    /// <param name="change">A change that <see cref="Update" /> gave.</param>
+    public void Replace(ItemChange change) =>
+        this.Raise(
+            args: new NotifyCollectionChangedEventArgs(
+                action: NotifyCollectionChangedAction.Replace,
+                newItem: change.After,
+                oldItem: change.Before,
+                index: change.Index));
 
     /// <inheritdoc />
     public IEnumerator GetEnumerator() => this.Enumerate().GetEnumerator();
@@ -206,37 +209,46 @@ internal sealed class VirtualItemList : IList, IReadOnlyList<object?>, INotifyCo
     }
 
     // The positions that were in the list before and after, and that hold a different item now. Only
-    // the two sets of rows can differ, because every other position is a placeholder in both.
-    private static List<int> ChangedPositions(
+    // the two sets of rows can differ, because every other position is a placeholder in both. Thus,
+    // the walk reads the two sets of rows and not the positions between them. A jump of the list
+    // then costs no more than the rows. The sequence keeps no list, thus a long run of changed
+    // positions costs no memory.
+    private static IEnumerable<ItemChange> Changes(
         VirtualRows oldRows,
         int oldCount,
         VirtualRows newRows,
         int newCount)
     {
         int shared = Math.Min(val1: oldCount, val2: newCount);
-        int from = Math.Max(val1: 0, val2: Math.Min(val1: oldRows.Offset, val2: newRows.Offset));
 
-        int to =
-            Math.Min(
-                val1: shared,
-                val2: Math.Max(
-                    val1: oldRows.Offset + oldRows.Items.Count,
-                    val2: newRows.Offset + newRows.Items.Count));
+        (VirtualRows lower, VirtualRows upper) =
+            oldRows.Offset <= newRows.Offset ? (oldRows, newRows) : (newRows, oldRows);
 
-        List<int> changed = [];
+        int lowerEnd = lower.Offset + lower.Items.Count;
+        int upperStart = Math.Max(val1: 0, val2: upper.Offset);
+        int end = Math.Min(val1: shared, val2: Math.Max(val1: lowerEnd, val2: upper.Offset + upper.Items.Count));
+        int index = Math.Max(val1: 0, val2: lower.Offset);
 
-        for (int index = from; index < to; index++)
+        while (index < end)
         {
+            // The positions between the two sets of rows. When the sets touch or overlap, there are none.
+            if (index >= lowerEnd && index < upperStart)
+            {
+                index = upperStart;
+
+                continue;
+            }
+
             object? before = ItemAt(rows: oldRows, index: index);
             object? after = ItemAt(rows: newRows, index: index);
 
             if (!ReferenceEquals(objA: before, objB: after))
             {
-                changed.Add(item: index);
+                yield return new ItemChange(Index: index, Before: before, After: after);
             }
-        }
 
-        return changed;
+            index++;
+        }
     }
 
     private IEnumerable<object?> Enumerate()

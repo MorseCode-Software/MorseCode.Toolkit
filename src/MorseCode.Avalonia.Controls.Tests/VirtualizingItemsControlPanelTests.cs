@@ -16,6 +16,8 @@ namespace MorseCode.Avalonia.Controls.Tests;
 /// </summary>
 public sealed class VirtualizingItemsControlPanelTests
 {
+    private const string PlaceholderText = "placeholder";
+
     [Test]
     [Arguments(0)]
     [Arguments(10)]
@@ -28,14 +30,15 @@ public sealed class VirtualizingItemsControlPanelTests
 
                 await Assert.That(model.RowsValues).IsEqualTo(expected: 1);
 
-                await Assert.That(shown.List.VisibleRange)
+                await Assert.That(shown.List.ReportedRange.Constructed)
                     .IsEqualTo(expected: new ItemRange(First: 0, Count: 10 + buffer));
 
                 await Assert.That(Texts(shown: shown))
                     .IsEquivalentTo(expected: Rows(first: 0, count: 10), ordering: CollectionOrdering.Matching);
             });
 
-    // The panel replaces each container, thus no container is there when the control reports.
+    // Each container gets a different row. The control changes the containers of this panel as it
+    // changes those of the default panel.
     [Test]
     [Arguments(0)]
     [Arguments(10)]
@@ -57,8 +60,7 @@ public sealed class VirtualizingItemsControlPanelTests
                     .IsEquivalentTo(expected: Rows(first: 1, count: 10), ordering: CollectionOrdering.Matching);
             });
 
-    // The panel replaces only the containers from the key down. Thus, some containers are there when
-    // the control reports, and they are fewer than the positions that show.
+    // Only the containers from the key down get a different row.
     [Test]
     [Arguments(0)]
     [Arguments(10)]
@@ -102,7 +104,9 @@ public sealed class VirtualizingItemsControlPanelTests
 
                 await Assert.That(model.RowsValues - before).IsEqualTo(expected: 2);
                 await Assert.That(model.Built.Count).IsEqualTo(expected: built);
-                await Assert.That(shown.List.VisibleRange).IsEqualTo(expected: new ItemRange(First: 0, Count: 4));
+
+                await Assert.That(shown.List.ReportedRange.Constructed)
+                    .IsEqualTo(expected: new ItemRange(First: 0, Count: 4));
 
                 await Assert.That(Texts(shown: shown))
                     .IsEquivalentTo(
@@ -110,16 +114,36 @@ public sealed class VirtualizingItemsControlPanelTests
                         ordering: CollectionOrdering.Matching);
             });
 
-    // The second value has the row for the new position, as with the default panel.
+    // The four tests that follow are the tests of the default panel, with this panel.
+    // Each range that the control reports stops at the count. The positions that the control wants after
+    // the end of the list are a number, which only the slice of a collection source reads.
     [Test]
     [Arguments(0)]
     [Arguments(10)]
-    public Task AnAddedKeyAtAnEndThatShowsBringsTheCountAndThenTheRow(int buffer) =>
+    public Task TheRangesOfAListThatEndsInsideTheWindowStayInsideTheList(int buffer) =>
         TestApplication.Run(
             test: async () =>
             {
                 using RecipeModel model = new(total: 5, retainedBeyondTheView: 512);
                 using ShownVirtual shown = Show(model: model, buffer: buffer);
+
+                ReportedRange reported = shown.List.ReportedRange;
+
+                await Assert.That(reported.Visible).IsEqualTo(expected: new ItemRange(First: 0, Count: 5));
+                await Assert.That(reported.Constructed).IsEqualTo(expected: new ItemRange(First: 0, Count: 5));
+                await Assert.That(reported.Ahead).IsEqualTo(expected: buffer);
+            });
+
+    // With no buffer, the control wants no position after the end of the list. The first value has the
+    // new count. The control can report the new position only after the panel made a container for it.
+    // The second value has the row for that position.
+    [Test]
+    public Task AnAddedKeyAtAnEndThatShowsBringsTheCountAndThenTheRowWithNoBuffer() =>
+        TestApplication.Run(
+            test: static async () =>
+            {
+                using RecipeModel model = new(total: 5, retainedBeyondTheView: 512);
+                using ShownVirtual shown = Show(model: model, buffer: 0);
 
                 int before = model.RowsValues;
 
@@ -130,6 +154,57 @@ public sealed class VirtualizingItemsControlPanelTests
 
                 await Assert.That(Texts(shown: shown))
                     .IsEquivalentTo(expected: Rows(first: 0, count: 6), ordering: CollectionOrdering.Matching);
+            });
+
+    // With a buffer, the slice of the source goes on after the end of the list. Thus, the first value
+    // has the row of the new key, and no layout shows a placeholder. The control then reports the
+    // longer ranges, and the second value is the answer to them, with the same rows.
+    [Test]
+    public Task AnAddedKeyAtAnEndThatShowsComesWithItsRow() =>
+        TestApplication.Run(
+            test: static async () =>
+            {
+                using RecipeModel model = new(total: 5, retainedBeyondTheView: 512);
+                using ShownVirtual shown = Show(model: model, buffer: 10);
+
+                shown.WatchLayouts();
+
+                int before = model.RowsValues;
+
+                model.Add(key: 5);
+                shown.Settle();
+
+                await Assert.That(model.RowsValues - before).IsEqualTo(expected: 2);
+                await Assert.That(shown.TextsAtLayouts).IsNotEmpty();
+                await Assert.That(shown.TextsAtLayouts).DoesNotContain(expected: PlaceholderText);
+
+                await Assert.That(Texts(shown: shown))
+                    .IsEquivalentTo(expected: Rows(first: 0, count: 6), ordering: CollectionOrdering.Matching);
+            });
+
+    // An empty list shows no position, and the control wants the positions that come. Thus, the first
+    // key comes with its row.
+    [Test]
+    public Task TheFirstKeyOfAnEmptyListComesWithItsRow() =>
+        TestApplication.Run(
+            test: static async () =>
+            {
+                using RecipeModel model = new(total: 0, retainedBeyondTheView: 512);
+                using ShownVirtual shown = Show(model: model, buffer: 10);
+
+                await Assert.That(shown.List.ReportedRange)
+                    .IsEqualTo(expected: ReportedRange.Empty with { Ahead = 10 });
+
+                shown.WatchLayouts();
+
+                model.Add(key: 0);
+                shown.Settle();
+
+                await Assert.That(shown.TextsAtLayouts).IsNotEmpty();
+                await Assert.That(shown.TextsAtLayouts).DoesNotContain(expected: PlaceholderText);
+
+                await Assert.That(Texts(shown: shown))
+                    .IsEquivalentTo(expected: Rows(first: 0, count: 1), ordering: CollectionOrdering.Matching);
             });
 
     private static ShownVirtual Show(IVirtualItemsSource model, int buffer) =>

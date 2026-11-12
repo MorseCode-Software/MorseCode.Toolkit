@@ -18,7 +18,7 @@ public static class VirtualItemsSourceExtensions
 {
     /// <summary>
     ///     Makes the source of a collection. A <c>Slice</c> of the collection follows the range that the
-    ///     control reports, and a <c>Map</c> after it builds a row for each key in the slice.
+    ///     control wants rows for, and a <c>Map</c> after it builds a row for each key in the slice.
     /// </summary>
     /// <remarks>
     ///     <para>
@@ -47,6 +47,10 @@ public static class VirtualItemsSourceExtensions
     /// <param name="clears">The events that withdraw a request that the control did not use yet. None by default.</param>
     /// <param name="retainedBeyondTheView">The number of keys that left the slice, for which the map keeps a row.</param>
     /// <param name="onEvicted">Receives a row that the map removed. Release its resources here.</param>
+    /// <param name="reportedRange">
+    ///     The cell that receives what the control reports. Give one to read the positions that show. By
+    ///     default, the source makes its own.
+    /// </param>
     /// <returns>The source. Expose it on the view model, and bind <see cref="VirtualizingItemsControl.Source" /> to it.</returns>
     /// <exception cref="ArgumentNullException">
     ///     <paramref name="output" />, <paramref name="collection" />, <paramref name="project" />,
@@ -59,7 +63,8 @@ public static class VirtualItemsSourceExtensions
         Stream<int> scrollRequests,
         Stream<Unit>? clears = null,
         int retainedBeyondTheView = MappedItems.DefaultRetainedBeyondTheView,
-        Action<TRow>? onEvicted = null)
+        Action<TRow>? onEvicted = null,
+        CellSink<ReportedRange>? reportedRange = null)
         where TKey : notnull
         where TIdentity : notnull
         where TRow : class
@@ -73,12 +78,18 @@ public static class VirtualItemsSourceExtensions
         return Transaction.Run(
             f: () =>
             {
-                CellSink<ItemRange> range = Cell.CreateSink(initialValue: ItemRange.Empty);
+                CellSink<ReportedRange> range =
+                    reportedRange ?? Cell.CreateSink(initialValue: ReportedRange.Empty);
 
                 // The offset and the limit are two views of the one cell. Thus, the slice always reads
-                // both values of the same range.
-                Cell<int> offset = range.Map(f: static visible => visible.First);
-                Cell<int> limit = range.Map(f: static visible => visible.Count);
+                // both values of the same report. The limit also has the positions that the control
+                // wants after the end of the list. Thus, a key that the collection gets at its end is in
+                // the slice already, and its row comes with the new count. A report that changes only
+                // the positions that show does not change the slice.
+                Cell<int> offset = range.Map(f: static reported => reported.Constructed.First).Calm();
+
+                Cell<int> limit =
+                    range.Map(f: static reported => reported.Constructed.Count + reported.Ahead).Calm();
 
                 // The output releases the rows with the view model. A caller cannot forget it.
                 MappedItems<TRow> mapped =
@@ -101,7 +112,7 @@ public static class VirtualItemsSourceExtensions
                 return Build(
                     bindableFactory: output.BindableFactory,
                     rows: rows,
-                    visibleRange: range,
+                    reportedRange: range,
                     scrollRequests: scrollRequests,
                     clears: clears);
             });
@@ -109,7 +120,7 @@ public static class VirtualItemsSourceExtensions
 
     /// <summary>
     ///     Makes the source of a collection, as
-    ///     <see cref="CreateVirtualItemsSource{TKey,TIdentity,TState,TRow}(ViewModelBase.IOutput,ReactiveCollection{TKey,TIdentity,TState},Func{TKey,TRow},Stream{int},Stream{Unit},int,Action{TRow})" />
+    ///     <see cref="CreateVirtualItemsSource{TKey,TIdentity,TState,TRow}(ViewModelBase.IOutput,ReactiveCollection{TKey,TIdentity,TState},Func{TKey,TRow},Stream{int},Stream{Unit},int,Action{TRow},CellSink{ReportedRange})" />
     ///     does, with scroll requests by key and not by position.
     /// </summary>
     /// <remarks>
@@ -137,6 +148,10 @@ public static class VirtualItemsSourceExtensions
     /// <param name="clears">The events that withdraw a request that the control did not use yet. None by default.</param>
     /// <param name="retainedBeyondTheView">The number of keys that left the slice, for which the map keeps a row.</param>
     /// <param name="onEvicted">Receives a row that the map removed. Release its resources here.</param>
+    /// <param name="reportedRange">
+    ///     The cell that receives what the control reports. Give one to read the positions that show. By
+    ///     default, the source makes its own.
+    /// </param>
     /// <returns>The source. Expose it on the view model, and bind <see cref="VirtualizingItemsControl.Source" /> to it.</returns>
     /// <exception cref="ArgumentNullException">
     ///     <paramref name="output" />, <paramref name="collection" />, <paramref name="project" />,
@@ -149,7 +164,8 @@ public static class VirtualItemsSourceExtensions
         Stream<TKey> scrollRequests,
         Stream<Unit>? clears = null,
         int retainedBeyondTheView = MappedItems.DefaultRetainedBeyondTheView,
-        Action<TRow>? onEvicted = null)
+        Action<TRow>? onEvicted = null,
+        CellSink<ReportedRange>? reportedRange = null)
         where TKey : notnull
         where TIdentity : notnull
         where TRow : class
@@ -174,7 +190,8 @@ public static class VirtualItemsSourceExtensions
                     scrollRequests: positions,
                     clears: clears,
                     retainedBeyondTheView: retainedBeyondTheView,
-                    onEvicted: onEvicted);
+                    onEvicted: onEvicted,
+                    reportedRange: reportedRange);
             });
     }
 
@@ -183,30 +200,37 @@ public static class VirtualItemsSourceExtensions
     ///     do not come from a <c>ReactiveCollection</c>.
     /// </summary>
     /// <remarks>
-    ///     The view model reads the range from <paramref name="visibleRange" /> and answers in
-    ///     <paramref name="rows" />. Make the count, the rows, and their offset from one cell, so that
-    ///     they always agree.
+    ///     <para>
+    ///         The view model reads what the control reports from <paramref name="reportedRange" />
+    ///         and answers in <paramref name="rows" />. Make the count, the rows, and their offset
+    ///         from one cell, so that they always agree.
+    ///     </para>
+    ///     <para>
+    ///         Build rows for <see cref="ReportedRange.Constructed" />. That range is inside the list
+    ///         as the control knew it at the report, and the count can be different by then. Thus,
+    ///         stop at the count of the view model.
+    ///     </para>
     /// </remarks>
     /// <param name="output">The output of the view model. The source makes its values with the factory of the output.</param>
     /// <param name="rows">The rows for some of the positions, with the position of the first and the number of positions in the whole list.</param>
-    /// <param name="visibleRange">The cell that receives the range that the control reports.</param>
+    /// <param name="reportedRange">The cell that receives what the control reports.</param>
     /// <param name="scrollRequests">The positions to scroll to.</param>
     /// <param name="clears">The events that withdraw a request that the control did not use yet. None by default.</param>
     /// <returns>The source. Expose it on the view model, and bind <see cref="VirtualizingItemsControl.Source" /> to it.</returns>
     /// <exception cref="ArgumentNullException">
-    ///     <paramref name="output" />, <paramref name="rows" />, <paramref name="visibleRange" />, or
+    ///     <paramref name="output" />, <paramref name="rows" />, <paramref name="reportedRange" />, or
     ///     <paramref name="scrollRequests" /> is null.
     /// </exception>
     public static IVirtualItemsSource CreateVirtualItemsSource(
         this ViewModelBase.IOutput output,
         Cell<VirtualRows> rows,
-        CellSink<ItemRange> visibleRange,
+        CellSink<ReportedRange> reportedRange,
         Stream<int> scrollRequests,
         Stream<Unit>? clears = null)
     {
         ArgumentNullException.ThrowIfNull(argument: output);
         ArgumentNullException.ThrowIfNull(argument: rows);
-        ArgumentNullException.ThrowIfNull(argument: visibleRange);
+        ArgumentNullException.ThrowIfNull(argument: reportedRange);
         ArgumentNullException.ThrowIfNull(argument: scrollRequests);
 
         return Transaction.Run(
@@ -214,7 +238,7 @@ public static class VirtualItemsSourceExtensions
                 Build(
                     bindableFactory: output.BindableFactory,
                     rows: rows,
-                    visibleRange: visibleRange,
+                    reportedRange: reportedRange,
                     scrollRequests: scrollRequests,
                     clears: clears));
     }
@@ -226,13 +250,13 @@ public static class VirtualItemsSourceExtensions
     /// <remarks>
     ///     <para>
     ///         The count of the control is the count of the list, and the rows start at position zero. The
-    ///         source keeps the range that the control reports, and nothing reads it, because the list has
-    ///         each row. A view model that makes its rows for the range uses the overload that takes a sink of
-    ///         the range.
+    ///         source keeps what the control reports, and nothing reads it, because the list has each row.
+    ///         A view model that makes its rows for the report uses the overload that takes a sink of the
+    ///         report.
     ///     </para>
     ///     <para>
-    ///         The range is not optional on that overload, because there a range that goes nowhere is a
-    ///         list whose rows never load. Here no range is correct, thus this is an overload of its own.
+    ///         The sink is not optional on that overload, because there a report that goes nowhere is a
+    ///         list whose rows never load. Here no sink is correct, thus this is an overload of its own.
     ///     </para>
     /// </remarks>
     /// <typeparam name="TRow">
@@ -261,7 +285,7 @@ public static class VirtualItemsSourceExtensions
                 Build(
                     bindableFactory: output.BindableFactory,
                     rows: rows.Map(f: static list => new VirtualRows(TotalCount: list.Count, Offset: 0, Items: list)),
-                    visibleRange: Cell.CreateSink(initialValue: ItemRange.Empty),
+                    reportedRange: Cell.CreateSink(initialValue: ReportedRange.Empty),
                     scrollRequests: scrollRequests ?? Stream.Never<int>(),
                     clears: clears));
     }
@@ -269,7 +293,7 @@ public static class VirtualItemsSourceExtensions
     private static VirtualItemsSource Build(
         IBindableFactory bindableFactory,
         Cell<VirtualRows> rows,
-        CellSink<ItemRange> visibleRange,
+        CellSink<ReportedRange> reportedRange,
         Stream<int> scrollRequests,
         Stream<Unit>? clears)
     {
@@ -280,7 +304,7 @@ public static class VirtualItemsSourceExtensions
 
         return new VirtualItemsSource(
             rows: bindableFactory.CreateOneWay(cell: rows),
-            visibleRange: bindableFactory.CreateOneWayToSource(sink: visibleRange),
+            range: bindableFactory.CreateOneWayToSource(sink: reportedRange),
             scrollRequest: scroll.Request,
             scrollHandled: scroll.Handled);
     }

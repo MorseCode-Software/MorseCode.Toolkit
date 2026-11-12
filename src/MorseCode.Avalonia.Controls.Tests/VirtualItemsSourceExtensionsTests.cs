@@ -27,13 +27,13 @@ public sealed class VirtualItemsSourceExtensionsTests
             Cell.CreateSink(
                 initialValue: new VirtualRows(TotalCount: 10, Offset: 2, Items: [new VirtualRow(Position: 2)]));
 
-        CellSink<ItemRange> range = Cell.CreateSink(initialValue: ItemRange.Empty);
+        CellSink<ReportedRange> range = Cell.CreateSink(initialValue: ReportedRange.Empty);
         StreamSink<int> requests = Stream.CreateSink<int>();
 
         (IVirtualItemsSource source, ViewModelBase viewModel) =
             Make(
                 make: output =>
-                    output.CreateVirtualItemsSource(rows: rows, visibleRange: range, scrollRequests: requests));
+                    output.CreateVirtualItemsSource(rows: rows, reportedRange: range, scrollRequests: requests));
 
         using ViewModelBase owner = viewModel;
 
@@ -41,10 +41,10 @@ public sealed class VirtualItemsSourceExtensionsTests
         await Assert.That(source.Rows.Value.TotalCount).IsEqualTo(expected: 10);
 
         rows.Send(a: rows.Sample() with { TotalCount = 12 });
-        source.VisibleRange.Value = new ItemRange(First: 3, Count: 4);
+        source.Range.Value = Reported(first: 3, count: 4);
 
         await Assert.That(source.Rows.Value.TotalCount).IsEqualTo(expected: 12);
-        await Assert.That(range.Sample()).IsEqualTo(expected: new ItemRange(First: 3, Count: 4));
+        await Assert.That(range.Sample()).IsEqualTo(expected: Reported(first: 3, count: 4));
     }
 
     [Test]
@@ -57,7 +57,7 @@ public sealed class VirtualItemsSourceExtensionsTests
                 make: output =>
                     output.CreateVirtualItemsSource(
                         rows: Cell.Constant(VirtualRows.Empty),
-                        visibleRange: Cell.CreateSink(initialValue: ItemRange.Empty),
+                        reportedRange: Cell.CreateSink(initialValue: ReportedRange.Empty),
                         scrollRequests: requests));
 
         using ViewModelBase owner = viewModel;
@@ -84,7 +84,7 @@ public sealed class VirtualItemsSourceExtensionsTests
                 make: output =>
                     output.CreateVirtualItemsSource(
                         rows: Cell.Constant(VirtualRows.Empty),
-                        visibleRange: Cell.CreateSink(initialValue: ItemRange.Empty),
+                        reportedRange: Cell.CreateSink(initialValue: ReportedRange.Empty),
                         scrollRequests: requests,
                         clears: clears));
 
@@ -97,7 +97,7 @@ public sealed class VirtualItemsSourceExtensionsTests
     }
 
     // A list that has all of its rows. The count is the count of the list, and the rows start at position zero.
-    // The list goes into the rows without a copy. A range from the control goes into the sink of the source,
+    // The list goes into the rows without a copy. A report from the control goes into the sink of the source,
     // and changes nothing.
     [Test]
     public async Task AWholeListGivesItsRowsFromPositionZeroWithItsCount()
@@ -123,7 +123,7 @@ public sealed class VirtualItemsSourceExtensionsTests
         ];
 
         rows.Send(a: second);
-        source.VisibleRange.Value = new ItemRange(First: 1, Count: 2);
+        source.Range.Value = Reported(first: 1, count: 2);
 
         await Assert.That(source.Rows.Value.TotalCount).IsEqualTo(expected: 5);
         await Assert.That(source.Rows.Value.Offset).IsEqualTo(expected: 0);
@@ -177,7 +177,7 @@ public sealed class VirtualItemsSourceExtensionsTests
         await Assert.That(source.Rows.Value.Items).IsEmpty();
         await Assert.That(built).IsEmpty();
 
-        source.VisibleRange.Value = new ItemRange(First: 10, Count: 5);
+        source.Range.Value = Reported(first: 10, count: 5);
 
         await Assert.That(source.Rows.Value.Offset).IsEqualTo(expected: 10);
 
@@ -208,8 +208,8 @@ public sealed class VirtualItemsSourceExtensionsTests
 
         using ViewModelBase owner = viewModel;
 
-        source.VisibleRange.Value = new ItemRange(First: 10, Count: 5);
-        source.VisibleRange.Value = new ItemRange(First: 12, Count: 5);
+        source.Range.Value = Reported(first: 10, count: 5);
+        source.Range.Value = Reported(first: 12, count: 5);
 
         await Assert.That(built)
             .IsEquivalentTo(expected: [10, 11, 12, 13, 14, 15, 16], ordering: CollectionOrdering.Matching);
@@ -318,7 +318,7 @@ public sealed class VirtualItemsSourceExtensionsTests
                         scrollRequests: Stream.CreateSink<int>(),
                         onEvicted: row => evicted.Add(item: row.Position)));
 
-        source.VisibleRange.Value = new ItemRange(First: 10, Count: 3);
+        source.Range.Value = Reported(first: 10, count: 3);
 
         await Assert.That(evicted).IsEmpty();
 
@@ -328,12 +328,120 @@ public sealed class VirtualItemsSourceExtensionsTests
             .IsEquivalentTo(expected: [10, 11, 12], ordering: CollectionOrdering.Matching);
     }
 
+    // The control wants rows for positions after the end of the list. The slice has those positions,
+    // thus the row of a key that the collection gets there comes in the value that has the new count.
+    [Test]
+    public async Task ARowAtAPositionThatTheControlWantsAfterTheEndComesWithTheCount()
+    {
+        StreamSink<CollectionEdit<int, int, int>> edits = Stream.CreateSink<CollectionEdit<int, int, int>>();
+
+        ReactiveCollection<int, int, int> collection =
+            ReactiveCollection<int, int, int>.Create(
+                keySelector: static identity => identity,
+                initialItems:
+                [
+                    .. Enumerable.Range(start: 0, count: 5)
+                        .Select(selector: static key => new Item<int, int>(identity: key, state: 0))
+                ],
+                edits);
+
+        (IVirtualItemsSource source, ViewModelBase viewModel) =
+            Make(
+                make: output =>
+                    output.CreateVirtualItemsSource(
+                        collection: collection,
+                        project: static key => new VirtualRow(Position: key),
+                        scrollRequests: Stream.CreateSink<int>()));
+
+        using ViewModelBase owner = viewModel;
+
+        source.Range.Value = Reported(first: 0, count: 5) with { Ahead = 2 };
+
+        List<VirtualRows> values = [];
+        IListener listener = source.Rows.Cell.Updates().Listen(handler: values.Add);
+
+        edits.Send(a: CollectionEdit<int, int, int>.Add(new Item<int, int>(identity: 5, state: 0)));
+        listener.Unlisten();
+
+        await Assert.That(values.Count).IsEqualTo(expected: 1);
+        await Assert.That(values[0].TotalCount).IsEqualTo(expected: 6);
+
+        await Assert.That(values[0].Items.OfType<VirtualRow>().Select(selector: static row => row.Position))
+            .IsEquivalentTo(expected: [0, 1, 2, 3, 4, 5], ordering: CollectionOrdering.Matching);
+    }
+
+    // The control also reports when only the positions that show change. The slice is the same then.
+    [Test]
+    public async Task AReportThatChangesOnlyThePositionsThatShowBringsNoRows()
+    {
+        (IVirtualItemsSource source, ViewModelBase viewModel) =
+            Make(
+                make: static output =>
+                    output.CreateVirtualItemsSource(
+                        collection: Collection(total: 100),
+                        project: static key => new VirtualRow(Position: key),
+                        scrollRequests: Stream.CreateSink<int>()));
+
+        using ViewModelBase owner = viewModel;
+
+        ItemRange constructed = new(First: 5, Count: 15);
+        source.Range.Value = new ReportedRange(Visible: new ItemRange(First: 10, Count: 5), Constructed: constructed);
+
+        List<VirtualRows> values = [];
+        IListener listener = source.Rows.Cell.Updates().Listen(handler: values.Add);
+
+        source.Range.Value = new ReportedRange(Visible: new ItemRange(First: 11, Count: 5), Constructed: constructed);
+        listener.Unlisten();
+
+        await Assert.That(values).IsEmpty();
+    }
+
+    [Test]
+    public async Task ACollectionSourceGivesTheReportOfTheControlToTheCellOfTheViewModel()
+    {
+        CellSink<ReportedRange> byPosition = Cell.CreateSink(initialValue: ReportedRange.Empty);
+        CellSink<ReportedRange> byKey = Cell.CreateSink(initialValue: ReportedRange.Empty);
+
+        (IVirtualItemsSource source, ViewModelBase viewModel) =
+            Make(
+                make: output =>
+                    output.CreateVirtualItemsSource(
+                        collection: Collection(total: 100),
+                        project: static key => new VirtualRow(Position: key),
+                        scrollRequests: Stream.CreateSink<int>(),
+                        reportedRange: byPosition));
+
+        (IVirtualItemsSource keySource, ViewModelBase keyViewModel) =
+            Make(
+                make: output =>
+                    output.CreateVirtualItemsSourceByKey(
+                        collection: Collection(total: 100),
+                        project: static key => new VirtualRow(Position: key),
+                        scrollRequests: Stream.CreateSink<int>(),
+                        reportedRange: byKey));
+
+        using ViewModelBase owner = viewModel;
+        using ViewModelBase keyOwner = keyViewModel;
+
+        ReportedRange reported =
+            new(Visible: new ItemRange(First: 10, Count: 5), Constructed: new ItemRange(First: 5, Count: 15));
+
+        source.Range.Value = reported;
+        keySource.Range.Value = reported;
+
+        await Assert.That(byPosition.Sample()).IsEqualTo(expected: reported);
+        await Assert.That(byKey.Sample()).IsEqualTo(expected: reported);
+        await Assert.That(source.Rows.Value.Offset).IsEqualTo(expected: 5);
+        await Assert.That(source.Rows.Value.Items.Count).IsEqualTo(expected: 15);
+        await Assert.That(keySource.Rows.Value.Items.Count).IsEqualTo(expected: 15);
+    }
+
     [Test]
     public async Task ANullArgumentIsRefusedAndNamed()
     {
         StreamSink<int> requests = Stream.CreateSink<int>();
         ReactiveCollection<int, int, int> collection = Collection(total: 1);
-        CellSink<ItemRange> range = Cell.CreateSink(initialValue: ItemRange.Empty);
+        CellSink<ReportedRange> range = Cell.CreateSink(initialValue: ReportedRange.Empty);
         Cell<IReadOnlyList<VirtualRow>> wholeList = Cell.Constant<IReadOnlyList<VirtualRow>>([]);
 
         // The nulls are typed variables and not arguments with a null-forgiving operator, which the
@@ -342,7 +450,7 @@ public sealed class VirtualItemsSourceExtensionsTests
         Func<int, VirtualRow> noProject = null!;
         ReactiveCollection<int, int, int> noCollection = null!;
         Cell<VirtualRows> noRows = null!;
-        CellSink<ItemRange> noRange = null!;
+        CellSink<ReportedRange> noRange = null!;
         Stream<int> noRequests = null!;
         ViewModelBase.IOutput noOutput = null!;
         Cell<IReadOnlyList<VirtualRow>> noWholeList = null!;
@@ -372,11 +480,11 @@ public sealed class VirtualItemsSourceExtensionsTests
                 scrollRequests: noRequests))),
             Catch(action: () => MakeAndRefuse(make: output => output.CreateVirtualItemsSource(
                 rows: noRows,
-                visibleRange: range,
+                reportedRange: range,
                 scrollRequests: requests))),
             Catch(action: () => MakeAndRefuse(make: output => output.CreateVirtualItemsSource(
                 rows: Cell.Constant(VirtualRows.Empty),
-                visibleRange: noRange,
+                reportedRange: noRange,
                 scrollRequests: requests))),
             Catch(action: () => noOutput.CreateVirtualItemsSource(rows: wholeList)),
             Catch(action: () => MakeAndRefuse(make: output => output.CreateVirtualItemsSource(rows: noWholeList)))
@@ -386,10 +494,14 @@ public sealed class VirtualItemsSourceExtensionsTests
             .IsEquivalentTo(
                 expected:
                 [
-                    "output", "collection", "project", "scrollRequests", "rows", "visibleRange", "output", "rows"
+                    "output", "collection", "project", "scrollRequests", "rows", "reportedRange", "output", "rows"
                 ],
                 ordering: CollectionOrdering.Matching);
     }
+
+    // A report of a control with no positions on each side: it wants rows for the positions that show.
+    private static ReportedRange Reported(int first, int count) =>
+        new(Visible: new ItemRange(First: first, Count: count), Constructed: new ItemRange(First: first, Count: count));
 
     // The value that the construction returns carries the result and the view model out.
     private static (T Result, ViewModelBase ViewModel) Make<T>(Func<ViewModelBase.IOutput, T> make) =>
