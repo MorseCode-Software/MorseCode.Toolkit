@@ -35,6 +35,20 @@ public interface IVirtualItemsSource<TRow> : IVirtualItemsSource
     Cell<IReadOnlyList<TRow>> VisibleRows { get; }
 
     /// <summary>
+    ///     Gets how much of the first of the <see cref="VisibleRows" /> shows, from 0.0 to 1.0.
+    /// </summary>
+    /// <remarks>
+    ///     Each row between the first and the last shows in full. With one row that shows, this is the
+    ///     number of <see cref="LastVisibilityAmount" />. With none, it is 0.0.
+    /// </remarks>
+    Cell<double> FirstVisibilityAmount { get; }
+
+    /// <summary>
+    ///     Gets how much of the last of the <see cref="VisibleRows" /> shows, from 0.0 to 1.0.
+    /// </summary>
+    Cell<double> LastVisibilityAmount { get; }
+
+    /// <summary>
     ///     Gets the last report of the control.
     /// </summary>
     /// <remarks>

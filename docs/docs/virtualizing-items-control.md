@@ -110,6 +110,8 @@ IVirtualItemsSource<RowViewModel> source = output.CreateVirtualItemsSource(
     scrollRequests: scrollTo);
 
 Cell<IReadOnlyList<RowViewModel>> onScreen = source.VisibleRows;
+Cell<double> firstRowShare = source.FirstVisibilityAmount;
+Cell<double> lastRowShare = source.LastVisibilityAmount;
 Cell<IReadOnlyList<RowViewModel>> built = source.ConstructedRows;
 Cell<ReportedRange> reported = source.Reported;
 ```
@@ -117,6 +119,8 @@ Cell<ReportedRange> reported = source.Reported;
 | Member | What it is |
 | --- | --- |
 | `VisibleRows` | The rows on screen, in order. It changes only when a different row shows. |
+| `FirstVisibilityAmount` | How much of the first of `VisibleRows` is on screen, from 0.0 to 1.0. |
+| `LastVisibilityAmount` | How much of the last of `VisibleRows` is on screen, from 0.0 to 1.0. |
 | `ConstructedRows` | The rows that the control was given. It is the list in `Rows`, with the type of your rows. |
 | `Reported` | The last `ReportedRange`. It changes at every step of a scroll. |
 
@@ -132,11 +136,8 @@ the default one is read as a list from top to bottom.
 The rows sit in one line along the scroll direction, so every visible row is fully on screen
 except possibly the first and the last. The report carries those two as `FirstVisibilityAmount` and
 `LastVisibilityAmount`, each from 0.0 for none of the row to 1.0 for all of it. A row that is half
-scrolled out gives 0.5. When a single row is visible, the two amounts are the same number.
-
-```csharp
-Cell<double> firstRowShare = source.Reported.Map(static range => range.FirstVisibilityAmount);
-```
+scrolled out gives 0.5. When a single row is visible, the two amounts are the same number. The
+typed source has a cell for each of them, as shown above.
 
 An amount is measured along the scroll direction, against the part of the list that nothing above
 it clips. Because the amounts change with every pixel, the control reports at every step of a

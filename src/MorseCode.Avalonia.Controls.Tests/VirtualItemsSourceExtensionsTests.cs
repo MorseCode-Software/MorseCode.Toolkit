@@ -367,13 +367,21 @@ public sealed class VirtualItemsSourceExtensionsTests
         using ViewModelBase keyOwner = keyViewModel;
 
         ReportedRange reported =
-            Reported(visible: new ItemRange(First: 10, Count: 5), constructed: new ItemRange(First: 5, Count: 15));
+            new(
+                Visible: new ItemRange(First: 10, Count: 5),
+                Constructed: new ItemRange(First: 5, Count: 15),
+                FirstVisibilityAmount: 0.25,
+                LastVisibilityAmount: 0.75);
 
         source.Range.Value = reported;
         keySource.Range.Value = reported;
 
         await Assert.That(source.Reported.Sample()).IsEqualTo(expected: reported);
         await Assert.That(keySource.Reported.Sample()).IsEqualTo(expected: reported);
+        await Assert.That(source.FirstVisibilityAmount.Sample()).IsEqualTo(expected: 0.25);
+        await Assert.That(source.LastVisibilityAmount.Sample()).IsEqualTo(expected: 0.75);
+        await Assert.That(keySource.FirstVisibilityAmount.Sample()).IsEqualTo(expected: 0.25);
+        await Assert.That(keySource.LastVisibilityAmount.Sample()).IsEqualTo(expected: 0.75);
 
         // The constructed rows are the list that the control gets, and not a copy.
         await Assert.That(source.ConstructedRows.Sample()).IsSameReferenceAs(expected: source.Rows.Value.Items);
@@ -407,16 +415,20 @@ public sealed class VirtualItemsSourceExtensionsTests
         source.Range.Value = Reported(visible: visible, constructed: new ItemRange(First: 5, Count: 15));
 
         List<IReadOnlyList<VirtualRow>> values = [];
+        List<double> amounts = [];
+        List<double> lastAmounts = [];
         IListener listener = source.VisibleRows.Updates().Listen(handler: values.Add);
+        IListener amountListener = source.FirstVisibilityAmount.Updates().Listen(handler: amounts.Add);
+        IListener lastAmountListener = source.LastVisibilityAmount.Updates().Listen(handler: lastAmounts.Add);
 
-        // A different amount of the first row shows.
+        // A different amount of the first row shows. The cell of the amount changes, and the rows do not.
         source.Range.Value =
             Reported(visible: visible, constructed: new ItemRange(First: 5, Count: 15)) with
             {
                 FirstVisibilityAmount = 0.5
             };
 
-        // The slice moves, and the rows that show stay.
+        // The slice moves, and the rows that show stay. The amount is the same number.
         source.Range.Value =
             Reported(visible: visible, constructed: new ItemRange(First: 4, Count: 17)) with
             {
@@ -424,12 +436,16 @@ public sealed class VirtualItemsSourceExtensionsTests
             };
 
         await Assert.That(values).IsEmpty();
+        await Assert.That(amounts).IsEquivalentTo(expected: [0.5], ordering: CollectionOrdering.Matching);
+        await Assert.That(lastAmounts).IsEmpty();
 
         // A different row shows.
         source.Range.Value =
             Reported(visible: new ItemRange(First: 11, Count: 5), constructed: new ItemRange(First: 4, Count: 17));
 
         listener.Unlisten();
+        amountListener.Unlisten();
+        lastAmountListener.Unlisten();
 
         await Assert.That(values.Count).IsEqualTo(expected: 1);
 

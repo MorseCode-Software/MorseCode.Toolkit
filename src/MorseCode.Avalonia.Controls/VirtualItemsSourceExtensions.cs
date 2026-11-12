@@ -135,6 +135,8 @@ public static class VirtualItemsSourceExtensions
                         clears: clears),
                     constructedRows: mapped.Items,
                     visibleRows: visibleRows,
+                    firstVisibilityAmount: range.Map(f: static reported => reported.FirstVisibilityAmount).Calm(),
+                    lastVisibilityAmount: range.Map(f: static reported => reported.LastVisibilityAmount).Calm(),
                     reported: range);
             });
     }

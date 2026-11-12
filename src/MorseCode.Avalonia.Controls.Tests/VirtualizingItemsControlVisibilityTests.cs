@@ -196,8 +196,9 @@ public sealed class VirtualizingItemsControlVisibilityTests
                     .IsEqualTo(expected: Rounded(amount: Math.Min(val1: 1.0, val2: (end - last.X) / last.Width)));
             });
 
-    // The view model reads the rows that show from its source, with their type. They are the rows on the
-    // screen after each change of the view and of the collection.
+    // The view model reads the rows that show from its source, with their type. It also reads the
+    // amounts of the first and of the last of them. They are what is on the screen after each change
+    // of the view and of the collection.
     [Test]
     public Task TheRowsThatTheViewModelReadsAsVisibleAreTheRowsOnTheScreen() =>
         TestApplication.Run(
@@ -207,6 +208,7 @@ public sealed class VirtualizingItemsControlVisibilityTests
                 using ShownVirtual shown = new(model: model, buffer: 10);
 
                 await TheVisibleRowsAreOnTheScreen(model: model, shown: shown);
+                await Assert.That(model.VisibilityAmounts).IsEqualTo(expected: (1.0, 1.0));
 
                 // A row at each end shows in part.
                 shown.Scroller.Offset = new Vector(x: 0, y: 2007);
@@ -214,6 +216,8 @@ public sealed class VirtualizingItemsControlVisibilityTests
 
                 await Assert.That(model.VisibleRows.Sample().Count).IsEqualTo(expected: 11);
                 await TheVisibleRowsAreOnTheScreen(model: model, shown: shown);
+                await Assert.That(Rounded(amount: model.VisibilityAmounts.First)).IsEqualTo(expected: 0.65);
+                await Assert.That(Rounded(amount: model.VisibilityAmounts.Last)).IsEqualTo(expected: 0.35);
 
                 // Each position gets the next key.
                 model.Remove(key: 0);
@@ -227,6 +231,12 @@ public sealed class VirtualizingItemsControlVisibilityTests
 
                 await Assert.That(model.VisibleRows.Sample()[index: 0].Position).IsEqualTo(expected: 501);
                 await TheVisibleRowsAreOnTheScreen(model: model, shown: shown);
+
+                // A control above the list shows 105 px of it: five rows, and 5 px of the row after them.
+                shown.ClipTo(height: 105, hiddenAtTheTop: 0);
+
+                await Assert.That(model.VisibleRows.Sample().Count).IsEqualTo(expected: 6);
+                await Assert.That(Rounded(amount: model.VisibilityAmounts.Last)).IsEqualTo(expected: 0.25);
             });
 
     private static async Task TheVisibleRowsAreOnTheScreen(RecipeModel model, ShownVirtual shown) =>

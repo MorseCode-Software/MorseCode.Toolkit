@@ -15,6 +15,8 @@ internal sealed class VirtualItemsSource<TRow>(
     in IVirtualItemsSource values,
     in Cell<IReadOnlyList<TRow>> constructedRows,
     in Cell<IReadOnlyList<TRow>> visibleRows,
+    in Cell<double> firstVisibilityAmount,
+    in Cell<double> lastVisibilityAmount,
     in Cell<ReportedRange> reported) : IVirtualItemsSource<TRow>
     where TRow : class
 {
@@ -35,6 +37,12 @@ internal sealed class VirtualItemsSource<TRow>(
 
     /// <inheritdoc />
     public Cell<IReadOnlyList<TRow>> VisibleRows { get; } = visibleRows;
+
+    /// <inheritdoc />
+    public Cell<double> FirstVisibilityAmount { get; } = firstVisibilityAmount;
+
+    /// <inheritdoc />
+    public Cell<double> LastVisibilityAmount { get; } = lastVisibilityAmount;
 
     /// <inheritdoc />
     public Cell<ReportedRange> Reported { get; } = reported;

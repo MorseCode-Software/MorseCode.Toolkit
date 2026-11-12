@@ -111,10 +111,11 @@ rows for Constructed.
 
 New: the overloads of CreateVirtualItemsSource for a collection return an IVirtualItemsSource of
 the row type. It is an IVirtualItemsSource, so the view binds to it as before, and it gives the view
-model three cells. VisibleRows is the rows on screen, and it changes only when a different row
-shows. ConstructedRows is the rows that the control was given, which is the list in Rows with the
-type of the rows. Reported is the last ReportedRange. Before, a view model could read its rows only
-as a list of object, and had to work out the visible ones itself.
+model these cells. VisibleRows is the rows on screen, and it changes only when a different row
+shows. FirstVisibilityAmount and LastVisibilityAmount say how much of the first and of the last of
+those rows is on screen. ConstructedRows is the rows that the control was given, which is the list
+in Rows with the type of the rows. Reported is the last ReportedRange. Before, a view model could
+read its rows only as a list of object, and had to work out the visible ones itself.
 
 A row that is added at an end of the list that is on screen no longer shows as a placeholder first.
 A source made from a collection slices past the end of the list by the positions that the control

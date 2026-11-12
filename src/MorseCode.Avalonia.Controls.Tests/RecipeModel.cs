@@ -103,6 +103,13 @@ internal sealed class RecipeModel : IVirtualItemsSource, IDisposable
     public Cell<IReadOnlyList<VirtualRow>> VisibleRows => this.source.VisibleRows;
 
     /// <summary>
+    ///     Gets how much of the first and of the last of the <see cref="VisibleRows" /> shows, as the
+    ///     view model reads the two numbers from its source.
+    /// </summary>
+    public (double First, double Last) VisibilityAmounts =>
+        (this.source.FirstVisibilityAmount.Sample(), this.source.LastVisibilityAmount.Sample());
+
+    /// <summary>
     ///     Gets the action that asks the view to scroll to a position.
     /// </summary>
     public IBindableAction<int> ScrollTo { get; }
