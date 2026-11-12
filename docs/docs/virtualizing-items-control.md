@@ -173,15 +173,22 @@ If your view model already holds every row, and you want only the virtualization
 pass the list itself:
 
 ```csharp
-IVirtualItemsSource source = output.CreateVirtualItemsSource(rows: courses);
+IVirtualItemsSource<CourseRow> source = output.CreateVirtualItemsSource(rows: courses);
 ```
 
-`courses` is a `Cell<IReadOnlyList<TRow>>`, where `TRow` is a class, so the list goes to the control
-without a copy. The count is the count of the list, and the rows start at position 0. The control
-still reports what it shows, and the source keeps that report where nothing reads it, since every
-row is there already. `scrollRequests` is optional on this overload: pass a `Stream<int>` of
-positions if the view model scrolls. As with the others, don't change a list after you hand it
-over. Send a new one.
+`courses` is a `Cell<IReadOnlyList<CourseRow>>`. The row type must be a class, so the list goes to
+the control without a copy. The count is the count of the list, and the rows start at position 0.
+`scrollRequests` is optional on this overload: pass a `Stream<int>` of positions if the view model
+scrolls. As with the others, don't change a list after you hand it over. Send a new one.
+
+No row waits for the report here, because the control has them all. The source still keeps the
+report, and it carries the type of your rows just as the source of a collection does. Your view
+model reads `VisibleRows`, the two amounts, and `Reported` from it in the same way.
+
+`ConstructedRows` differs. The control was given the whole list, so here that cell holds the part
+of the list at the positions of `Constructed`, not the list in `Rows`. `VisibleRows` and
+`ConstructedRows` change only when a different row object sits at one of their positions. An edit
+elsewhere in the list sends a new list and leaves both cells as they were.
 
 If you build the rows for `Constructed` instead, use the overload above, where the sink for the
 report is required.
