@@ -100,20 +100,30 @@ It holds two ranges:
 | `Constructed` | The positions that the control wants rows for: the visible ones, and more on each side, so that a scroll finds its rows ready. |
 
 Both ranges stay inside the list. `CreateVirtualItemsSource` builds the rows of `Constructed` for
-you. If your view model wants to know what the user sees, hand it a cell of your own and read
-`Visible` from it:
+you. The source that it returns carries the type of your rows, and your view model can read the
+report and the rows from it:
 
 ```csharp
-CellSink<ReportedRange> reported = Cell.CreateSink(ReportedRange.Empty);
-
-IVirtualItemsSource source = output.CreateVirtualItemsSource(
+IVirtualItemsSource<RowViewModel> source = output.CreateVirtualItemsSource(
     collection: collection,
     project: key => new RowViewModel(key),
-    scrollRequests: scrollTo,
-    reportedRange: reported);
+    scrollRequests: scrollTo);
 
-Cell<ItemRange> onScreen = reported.Map(static range => range.Visible);
+Cell<IReadOnlyList<RowViewModel>> onScreen = source.VisibleRows;
+Cell<IReadOnlyList<RowViewModel>> built = source.ConstructedRows;
+Cell<ReportedRange> reported = source.Reported;
 ```
+
+| Member | What it is |
+| --- | --- |
+| `VisibleRows` | The rows on screen, in order. It changes only when a different row shows. |
+| `ConstructedRows` | The rows that the control was given. It is the list in `Rows`, with the type of your rows. |
+| `Reported` | The last `ReportedRange`. It changes at every step of a scroll. |
+
+Expose the source to the view as an `IVirtualItemsSource`. The typed members are for the view model.
+The source can hold more rows than `ConstructedRows`, because `Map` keeps the row of a key that has
+scrolled out. If you need every row that exists, collect them in `project` and drop them in
+`onEvicted`.
 
 `Visible` is exact with the default panel. A panel that makes containers for rows that are not on
 screen reports those too.
@@ -123,7 +133,7 @@ it. It is the share of the row's area that nothing above the list clips, so a ro
 scrolled out gives 0.5. A position that is not in `Visible` gives 0.0.
 
 ```csharp
-Cell<double> shareOfRowSeven = reported.Map(static range => range.VisibilityOf(position: 7));
+Cell<double> shareOfRowSeven = source.Reported.Map(static range => range.VisibilityOf(position: 7));
 ```
 
 Because that share changes with every pixel, the control reports at every step of a scroll. The two
