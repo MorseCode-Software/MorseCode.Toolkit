@@ -112,11 +112,10 @@ rows for Constructed.
 
 A row that is added at an end of the list that is on screen no longer shows as a placeholder first.
 A source made from a collection slices past the end of the list by the positions that the control
-wants there, which the control reports as ReportedRange.Ahead, so the row arrives together with the
-new count. That includes the first row of an empty list, and a list that is read at its end while
-rows arrive, such as a log. For a view model with its own rows, the control now reports as soon as
-it sees a new count, where it waited for a container before. With the default panel the row then
-arrives before the next layout.
+wants there, so the row arrives together with the new count. That includes the first row of an
+empty list, and a list that is read at its end while rows arrive, such as a log. For a view model
+with its own rows, the control now reports as soon as it sees a new count, where it waited for a
+container before. With the default panel the row then arrives before the next layout.
 
 New: ReportedRange has FirstVisibilityAmount and LastVisibilityAmount, which say how much of the
 first and of the last visible row is on screen, from 0.0 for none of it to 1.0 for all of it. Every

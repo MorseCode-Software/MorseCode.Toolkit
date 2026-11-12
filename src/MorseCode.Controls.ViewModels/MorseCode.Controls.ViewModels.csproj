@@ -58,8 +58,13 @@
         <Compile Include="VirtualItemsSourceExtensions.cs"/>
     </ItemGroup>
 
-    <!-- CreateScrollRequest is internal, and its tests call it. -->
+    <!--
+        ReportedRange.Ahead is internal. The control writes it, and the tests of the control read it.
+        CreateScrollRequest is internal, and its tests call it.
+    -->
     <ItemGroup>
+        <InternalsVisibleTo Include="MorseCode.Controls.UI.Avalonia"/>
+        <InternalsVisibleTo Include="MorseCode.Controls.UI.Avalonia.Tests"/>
         <InternalsVisibleTo Include="MorseCode.Controls.ViewModels.Tests"/>
     </ItemGroup>
 

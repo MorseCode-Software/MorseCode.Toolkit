@@ -66,15 +66,9 @@ public readonly record struct ReportedRange(
             FirstVisibilityAmount: 0.0,
             LastVisibilityAmount: 0.0);
 
-    /// <summary>
-    ///     Gets the number of positions after the end of the list that the control also wants rows
-    ///     for, when the list gets them.
-    /// </summary>
-    /// <remarks>
-    ///     A range in this value cannot hold those positions, because each range stays inside the
-    ///     list. The source of a collection adds this number to its slice. Thus, a row that the list
-    ///     gets at an end that shows comes in the value that has the new count. The control sets the
-    ///     number, and it is zero if the control does not.
-    /// </remarks>
-    public int Ahead { get; init; }
+    // The number of positions after the end of the list that the control also wants rows for, when
+    // the list gets them. A range in this value cannot hold them, because each range stays inside the
+    // list. Only the slice of a collection source reads this number. The control writes it from a
+    // different assembly, which the project file names as a friend.
+    internal int Ahead { get; init; }
 }

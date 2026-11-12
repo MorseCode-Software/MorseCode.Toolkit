@@ -336,11 +336,10 @@ size. There is no setting for it.
 
 A row that is added at an end of the list that is on screen does not show as a placeholder first.
 A source made from a collection delivers the row together with the new count, because its slice
-reaches past the end of the list. The control says how far past in `Ahead`, a number in the same
-`ReportedRange`. It is not part of either range, because both stay inside the list. A list that is
-read at its end while rows arrive, such as a log, is the usual case. A view model that builds its
-own rows gets there in two steps: the control reports again as soon as it sees the new count, and
-the view model answers with the row. With the default panel that happens before the next layout.
+reaches past the end of the list. A list that is read at its end while rows arrive, such as a log,
+is the usual case. A view model that builds its own rows gets there in two steps: the control
+reports again as soon as it sees the new count, and the view model answers with the row. With the
+default panel that happens before the next layout.
 
 ### The control uses the style of `ListBox`
 

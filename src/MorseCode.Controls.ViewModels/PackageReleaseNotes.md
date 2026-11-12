@@ -51,12 +51,6 @@ different row object is at one of its positions, so an edit elsewhere in the lis
 With 0.2.x, an app bound TotalCount and Rows to such a list. Without this overload, 0.3.0 would make
 it pass a sink of the report and a stream of positions that never fires.
 
-New: ReportedRange.Ahead, the number of positions after the end of the list that the control also
-wants rows for, once the list has them. Both ranges of a ReportedRange stay inside the list, so
-neither can hold those positions. A source made from a collection adds the number to its slice, so
-a row that is added at an end on screen arrives together with the new count. The control sets it,
-and it is zero when the control sets nothing.
-
 The package targets net472, net6.0, net8.0, and netstandard2.0, as MorseCode.Mvvm does, so a project
 of view models keeps the targets that it has. It depends on MorseCode.Mvvm 0.3.0, and on SodaFlow
 [5.0.1, 6.0.0), SodaFlow.Bindable.ObjectModel [4.0.0, 5.0.0), SodaFlow.Collections [2.0.0, 3.0.0),
