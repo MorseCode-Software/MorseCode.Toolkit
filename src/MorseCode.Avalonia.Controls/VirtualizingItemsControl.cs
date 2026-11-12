@@ -104,9 +104,6 @@ public class VirtualizingItemsControl : ItemsControl
     // True from a request to report until the dispatcher runs the report.
     private bool isReportPending;
 
-    // True from a report that found the layout of the panel pending until that layout ran.
-    private bool isReportWaitingForLayout;
-
     // True from a request to scroll until the dispatcher runs it.
     private bool isScrollPending;
 
@@ -148,6 +145,10 @@ public class VirtualizingItemsControl : ItemsControl
         this.ItemsSource = this.items;
         this.ContainerPrepared += (_, _) => this.RequestReport();
         this.ContainerClearing += (_, _) => this.RequestReport();
+
+        // The part of a row that shows changes with each scroll and with each change of a size, and no
+        // container changes then. A layout is the one event that each of those has.
+        this.LayoutUpdated += (_, _) => this.RequestReport();
     }
 
     /// <summary>
@@ -534,10 +535,9 @@ public class VirtualizingItemsControl : ItemsControl
     {
         this.isReportPending = false;
 
+        // The layout that is pending brings the next report.
         if (this.IsLayoutPending())
         {
-            this.ReportAfterLayout();
-
             return;
         }
 
@@ -554,30 +554,6 @@ public class VirtualizingItemsControl : ItemsControl
     // at the next layout. The control cannot read the range of such a panel, thus its report waits for
     // that layout.
     private bool IsLayoutPending() => this.ItemsPanelRoot is { IsMeasureValid: false } and not VirtualizingStackPanel;
-
-    private void ReportAfterLayout()
-    {
-        if (this.isReportWaitingForLayout)
-        {
-            return;
-        }
-
-        this.isReportWaitingForLayout = true;
-        this.LayoutUpdated += this.OnLayoutUpdated;
-    }
-
-    private void OnLayoutUpdated(object? sender, EventArgs e)
-    {
-        // Avalonia raises the event for each layout of the window, and the panel can be invalid again.
-        if (this.IsLayoutPending())
-        {
-            return;
-        }
-
-        this.LayoutUpdated -= this.OnLayoutUpdated;
-        this.isReportWaitingForLayout = false;
-        this.RequestReport();
-    }
 
     // Finds the positions that Avalonia shows now, and the positions that the control wants rows for.
     private ReportedRange Measure()
@@ -635,8 +611,69 @@ public class VirtualizingItemsControl : ItemsControl
             Visible: new ItemRange(First: visibleStart, Count: visibleEnd - visibleStart),
             Constructed: new ItemRange(First: start, Count: end - start))
         {
-            Ahead = wantedEnd - end
+            Ahead = wantedEnd - end,
+            Parts = this.PartsThatShow(first: visibleStart, count: visibleEnd - visibleStart)
         };
+    }
+
+    // Finds how much of each position that shows is in the viewport.
+    private ReportedRange.VisibleParts PartsThatShow(int first, int count)
+    {
+        if (count == 0 || this.ItemsPanelRoot is not { } panel)
+        {
+            return default;
+        }
+
+        Rect viewport = ViewportOf(visual: panel);
+        double[] parts = new double[count];
+
+        for (int index = 0; index < count; index++)
+        {
+            // A position with no container at this instant gets its container at the next layout, and
+            // that layout brings the next report.
+            parts[index] =
+                this.ContainerFromIndex(index: first + index) is { } container
+                    ? PartOf(bounds: container.Bounds, viewport: viewport)
+                    : 1.0;
+        }
+
+        return ReportedRange.VisibleParts.From(parts: parts);
+    }
+
+    // The part of the area of a container that is in the viewport.
+    private static double PartOf(Rect bounds, Rect viewport)
+    {
+        double area = bounds.Width * bounds.Height;
+
+        if (area <= 0)
+        {
+            return 0.0;
+        }
+
+        Rect shown = bounds.Intersect(rect: viewport);
+
+        return Math.Min(val1: 1.0, val2: shown.Width * shown.Height / area);
+    }
+
+    // The part of a visual that the visuals above it do not clip, in the coordinates of the visual. This
+    // is the effective viewport of Avalonia, which the layout manager gives only in an event. The
+    // control needs it at each report, thus the control finds it then and keeps no copy. A render
+    // transform of a visual above the list is not used.
+    private static Rect ViewportOf(Visual visual)
+    {
+        if (visual.GetVisualParent() is not { } parent)
+        {
+            return new Rect(size: visual.Bounds.Size);
+        }
+
+        Rect inParent = ViewportOf(visual: parent);
+
+        if (parent.ClipToBounds)
+        {
+            inParent = inParent.Intersect(rect: new Rect(size: parent.Bounds.Size));
+        }
+
+        return inParent.Translate(offset: -visual.Bounds.Position);
     }
 
     // No container, with positions to show, means that the control is not laid out. This is also the
