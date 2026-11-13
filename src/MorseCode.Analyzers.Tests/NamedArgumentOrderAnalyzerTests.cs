@@ -343,6 +343,55 @@ internal sealed class NamedArgumentOrderAnalyzerTests
             .IsEquivalentTo(expected: ["(maximum: 9, minimum: 1)"], ordering: CollectionOrdering.Matching);
     }
 
+    // An attribute without parentheses has no argument list. An empty pair of parentheses has a list with no
+    // argument. Neither gives a report.
+    [Test]
+    public async Task AnAttributeWithoutArgumentsGivesNoReport()
+    {
+        IReadOnlyList<Diagnostic> found =
+            await AnalyzerHarness.Analyze(
+                    analyzer: new NamedArgumentOrderAnalyzer(),
+                    source: """
+                            using System;
+
+                            [Serializable]
+                            [Obsolete()]
+                            public sealed class Plain;
+                            """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        await Assert.That(found).IsEmpty();
+    }
+
+    // An editor runs the analyzer while the code has errors. An attribute that does not bind to one constructor
+    // gives no report: a type that is not declared, and a name that no parameter has. An exception in the
+    // analyzer gives AD0001, and the test fails on it.
+    [Test]
+    public async Task AnAttributeThatDoesNotBindGivesNoReport()
+    {
+        IReadOnlyList<Diagnostic> found =
+            await AnalyzerHarness.Analyze(
+                    analyzer: new NamedArgumentOrderAnalyzer(),
+                    source: """
+                            using System;
+
+                            public sealed class MarkAttribute(int a, int b) : Attribute
+                            {
+                                public int A { get; } = a;
+
+                                public int B { get; } = b;
+                            }
+
+                            [Missing(b: 2, a: 1)]
+                            [Mark(c: 2, a: 1)]
+                            public sealed class Marked;
+                            """,
+                    errors: ["CS0246", "CS0246", "CS1739"])
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        await Assert.That(found).IsEmpty();
+    }
+
     // The arguments of an indexer, in order and out of order, and through a conditional access. A property
     // without parameters has no argument list. Each report covers the brackets.
     [Test]
