@@ -1,0 +1,77 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <!--
+        The targets of MorseCode.Mvvm, and not those of a UI framework. A view model that gives its
+        rows to a control of this toolkit references this package and no UI package. Thus, it can
+        have each target that its other view models have.
+    -->
+    <PropertyGroup>
+        <TargetFrameworks>net472;net6.0;net8.0;netstandard2.0</TargetFrameworks>
+        <LangVersion>14</LangVersion>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="$([MSBuild]::IsTargetFrameworkCompatible('$(TargetFramework)', 'net8.0'))">
+        <IsAotCompatible>true</IsAotCompatible>
+    </PropertyGroup>
+
+    <PropertyGroup>
+        <PackageId>MorseCode.Controls.ViewModels</PackageId>
+        <MinVerTagPrefix>morsecode-controls-viewmodels-</MinVerTagPrefix>
+        <Product>MorseCode.Controls.ViewModels</Product>
+        <Title>MorseCode.Controls.ViewModels</Title>
+        <Description>What a view model on SodaFlow gives to a control of the MorseCode toolkit, and the methods that build it. It has no dependency on a UI framework.</Description>
+        <PackageIcon>MorseCode.png</PackageIcon>
+        <AssemblyName>MorseCode.Controls.ViewModels</AssemblyName>
+        <RootNamespace>MorseCode.Controls.ViewModels</RootNamespace>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    </PropertyGroup>
+
+    <!--
+        The builders of a source use the cells and the streams of SodaFlow, its bindable values, and
+        its collections. Maybe is the type of a scroll request.
+    -->
+    <ItemGroup>
+        <PackageReference Include="SodaFlow" Version="5.0.1"/>
+        <PackageReference Include="SodaFlow.Bindable.ObjectModel" Version="4.0.0"/>
+        <PackageReference Include="SodaFlow.Collections" Version="2.0.0"/>
+        <PackageReference Include="SodaFlow.Functional" Version="3.0.2"/>
+    </ItemGroup>
+
+    <!-- CreateVirtualItemsSource registers the disposal of its source with the IOutput of a view model. -->
+    <ItemGroup>
+        <ProjectReference Include="..\MorseCode.Mvvm\MorseCode.Mvvm.csproj"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <Compile Include="Argument.cs"/>
+        <Compile Include="IsExternalInit.cs"/>
+        <Compile Include="IVirtualItemsSource.cs"/>
+        <Compile Include="IVirtualItemsSource.Generic.cs"/>
+        <Compile Include="ItemRange.cs"/>
+        <Compile Include="ReportedRange.cs"/>
+        <Compile Include="ScrollRequestBindables.cs"/>
+        <Compile Include="ScrollRequestExtensions.cs"/>
+        <Compile Include="VirtualRows.cs"/>
+        <Compile Include="VirtualItemsSource.cs"/>
+        <Compile Include="VirtualItemsSource.Generic.cs"/>
+        <Compile Include="VirtualItemsSourceExtensions.cs"/>
+    </ItemGroup>
+
+    <!--
+        ReportedRange.Ahead is internal. The control writes it, and the tests of the control read it.
+        CreateScrollRequest is internal, and its tests call it.
+    -->
+    <ItemGroup>
+        <InternalsVisibleTo Include="MorseCode.Controls.UI.Avalonia"/>
+        <InternalsVisibleTo Include="MorseCode.Controls.UI.Avalonia.Tests"/>
+        <InternalsVisibleTo Include="MorseCode.Controls.ViewModels.Tests"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Include="..\..\logo\MorseCode.png" Pack="true" PackagePath="\">
+            <Link>MorseCode.png</Link>
+        </None>
+    </ItemGroup>
+
+</Project>

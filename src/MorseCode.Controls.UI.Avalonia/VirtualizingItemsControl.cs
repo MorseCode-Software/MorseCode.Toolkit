@@ -1,0 +1,745 @@
+using System;
+using System.ComponentModel;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Controls.Presenters;
+using Avalonia.Controls.Primitives;
+using Avalonia.Controls.Templates;
+using Avalonia.Interactivity;
+using Avalonia.Layout;
+using Avalonia.Threading;
+using Avalonia.VisualTree;
+using JetBrains.Annotations;
+using MorseCode.Controls.ViewModels;
+using SodaFlow.Functional;
+
+namespace MorseCode.Controls.UI.Avalonia;
+
+/// <summary>
+///     An items control for a long list whose rows are heavy to build. It tells the
+///     view model which positions Avalonia shows, and the view model gives back the
+///     rows for only those positions.
+/// </summary>
+/// <remarks>
+///     <para>
+///         Set <see cref="Source" /> to the one object that the view model gives. The control has a
+///         position for each item that the source counts. Thus, the scroll bar, the size of the
+///         scroll area, and <see cref="ItemsControl.ScrollIntoView(int)" /> work as on any items
+///         control. Avalonia makes containers for the positions that show. The control reports
+///         those positions to the source, and with them a larger range that it wants rows for. A
+///         position that the rows of the source do not cover shows
+///         <see cref="PlaceholderTemplate" />.
+///     </para>
+///     <para>
+///         The larger range has one screen of positions on each side of the positions that show,
+///         and not fewer than 10. Thus, a scroll by one screen finds its rows. No property sets
+///         that number.
+///     </para>
+///     <para>
+///         In the view model, make the source with <c>CreateVirtualItemsSource</c>. It sends the
+///         range that the control wants rows for to the offset and the limit of <c>Slice</c>, and
+///         builds the rows with <c>Map</c> after it. The <c>Map</c> builds a row for a key only
+///         when the key is inside the slice.
+///     </para>
+///     <para>
+///         To scroll, the view model makes a request in the source. The control scrolls there when
+///         it can, and then reports the position back. Thus, a request made before the control is
+///         bound or laid out is not lost.
+///     </para>
+///     <para>
+///         Do not set <see cref="ItemsControl.ItemsSource" />. The control sets it. A
+///         placeholder must be about as high as a row. Otherwise, Avalonia shows more
+///         placeholders than the screen needs, and the view model builds rows that the
+///         user cannot see.
+///     </para>
+///     <para>
+///         When the rows change, the control keeps the container of each position and gives it
+///         the new row. A row template that uses its view again, as each XAML template does, gets
+///         the new row only as the data context of that view. Thus, such a view must read each
+///         value from its data context, as a binding does. The control raises
+///         <see cref="ItemsControl.ContainerPrepared" /> when Avalonia makes a container for a
+///         position, and not when the row of the position changes.
+///     </para>
+///     <para>
+///         The control uses the style of <see cref="ListBox" />. Thus, a style in the application
+///         that selects <c>ListBox</c> also applies to this control.
+///     </para>
+/// </remarks>
+[PublicAPI]
+// ReSharper disable once InheritdocConsiderUsage - The summary of ItemsControl does not say what this control reports.
+public class VirtualizingItemsControl : ItemsControl
+{
+    /// <summary>
+    ///     Defines the <see cref="Source" /> property.
+    /// </summary>
+    public static readonly StyledProperty<IVirtualItemsSource?> SourceProperty =
+        AvaloniaProperty.Register<VirtualizingItemsControl, IVirtualItemsSource?>(name: nameof(Source));
+
+    // The source feeds these two properties, and the tests of the control read them.
+    internal static readonly StyledProperty<VirtualRows> RowsProperty =
+        AvaloniaProperty.Register<VirtualizingItemsControl, VirtualRows>(
+            name: nameof(Rows),
+            defaultValue: VirtualRows.Empty);
+
+    internal static readonly StyledProperty<Maybe<int>> ScrollRequestProperty =
+        AvaloniaProperty.Register<VirtualizingItemsControl, Maybe<int>>(
+            name: nameof(ScrollRequest),
+            defaultValue: Maybe<int>.None);
+
+    /// <summary>
+    ///     Defines the <see cref="PlaceholderTemplate" /> property.
+    /// </summary>
+    public static readonly StyledProperty<IDataTemplate?> PlaceholderTemplateProperty =
+        AvaloniaProperty.Register<VirtualizingItemsControl, IDataTemplate?>(name: nameof(PlaceholderTemplate));
+
+    // The fewest positions on each side of the positions that show, for which the control wants rows.
+    private const int SmallestBuffer = 10;
+
+    private static readonly FuncTemplate<Panel?> DefaultPanel =
+        new(func: static () => new VirtualizingStackPanel());
+
+    private readonly VirtualItemList items = new();
+
+    // Gives the number of positions on each side, from the number of positions that show.
+    private readonly Func<int, int> bufferFor;
+
+    // True from a request to report until the dispatcher runs the report.
+    private bool isReportPending;
+
+    // True from a request to scroll until the dispatcher runs it.
+    private bool isScrollPending;
+
+    // True from the moment that the control handled the request that it holds until the request changes.
+    // The view model clears the request after it receives the report, and that can take a moment.
+    private bool isRequestHandled;
+
+    // The source that the control reads and reports to.
+    private IVirtualItemsSource? source;
+
+    // The handlers on the values of the source. They are set only while the control follows the source,
+    // which is while it is in a visual tree. A handler is a reference from the source to the control, and
+    // a view model can outlive its view. Thus, a control that left the tree holds none.
+    private PropertyChangedEventHandler? onRowsChanged;
+    private PropertyChangedEventHandler? onScrollRequestChanged;
+
+    // The default panel of an items control does not virtualize. This is the default panel of the list
+    // box of Avalonia.
+    static VirtualizingItemsControl() =>
+        ItemsPanelProperty.OverrideDefaultValue<VirtualizingItemsControl>(defaultValue: DefaultPanel);
+
+    /// <summary>
+    ///     Initializes a new instance of the <see cref="VirtualizingItemsControl" /> class.
+    /// </summary>
+    // ReSharper disable once InheritdocConsiderUsage - The constructor of ItemsControl does not say what this one sets.
+    public VirtualizingItemsControl()
+
+        // A scroll shows no placeholder when its step is not longer than the positions on one side.
+        // Thus, the control wants rows for one screen of positions on each side. A screen with few
+        // rows, and an empty list, get the smallest number.
+        : this(bufferFor: static shown => Math.Max(val1: SmallestBuffer, val2: shown))
+    {
+    }
+
+    // A test gives its own number of positions on each side. An app cannot.
+    internal VirtualizingItemsControl(Func<int, int> bufferFor)
+    {
+        this.bufferFor = bufferFor;
+        this.ItemsSource = this.items;
+        this.ContainerPrepared += (_, _) => this.RequestReport();
+        this.ContainerClearing += (_, _) => this.RequestReport();
+
+        // The amount of a row that shows changes with each scroll and with each change of a size, and no
+        // container changes then. A layout is the one event that each of those has.
+        this.LayoutUpdated += (_, _) => this.RequestReport();
+    }
+
+    /// <summary>
+    ///     Gets or sets the object that the view model gives to the control: the count, the rows, the
+    ///     range that shows, and the scroll request.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The control reads the rows, with their count, and the scroll request from the source, and
+    ///         writes the range that shows and the position that it scrolled to. Make the source with
+    ///         <c>CreateVirtualItemsSource</c>. A change of this property detaches the control from the
+    ///         old source and attaches it to the new one.
+    ///     </para>
+    ///     <para>
+    ///         The control follows the source only while it is in a visual tree. A control that left the
+    ///         tree keeps no reference in the source. Thus, a view model that outlives its view does not
+    ///         keep the view alive. The control reads the source again when it returns to a tree.
+    ///     </para>
+    /// </remarks>
+    public IVirtualItemsSource? Source
+    {
+        get => this.GetValue(property: SourceProperty);
+        set => this.SetValue(property: SourceProperty, value: value);
+    }
+
+    internal VirtualRows Rows
+    {
+        get => this.GetValue(property: RowsProperty);
+        set => this.SetValue(property: RowsProperty, value: value);
+    }
+
+    /// <summary>
+    ///     Gets or sets the template for a position that the rows of the source do
+    ///     not cover.
+    /// </summary>
+    /// <remarks>
+    ///     The data context of the template is the control's own placeholder, which has
+    ///     no data. Give the template the height of a row.
+    /// </remarks>
+    public IDataTemplate? PlaceholderTemplate
+    {
+        get => this.GetValue(property: PlaceholderTemplateProperty);
+        set => this.SetValue(property: PlaceholderTemplateProperty, value: value);
+    }
+
+    // The position that the view model wants to show. The control scrolls to it and then reports the
+    // position to the source. It scrolls once for each value of this property. If the view model has not
+    // cleared the request yet, a change of the count does not scroll again. A request beyond the count
+    // stays until the count grows. A negative position can never apply, so the control reports it at once
+    // and does not scroll.
+    internal Maybe<int> ScrollRequest
+    {
+        get => this.GetValue(property: ScrollRequestProperty);
+        set => this.SetValue(property: ScrollRequestProperty, value: value);
+    }
+
+    // The positions that show, and the positions that the control wants rows for. The control reports
+    // them to the source.
+    internal ReportedRange ReportedRange { get; private set; } = ReportedRange.Empty;
+
+    /// <inheritdoc />
+    protected override Type StyleKeyOverride => typeof(ListBox);
+
+    /// <inheritdoc />
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change: change);
+
+        if (change.Property == ItemsSourceProperty && !ReferenceEquals(objA: change.NewValue, objB: this.items))
+        {
+            throw new InvalidOperationException(
+                message: "VirtualizingItemsControl sets ItemsSource itself. Set Source instead.");
+        }
+
+        if (change.Property == RowsProperty)
+        {
+            foreach (ItemChange itemChange in this.items.Update(newRows: this.Rows))
+            {
+                this.Show(itemChange: itemChange);
+            }
+
+            // The count is the limit of each range that the control reports. Thus, a new count can
+            // change the ranges before a container changes. The row of a new position can then come
+            // before the layout that shows the position.
+            if (change.GetOldValue<VirtualRows>().TotalCount != change.GetNewValue<VirtualRows>().TotalCount)
+            {
+                this.RequestReport();
+            }
+        }
+        else if (change.Property == SourceProperty)
+        {
+            this.AttachSource(newSource: change.GetNewValue<IVirtualItemsSource?>());
+        }
+
+        // A new request value is a request that the control has not handled.
+        if (change.Property == ScrollRequestProperty)
+        {
+            this.isRequestHandled = false;
+        }
+
+        // A request can wait for the count, and the count can arrive after the request. New rows with the
+        // same count cannot make a request possible.
+        if (change.Property == ScrollRequestProperty
+            || (change.Property == RowsProperty
+                && change.GetOldValue<VirtualRows>().TotalCount != change.GetNewValue<VirtualRows>().TotalCount))
+        {
+            this.RequestScroll();
+        }
+    }
+
+    /// <inheritdoc />
+    protected override void OnLoaded(RoutedEventArgs e)
+    {
+        base.OnLoaded(e: e);
+
+        // A request that came before the Loaded event can scroll now.
+        this.RequestScroll();
+    }
+
+    /// <inheritdoc />
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e: e);
+
+        // The source can change while the control is out of the tree. The range that the control
+        // reported last stays, thus the view model keeps the rows for it and the return shows no
+        // placeholders.
+        if (this.source is not null)
+        {
+            this.Follow(source: this.source);
+            this.ReadSource(source: this.source);
+            this.RequestReport();
+        }
+    }
+
+    /// <inheritdoc />
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        this.StopFollowing();
+
+        base.OnDetachedFromVisualTree(e: e);
+    }
+
+    /// <inheritdoc />
+    protected override void PrepareContainerForItemOverride(Control container, object? item, int index)
+    {
+        base.PrepareContainerForItemOverride(container: container, item: item, index: index);
+
+        // Avalonia can reuse a container for a position that gets a different kind of item. Thus, the
+        // template is set in both directions.
+        IDataTemplate? template = item is RowPlaceholder ? this.PlaceholderTemplate : this.ItemTemplate;
+
+        switch (container)
+        {
+            case ContentPresenter presenter:
+                presenter.ContentTemplate = template;
+
+                break;
+            case ContentControl control:
+                control.ContentTemplate = template;
+
+                break;
+        }
+    }
+
+    /// <inheritdoc />
+    protected override void ClearContainerForItemOverride(Control container)
+    {
+        // The base clears the content before the template. A presenter in a tree builds its child again
+        // at each of the two changes. The ContentPresenter of Avalonia 12 builds an explicit template
+        // also for no content. Thus, the row template builds a row view for null, and the second change
+        // removes it. The template goes first here, so that the build for no content does not occur.
+        switch (container)
+        {
+            case ContentPresenter presenter:
+                presenter.ClearValue(property: ContentPresenter.ContentTemplateProperty);
+
+                break;
+            case ContentControl control:
+                control.ClearValue(property: ContentControl.ContentTemplateProperty);
+
+                break;
+        }
+
+        base.ClearContainerForItemOverride(container: container);
+    }
+
+    // Shows the new item of a position in the container that the position has. For a replaced item,
+    // the panel builds the container again. A panel with no container left that shows estimates its
+    // position from an average height. After a jump, that estimate is a different part of the list
+    // when the rows and the placeholders have different heights.
+    private void Show(ItemChange itemChange)
+    {
+        if (this.ContainerFromIndex(index: itemChange.Index) is not { } container)
+        {
+            return;
+        }
+
+        bool isShown =
+            container switch
+            {
+                ContentPresenter =>
+                    this.TryShow(
+                        container: container,
+                        content: ContentPresenter.ContentProperty,
+                        contentTemplate: ContentPresenter.ContentTemplateProperty,
+                        itemChange: itemChange),
+                ContentControl and not HeaderedContentControl =>
+                    this.TryShow(
+                        container: container,
+                        content: ContentControl.ContentProperty,
+                        contentTemplate: ContentControl.ContentTemplateProperty,
+                        itemChange: itemChange),
+                _ => false
+            };
+
+        if (!isShown)
+        {
+            this.items.Replace(change: itemChange);
+        }
+    }
+
+    // The control can change only a container that it made for the item from before. A control is its
+    // own container, and a container of a different type can show the item in a different property.
+    private bool TryShow(
+        Control container,
+        StyledProperty<object?> content,
+        StyledProperty<IDataTemplate?> contentTemplate,
+        ItemChange itemChange)
+    {
+        if (itemChange.After is Control
+            || !ReferenceEquals(objA: container.GetValue(property: content), objB: itemChange.Before))
+        {
+            return false;
+        }
+
+        // The presenter builds its view at each of the two changes. The placeholder template accepts
+        // each item, and a row template with bindings accepts only a row. Thus, the order is the one in
+        // which the row template never gets a placeholder.
+        if (itemChange.After is RowPlaceholder)
+        {
+            container.SetValue(property: contentTemplate, value: this.PlaceholderTemplate);
+            container.SetCurrentValue(property: content, value: itemChange.After);
+        }
+        else
+        {
+            container.SetCurrentValue(property: content, value: itemChange.After);
+            container.SetValue(property: contentTemplate, value: this.ItemTemplate);
+        }
+
+        container.DataContext = itemChange.After;
+
+        return true;
+    }
+
+    private void RequestScroll()
+    {
+        if (this.isScrollPending)
+        {
+            return;
+        }
+
+        this.isScrollPending = true;
+        this.Dispatcher.Post(action: this.ApplyScroll, priority: DispatcherPriority.Normal);
+    }
+
+    // The request is a value of the view model, thus it stays until the control can use it. The report in
+    // ScrollHandled is how the control says that it used it.
+    private void ApplyScroll()
+    {
+        this.isScrollPending = false;
+
+        if (this.isRequestHandled)
+        {
+            return;
+        }
+
+        this.ScrollRequest.MatchSome(
+            onSome: position =>
+            {
+                if (position < 0)
+                {
+                    this.Handle(position: position);
+                }
+                else if (this.IsLoaded && this.ItemsPanelRoot is not null && position < this.items.Count)
+                {
+                    this.ScrollIntoView(index: position);
+                    this.Handle(position: position);
+                }
+            });
+    }
+
+    private void Handle(int position)
+    {
+        // The flag comes first. The report can make the view model clear or replace the request at once,
+        // and that change of the request resets the flag.
+        this.isRequestHandled = true;
+
+        // The second write makes a report of the same position a change again, for a source that drops
+        // an equal write.
+        if (this.source is not null)
+        {
+            this.source.ScrollHandled.Value = Maybe<int>.Some(value: position);
+            this.source.ScrollHandled.Value = Maybe<int>.None;
+        }
+    }
+
+    private void AttachSource(IVirtualItemsSource? newSource)
+    {
+        this.StopFollowing();
+
+        this.source = newSource;
+
+        if (newSource is null)
+        {
+            // A control with no source shows nothing and has no request.
+            this.ScrollRequest = Maybe<int>.None;
+            this.Rows = VirtualRows.Empty;
+
+            return;
+        }
+
+        if (this.IsAttachedToVisualTree())
+        {
+            this.Follow(source: newSource);
+        }
+
+        this.ReadSource(source: newSource);
+
+        // The new source has no report yet.
+        this.ReportedRange = ReportedRange.Empty;
+        this.RequestReport();
+    }
+
+    private void Follow(IVirtualItemsSource source)
+    {
+        this.onRowsChanged = (_, _) => this.Rows = source.Rows.Value;
+        this.onScrollRequestChanged = (_, _) => this.ScrollRequest = source.ScrollRequest.Value;
+
+        source.Rows.PropertyChanged += this.onRowsChanged;
+        source.ScrollRequest.PropertyChanged += this.onScrollRequestChanged;
+    }
+
+    private void StopFollowing()
+    {
+        if (this.source is null)
+        {
+            return;
+        }
+
+        if (this.onRowsChanged is not null)
+        {
+            this.source.Rows.PropertyChanged -= this.onRowsChanged;
+        }
+
+        if (this.onScrollRequestChanged is not null)
+        {
+            this.source.ScrollRequest.PropertyChanged -= this.onScrollRequestChanged;
+        }
+
+        this.onRowsChanged = null;
+        this.onScrollRequestChanged = null;
+    }
+
+    // The source can hold values already.
+    private void ReadSource(IVirtualItemsSource source)
+    {
+        this.Rows = source.Rows.Value;
+        this.ScrollRequest = source.ScrollRequest.Value;
+    }
+
+    private void RequestReport()
+    {
+        if (this.isReportPending)
+        {
+            return;
+        }
+
+        this.isReportPending = true;
+        this.Dispatcher.Post(action: this.Report, priority: DispatcherPriority.Normal);
+    }
+
+    private void Report()
+    {
+        this.isReportPending = false;
+
+        // The layout that is pending brings the next report.
+        if (this.IsLayoutPending())
+        {
+            return;
+        }
+
+        ReportedRange range = this.Measure();
+
+        this.ReportedRange = range;
+
+        // The source drops a write that equals the last one.
+        this.source?.Range.Value = range;
+    }
+
+    // Measure reads the range of a VirtualizingStackPanel from the panel, which is correct at all times.
+    // A different panel can also recycle a container at a change of the items, and make it again only
+    // at the next layout. The control cannot read the range of such a panel, thus its report waits for
+    // that layout.
+    private bool IsLayoutPending() => this.ItemsPanelRoot is { IsMeasureValid: false } and not VirtualizingStackPanel;
+
+    // Finds the positions that Avalonia shows now, and the positions that the control wants rows for.
+    private ReportedRange Measure()
+    {
+        int first = int.MaxValue;
+        int last = -1;
+
+        if (this.ItemsPanelRoot is VirtualizingStackPanel { FirstRealizedIndex: >= 0 } panel)
+        {
+            // The panel recycles the container of a replaced item at once, and makes it again only at
+            // the next layout. Until then, the containers are fewer than the positions that show, and a
+            // range from them is too small. The view model then drops rows that show, and the control
+            // asks for them again without end. The panel keeps the position of a recycled container in
+            // its own range.
+            first = panel.FirstRealizedIndex;
+            last = panel.LastRealizedIndex;
+        }
+        else
+        {
+            // One pass over the containers, and no list. The control measures after each change of the
+            // containers, which is at each scroll.
+            // ReSharper disable once LoopCanBePartlyConvertedToQuery - The query allocates its iterators at each report, and this method exists to allocate nothing.
+            foreach (Control container in this.GetRealizedContainers())
+            {
+                int index = this.IndexFromContainer(container: container);
+
+                if (index < 0)
+                {
+                    continue;
+                }
+
+                first = Math.Min(val1: first, val2: index);
+                last = Math.Max(val1: last, val2: index);
+            }
+        }
+
+        int count = this.items.Count;
+
+        if (last < 0)
+        {
+            return this.MeasureWithNoContainer(count: count);
+        }
+
+        // A container can be older than the count. Each range stays inside the list.
+        int containersEnd = Math.Min(val1: count, val2: last + 1);
+        int containersStart = Math.Min(val1: first, val2: containersEnd);
+        int buffer = Math.Max(val1: 0, val2: this.bufferFor(arg: containersEnd - containersStart));
+
+        // The sum stops at the largest number.
+        int wantedEnd = buffer > int.MaxValue - containersEnd ? int.MaxValue : containersEnd + buffer;
+        int start = Math.Max(val1: 0, val2: containersStart - buffer);
+        int end = Math.Min(val1: count, val2: wantedEnd);
+
+        (ItemRange visible, double firstAmount, double lastAmount) =
+            this.PositionsThatShow(first: containersStart, end: containersEnd);
+
+        return new ReportedRange(
+            Visible: visible,
+            Constructed: new ItemRange(First: start, Count: end - start),
+            FirstVisibilityAmount: firstAmount,
+            LastVisibilityAmount: lastAmount)
+        {
+            Ahead = wantedEnd - end
+        };
+    }
+
+    // Finds the positions with a container that are in the viewport. It also finds how much of the
+    // first and of the last of them is in it. The panel can keep a container for a row that a control
+    // above the list hides. Thus, a container is not always a row that shows. The rows are in one line
+    // in the direction of the scroll, thus each row between the first and the last shows in full.
+    private (ItemRange Visible, double First, double Last) PositionsThatShow(int first, int end)
+    {
+        if (this.ItemsPanelRoot is not { } panel)
+        {
+            return (Visible: ItemRange.Empty, First: 0.0, Last: 0.0);
+        }
+
+        Rect viewport = ViewportOf(visual: panel);
+
+        // A panel that is not the default one is read as a list from top to bottom.
+        bool isHorizontal = panel is VirtualizingStackPanel { Orientation: Orientation.Horizontal };
+
+        double firstAmount = 0.0;
+
+        while (first < end && (firstAmount = Amount(position: first)) <= 0.0)
+        {
+            first++;
+        }
+
+        if (first == end)
+        {
+            return (Visible: ItemRange.Empty, First: 0.0, Last: 0.0);
+        }
+
+        double lastAmount = firstAmount;
+
+        while (end - 1 > first && (lastAmount = Amount(position: end - 1)) <= 0.0)
+        {
+            end--;
+        }
+
+        // One position is the first and the last.
+        return (
+            Visible: new ItemRange(First: first, Count: end - first),
+            First: firstAmount,
+            Last: end - 1 == first ? firstAmount : lastAmount);
+
+        double Amount(int position) =>
+            this.AmountAt(position: position, viewport: viewport, isHorizontal: isHorizontal);
+    }
+
+    // A position with no container at this instant gets its container at the next layout, and that
+    // layout brings the next report.
+    private double AmountAt(int position, Rect viewport, bool isHorizontal) =>
+        this.ContainerFromIndex(index: position) is { } container
+            ? AmountOf(bounds: container.Bounds, viewport: viewport, isHorizontal: isHorizontal)
+            : 1.0;
+
+    // The part of a container, in the direction of the scroll, that is in the viewport.
+    private static double AmountOf(Rect bounds, Rect viewport, bool isHorizontal)
+    {
+        (double start, double length, double from, double to) =
+            isHorizontal
+                ? (bounds.X, bounds.Width, viewport.X, viewport.Right)
+                : (bounds.Y, bounds.Height, viewport.Y, viewport.Bottom);
+
+        if (length <= 0)
+        {
+            return 0.0;
+        }
+
+        double shown = Math.Min(val1: start + length, val2: to) - Math.Max(val1: start, val2: from);
+
+        return Math.Clamp(value: shown / length, min: 0.0, max: 1.0);
+    }
+
+    // The part of a visual that the visuals above it do not clip, in the coordinates of the visual. This
+    // is the effective viewport of Avalonia, which the layout manager gives only in an event. The
+    // control needs it at each report, thus the control finds it then and keeps no copy. A render
+    // transform of a visual above the list is not used.
+    private static Rect ViewportOf(Visual visual)
+    {
+        if (visual.GetVisualParent() is not { } parent)
+        {
+            return new Rect(size: visual.Bounds.Size);
+        }
+
+        Rect inParent = ViewportOf(visual: parent);
+
+        if (parent.ClipToBounds)
+        {
+            inParent = inParent.Intersect(rect: new Rect(size: parent.Bounds.Size));
+        }
+
+        return inParent.Translate(offset: -visual.Bounds.Position);
+    }
+
+    // No container, with positions to show, means that the control is not laid out. This is also the
+    // case after a change of the items. The panel clears its containers then, and makes them again at
+    // the next layout. Thus, the last report stays. If it did not, the view model would drop its rows,
+    // the items would change again, and the cycle would repeat without end.
+    private ReportedRange MeasureWithNoContainer(int count)
+    {
+        int buffer = Math.Max(val1: 0, val2: this.bufferFor(arg: 0));
+
+        // An empty list shows no position. The control wants rows for the positions that come.
+        if (count == 0)
+        {
+            return ReportedRange.Empty with { Ahead = buffer };
+        }
+
+        // A list that was empty has no container until its next layout. The control wants rows for
+        // its first positions now, so that they come before that layout.
+        if (this.IsLoaded && this.ReportedRange.Constructed.Count == 0)
+        {
+            int wanted = Math.Min(val1: count, val2: buffer);
+
+            return ReportedRange.Empty with
+            {
+                Constructed = new ItemRange(First: 0, Count: wanted),
+                Ahead = buffer - wanted
+            };
+        }
+
+        return this.ReportedRange;
+    }
+}

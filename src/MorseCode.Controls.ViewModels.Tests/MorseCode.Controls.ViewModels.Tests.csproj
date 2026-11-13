@@ -1,0 +1,58 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFrameworks>net6.0;net8.0;net10.0;net472</TargetFrameworks>
+        <OutputType>Exe</OutputType>
+        <LangVersion>14</LangVersion>
+        <Nullable>enable</Nullable>
+        <!-- The usings are listed per file here, as everywhere else in this repository. -->
+        <TUnitImplicitUsings>disable</TUnitImplicitUsings>
+        <TUnitAssertionsImplicitUsings>disable</TUnitAssertionsImplicitUsings>
+        <!-- TUnit's transitive dependencies do not claim net472; their netstandard2.0 assets work. -->
+        <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
+    </PropertyGroup>
+
+    <!--
+        net6.0 runs the net6.0 build of the library, which an app on .NET 6 or .NET 7 takes. The SDK
+        reports net6.0 as out of support for an executable, and the warning is an error here. The
+        test project exists to run that build, thus the check is off for this target only.
+    -->
+    <PropertyGroup Condition=" '$(TargetFramework)' == 'net6.0' ">
+        <CheckEolTargetFramework>false</CheckEolTargetFramework>
+    </PropertyGroup>
+
+    <!-- Microsoft.Testing.Platform builds a native apphost for net472, which needs an explicit RID. -->
+    <PropertyGroup Condition=" '$(TargetFramework)' == 'net472' ">
+        <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    </PropertyGroup>
+
+    <PropertyGroup>
+        <AssemblyName>MorseCode.Controls.ViewModels.Tests</AssemblyName>
+        <RootNamespace>MorseCode.Controls.ViewModels.Tests</RootNamespace>
+        <IsPackable>false</IsPackable>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="SodaFlow" Version="5.0.1"/>
+        <PackageReference Include="SodaFlow.Bindable.ObjectModel" Version="4.0.0"/>
+        <PackageReference Include="SodaFlow.Collections" Version="2.0.0"/>
+        <PackageReference Include="TUnit" Version="1.66.27"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <Compile Include="..\TestPolyfills.cs" Link="TestPolyfills.cs"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <Compile Include="ScrollRequestExtensionsTests.cs"/>
+        <Compile Include="VirtualItemsSourceExtensionsTests.cs"/>
+        <Compile Include="VirtualRow.cs"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\MorseCode.Controls.ViewModels\MorseCode.Controls.ViewModels.csproj"/>
+        <!-- The tests build a ViewModelBase, as a view model does. -->
+        <ProjectReference Include="..\MorseCode.Mvvm\MorseCode.Mvvm.csproj"/>
+    </ItemGroup>
+
+</Project>

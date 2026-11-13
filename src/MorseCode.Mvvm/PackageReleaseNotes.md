@@ -2,7 +2,7 @@
 
 Breaking: BindableFactoryExtensions.CreateScrollRequest is no longer in this package, and the type
 BindableFactoryExtensions is gone. It served only VirtualizingItemsControl, so it moved into
-MorseCode.Avalonia.Controls 0.3.0, where it is not public. Use CreateVirtualItemsSource there to
+MorseCode.Controls.ViewModels 0.3.0, where it is not public. Use CreateVirtualItemsSource there to
 make the scroll request with the rest of the source.
 
 Changed: CreateBase now releases the registrations when its continuation returns without a call to
@@ -45,8 +45,8 @@ MorseCode.StagedConstruction 0.3.0 list the rules.
 
 New: the package has a net8.0 build, next to net472, net6.0, and netstandard2.0. It is the same
 code, compiled for net8.0. A project that targets net8.0 or later now takes the net8.0 build and
-not the net6.0 build. MorseCode.Avalonia.Controls references this package, and it targets
-net8.0.
+not the net6.0 build. MorseCode.Controls.UI.Avalonia depends on this package through
+MorseCode.Controls.ViewModels, and it targets net8.0.
 
 New: the net8.0 build is marked as compatible with trimming and native AOT. The build of the
 package runs the trim, AOT, and single-file analyzers on it and fails on a report, so code that
@@ -213,7 +213,7 @@ Building blocks for view models written in a functional reactive style on
 SodaFlow. It is part of the MorseCode toolkit, which holds the conventions that
 MorseCode Software builds its own applications with.
 
-Targets net472, net6.0, and netstandard2.0. Depends on SodaFlow.Bindable.ObjectModel and
+Targets net472, net6.0, net8.0, and netstandard2.0. Depends on SodaFlow.Bindable.ObjectModel and
 MorseCode.StagedConstruction.
 
 Source: https://github.com/MorseCode-Software/MorseCode.Toolkit

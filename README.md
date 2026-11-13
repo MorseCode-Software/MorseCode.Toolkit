@@ -39,15 +39,23 @@ The documentation site is at <https://morsecode-software.github.io/MorseCode.Too
   [![Latest Stable Version](https://img.shields.io/nuget/v/MorseCode.StagedConstruction.svg)](https://www.nuget.org/packages/MorseCode.StagedConstruction/)
   [![Total Downloads](https://img.shields.io/nuget/dt/MorseCode.StagedConstruction.svg)](https://www.nuget.org/packages/MorseCode.StagedConstruction/)
 
-- **MorseCode.Avalonia.Controls**: Avalonia controls for views that bind to view models
+- **MorseCode.Controls.ViewModels**: what a view model gives to a control of this toolkit, with no
+  dependency on a UI framework. `CreateVirtualItemsSource` builds the object that
+  `VirtualizingItemsControl` binds to, from a SodaFlow `ReactiveCollection`, from a list, or from
+  rows the view model makes itself. The project that holds your view models references this
+  package and no UI package.<br>
+  [![Latest Stable Version](https://img.shields.io/nuget/v/MorseCode.Controls.ViewModels.svg)](https://www.nuget.org/packages/MorseCode.Controls.ViewModels/)
+  [![Total Downloads](https://img.shields.io/nuget/dt/MorseCode.Controls.ViewModels.svg)](https://www.nuget.org/packages/MorseCode.Controls.ViewModels/)
+
+- **MorseCode.Controls.UI.Avalonia**: Avalonia controls for views that bind to view models
   on SodaFlow. `ComboBox` is a drop-in replacement for Avalonia's that applies a new list and a new
   selected item together, so a view model that changes both in one update keeps the selection it
   chose. `MaybeConverter` and `MaybeConverter<T, TSelf>` bind a control to a view model's
   `Maybe<T>`, one-way and two-way, turning the control's `null` into `None` and back.
   `VirtualizingItemsControl` shows a long list and builds the view model of a row only when the row
   is on screen.<br>
-  [![Latest Stable Version](https://img.shields.io/nuget/v/MorseCode.Avalonia.Controls.svg)](https://www.nuget.org/packages/MorseCode.Avalonia.Controls/)
-  [![Total Downloads](https://img.shields.io/nuget/dt/MorseCode.Avalonia.Controls.svg)](https://www.nuget.org/packages/MorseCode.Avalonia.Controls/)
+  [![Latest Stable Version](https://img.shields.io/nuget/v/MorseCode.Controls.UI.Avalonia.svg)](https://www.nuget.org/packages/MorseCode.Controls.UI.Avalonia/)
+  [![Total Downloads](https://img.shields.io/nuget/dt/MorseCode.Controls.UI.Avalonia.svg)](https://www.nuget.org/packages/MorseCode.Controls.UI.Avalonia/)
 
 - **MorseCode.Analyzers**: Roslyn analyzers for the conventions MorseCode Software writes C# with.
   They run in the compiler, so the build reports what they find. MC0001 reports a call whose

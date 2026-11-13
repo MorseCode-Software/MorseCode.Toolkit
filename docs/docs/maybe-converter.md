@@ -5,7 +5,7 @@ title: MaybeConverter
 # MaybeConverter
 
 View models on SodaFlow use `Maybe<T>` rather than `null` for a value that can be missing. Controls
-use `null`: a combo box with no selected item reports `null`, for example. `MorseCode.Avalonia.Controls`
+use `null`: a combo box with no selected item reports `null`, for example. `MorseCode.Controls.UI.Avalonia`
 has two converters that bridge the gap. Which one to use depends on the direction of the binding.
 
 | Binding | Converter |
@@ -16,7 +16,7 @@ has two converters that bridge the gap. Which one to use depends on the directio
 ## One-way bindings: MaybeConverter
 
 ```xml
-<UserControl xmlns:mc="clr-namespace:MorseCode.Avalonia.Controls;assembly=MorseCode.Avalonia.Controls">
+<UserControl xmlns:mc="clr-namespace:MorseCode.Controls.UI.Avalonia;assembly=MorseCode.Controls.UI.Avalonia">
 
     <TextBlock Text="{Binding Note.Value, Converter={x:Static mc:MaybeConverter.Instance}}" />
 
@@ -41,7 +41,7 @@ public sealed class CourseOptionConverter : MaybeConverter<CourseOption, CourseO
 Then use the subclass's `Instance`, which the base class provides:
 
 ```xml
-<UserControl xmlns:mc="clr-namespace:MorseCode.Avalonia.Controls;assembly=MorseCode.Avalonia.Controls"
+<UserControl xmlns:mc="clr-namespace:MorseCode.Controls.UI.Avalonia;assembly=MorseCode.Controls.UI.Avalonia"
              xmlns:app="clr-namespace:MyApp.Views">
 
     <mc:ComboBox ItemsSource="{Binding Courses.Value}"
