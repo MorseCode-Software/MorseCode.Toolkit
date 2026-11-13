@@ -25,7 +25,8 @@
     </PropertyGroup>
 
     <!--
-        The package holds the analyzer only, in analyzers/dotnet/cs, where the compiler finds it. It
+        The package holds the analyzer and its code fixes only, in analyzers/dotnet/cs, where the
+        compiler and an editor find them. It
         gives a project no assembly to reference, and no dependency: the compiler supplies Roslyn.
         DevelopmentDependency makes NuGet add the package with PrivateAssets="all", thus it does not
         flow to the packages of a project that uses it. A symbol package has nothing to hold.
@@ -60,8 +61,24 @@
         <Compile Include="PrimaryConstructorParameterAnalyzer.cs"/>
     </ItemGroup>
 
+    <!--
+        The code fixes ship in this package, beside the analyzer, where an editor finds them. This
+        reference makes the build of the code fixes come first, and it is not a dependency of the
+        package. The code fix project does not reference the analyzer, thus the rules reach it by
+        their identifiers, and its tests run the two together.
+    -->
+    <ItemGroup>
+        <ProjectReference Include="..\MorseCode.Analyzers.CodeFixes\MorseCode.Analyzers.CodeFixes.csproj"
+                          ReferenceOutputAssembly="false"
+                          PrivateAssets="all"/>
+    </ItemGroup>
+
     <ItemGroup>
         <None Include="$(OutputPath)$(AssemblyName).dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false"/>
+        <None Include="..\MorseCode.Analyzers.CodeFixes\bin\$(Configuration)\netstandard2.0\MorseCode.Analyzers.CodeFixes.dll"
+              Pack="true"
+              PackagePath="analyzers/dotnet/cs"
+              Visible="false"/>
         <None Include="..\..\logo\MorseCode.png" Pack="true" PackagePath="\">
             <Link>MorseCode.png</Link>
         </None>

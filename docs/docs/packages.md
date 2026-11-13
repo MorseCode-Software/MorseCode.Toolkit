@@ -82,6 +82,9 @@ rules:
 - MC0003, which reports a primary constructor parameter of a class or a struct that isn't `in`.
   See [Primary constructor parameter](primary-constructor-parameter.md).
 
+From 0.1.3, it also holds code fixes for MC0001 and MC0003, which an editor offers next to the
+warning. Each rule's page says what its fix does.
+
 It's a development dependency: NuGet adds it with `PrivateAssets="all"`, and it doesn't flow to
 the packages of a project that uses it. It needs the .NET 7 SDK or later, or Visual Studio 2022
 17.4 or later.

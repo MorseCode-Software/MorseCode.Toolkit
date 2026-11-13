@@ -96,12 +96,13 @@
     </PropertyGroup>
 
     <!--
-        The analyzers of MorseCode.Analyzers, in every project but their own and their tests, so the
-        toolkit keeps the conventions that the package reports. A finding is a warning of the build,
+        The analyzers of MorseCode.Analyzers, in every project but their own, their code fixes, and
+        their tests, so the toolkit keeps the conventions that the package reports. The analyzer
+        project references the code fix project, thus a reference back is a cycle. A finding is a warning of the build,
         and -warnaserror fails it. ReferenceOutputAssembly keeps the analyzer out of the references
         of a project. PrivateAssets keeps it out of the dependencies of a package that pack makes.
     -->
-    <ItemGroup Condition="'$(MSBuildProjectName)' != 'MorseCode.Analyzers' And '$(MSBuildProjectName)' != 'MorseCode.Analyzers.Tests'">
+    <ItemGroup Condition="'$(MSBuildProjectName)' != 'MorseCode.Analyzers' And '$(MSBuildProjectName)' != 'MorseCode.Analyzers.CodeFixes' And '$(MSBuildProjectName)' != 'MorseCode.Analyzers.Tests'">
         <ProjectReference Include="$(MSBuildThisFileDirectory)MorseCode.Analyzers\MorseCode.Analyzers.csproj"
                           OutputItemType="Analyzer"
                           ReferenceOutputAssembly="false"
@@ -116,7 +117,7 @@
         thus they get it in this way. MorseCode.Analyzers is left out because this analyzer
         references it as an analyzer, and a reference in the two directions is a cycle.
     -->
-    <ItemGroup Condition="'$(MSBuildProjectName)' != 'MorseCode.Analyzers' And '$(MSBuildProjectName)' != 'MorseCode.Analyzers.Tests' And '$(MSBuildProjectName)' != 'MorseCode.StagedConstruction.Analyzers'">
+    <ItemGroup Condition="'$(MSBuildProjectName)' != 'MorseCode.Analyzers' And '$(MSBuildProjectName)' != 'MorseCode.Analyzers.CodeFixes' And '$(MSBuildProjectName)' != 'MorseCode.Analyzers.Tests' And '$(MSBuildProjectName)' != 'MorseCode.StagedConstruction.Analyzers'">
         <ProjectReference Include="$(MSBuildThisFileDirectory)MorseCode.StagedConstruction.Analyzers\MorseCode.StagedConstruction.Analyzers.csproj"
                           OutputItemType="Analyzer"
                           ReferenceOutputAssembly="false"
