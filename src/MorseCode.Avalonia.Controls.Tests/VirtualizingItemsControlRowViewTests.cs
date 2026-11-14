@@ -117,6 +117,26 @@ public sealed class VirtualizingItemsControlRowViewTests
                     .IsTrue();
             });
 
+    // The presenter of Avalonia calls the overload of Build that takes a view. A caller of the other
+    // overload has no view to give, and gets a row view all the same. For no content, it gets nothing.
+    [Test]
+    public Task TheTemplateOfAContainerBuildsARowViewForACallerWithNoView() =>
+        TestApplication.Run(
+            test: static async () =>
+            {
+                VirtualModel model = new(total: 1000);
+                using ShownVirtual shown = new(model: model, buffer: 0);
+
+                IDataTemplate? template =
+                    shown.List.GetRealizedContainers().OfType<ContentPresenter>().First().ContentTemplate;
+
+                int built = shown.RowViewsBuilt;
+
+                await Assert.That(template?.Build(param: new VirtualRow(Position: 5))).IsNotNull();
+                await Assert.That(shown.RowViewsBuilt - built).IsEqualTo(expected: 1);
+                await Assert.That(template?.Build(param: null)).IsNull();
+            });
+
     [Test]
     public Task ARowTemplateThatDoesNotUseItsViewAgainGetsAViewForEachRow() =>
         TestApplication.Run(
