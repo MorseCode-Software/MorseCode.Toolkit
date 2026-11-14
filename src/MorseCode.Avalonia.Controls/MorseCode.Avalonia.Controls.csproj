@@ -36,9 +36,9 @@
     </ItemGroup>
 
     <!--
-        MaybeConverter converts the Maybe of SodaFlow view models. The control reads and writes the
-        bindable values of SodaFlow, and the builders of its source use the cells, the streams, and
-        the collections.
+        MaybeConverter converts the Maybe of SodaFlow view models. The control reads the bindable
+        values of SodaFlow and runs its bindable actions, and the builders of its source use the
+        cells, the streams, and the collections.
     -->
     <ItemGroup>
         <PackageReference Include="SodaFlow" Version="5.0.1"/>
