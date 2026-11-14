@@ -159,7 +159,7 @@ public class VirtualizingItemsControl : ItemsControl
     /// <remarks>
     ///     <para>
     ///         The control reads the rows, with their count, and the scroll request from the source, and
-    ///         writes the range that shows and the position that it scrolled to. Make the source with
+    ///         reports the range that shows and the position that it scrolled to. Make the source with
     ///         <c>CreateVirtualItemsSource</c>. A change of this property detaches the control from the
     ///         old source and attaches it to the new one.
     ///     </para>
@@ -416,8 +416,8 @@ public class VirtualizingItemsControl : ItemsControl
         this.Dispatcher.Post(action: this.ApplyScroll, priority: DispatcherPriority.Normal);
     }
 
-    // The request is a value of the view model, thus it stays until the control can use it. The report in
-    // ScrollHandled is how the control says that it used it.
+    // The request is a value of the view model, thus it stays until the control can use it. The control
+    // runs ScrollHandled to say that it used it.
     private void ApplyScroll()
     {
         this.isScrollPending = false;
@@ -448,13 +448,7 @@ public class VirtualizingItemsControl : ItemsControl
         // and that change of the request resets the flag.
         this.isRequestHandled = true;
 
-        // The second write makes a report of the same position a change again, for a source that drops
-        // an equal write.
-        if (this.source is not null)
-        {
-            this.source.ScrollHandled.Value = Maybe<int>.Some(value: position);
-            this.source.ScrollHandled.Value = Maybe<int>.None;
-        }
+        this.source?.ScrollHandled.Execute(parameter: position);
     }
 
     private void AttachSource(IVirtualItemsSource? newSource)
@@ -544,10 +538,14 @@ public class VirtualizingItemsControl : ItemsControl
 
         ReportedRange range = this.Measure();
 
-        this.ReportedRange = range;
+        // An action does not drop a report that equals the last one, thus the control does.
+        if (range == this.ReportedRange)
+        {
+            return;
+        }
 
-        // The source drops a write that equals the last one.
-        this.source?.Range.Value = range;
+        this.ReportedRange = range;
+        this.source?.RangeReported.Execute(parameter: range);
     }
 
     // Measure reads the range of a VirtualizingStackPanel from the panel, which is correct at all times.

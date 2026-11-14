@@ -5,18 +5,24 @@ using SodaFlow.Functional;
 namespace MorseCode.Avalonia.Controls;
 
 /// <summary>
-///     The values that a <see cref="VirtualizingItemsControl" /> reads from a view model and writes to
-///     it. The view model gives them to the control as one object, and the control binds to all of them.
+///     The values that a <see cref="VirtualizingItemsControl" /> reads from a view model, and the
+///     actions that it runs to report to it. The view model gives them to the control as one object,
+///     and the control attaches to all of them.
 /// </summary>
 /// <remarks>
 ///     <para>
-///         Make a source with <c>CreateVirtualItemsSource</c>. It builds the values so that they agree: the
-///         rows that answer the range, and the request that the report clears.
+///         Make a source with <c>CreateVirtualItemsSource</c>. It builds the members so that they
+///         agree: the rows that answer the range, and the request that the report clears.
 ///     </para>
 ///     <para>
-///         The values go in two pairs. The control writes <see cref="Range" />, and the view model
-///         answers with <see cref="Rows" />. The view model makes a <see cref="ScrollRequest" />, and the
-///         control answers with <see cref="ScrollHandled" />.
+///         The members go in two pairs. The control runs <see cref="RangeReported" />, and the view
+///         model answers with <see cref="Rows" />. The view model makes a <see cref="ScrollRequest" />,
+///         and the control answers with <see cref="ScrollHandled" />.
+///     </para>
+///     <para>
+///         A report of the control is an action and not a value that the control writes. An action
+///         does nothing after the disposal of the view model, and a write to a two-way value throws
+///         then. Thus, a view that outlives its view model can report with no effect.
 ///     </para>
 /// </remarks>
 [PublicAPI]
@@ -33,14 +39,16 @@ public interface IVirtualItemsSource
     IOneWayBindableValue<VirtualRows> Rows { get; }
 
     /// <summary>
-    ///     Gets the value that the control writes: the positions that show, how much of the first and of
-    ///     the last of them shows, and the positions that it wants rows for.
+    ///     Gets the action that the control runs with its report. The report has the positions that
+    ///     show, and the positions that the control wants rows for.
     /// </summary>
     /// <remarks>
-    ///     The control writes at each step of a scroll. A view model that makes its own rows calms
-    ///     <see cref="ReportedRange.Constructed" />, builds the rows for it, and stops at its own count.
+    ///     The control runs the action at each step of a scroll, and only with a report that is
+    ///     different from the last one. A source starts with <see cref="ReportedRange.Empty" />. A view
+    ///     model that makes its own rows calms <see cref="ReportedRange.Constructed" />, builds the rows
+    ///     for it, and stops at its own count.
     /// </remarks>
-    IOneWayToSourceBindableValue<ReportedRange> Range { get; }
+    IBindableAction<ReportedRange> RangeReported { get; }
 
     /// <summary>
     ///     Gets the position that the view model wants to show, or none.
@@ -52,11 +60,11 @@ public interface IVirtualItemsSource
     IOneWayBindableValue<Maybe<int>> ScrollRequest { get; }
 
     /// <summary>
-    ///     Gets the value that the control writes with the position of a request that it handled.
+    ///     Gets the action that the control runs with the position of a request that it handled.
     /// </summary>
     /// <remarks>
-    ///     The control writes the position, and then none at once. A view model ignores none. The
-    ///     view model clears the request only if the request is still that position.
+    ///     The control runs the action one time for each request that it handles. The view model
+    ///     clears the request only if the request is still that position.
     /// </remarks>
-    IOneWayToSourceBindableValue<Maybe<int>> ScrollHandled { get; }
+    IBindableAction<int> ScrollHandled { get; }
 }

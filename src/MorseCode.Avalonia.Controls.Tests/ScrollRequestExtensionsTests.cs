@@ -57,7 +57,7 @@ public sealed class ScrollRequestExtensionsTests
         ScrollRequestBindables scroll = Factory.CreateScrollRequest(requests: requests);
 
         requests.Send(a: 700);
-        scroll.Handled.Value = Maybe<int>.Some(value: 700);
+        scroll.Handled.Execute(parameter: 700);
 
         await Assert.That(scroll.Request.Value).IsEqualTo(expected: Maybe<int>.None);
     }
@@ -71,24 +71,9 @@ public sealed class ScrollRequestExtensionsTests
 
         requests.Send(a: 700);
         requests.Send(a: 800);
-        scroll.Handled.Value = Maybe<int>.Some(value: 700);
+        scroll.Handled.Execute(parameter: 700);
 
         await Assert.That(scroll.Request.Value).IsEqualTo(expected: Maybe<int>.Some(value: 800));
-    }
-
-    // The control sets its report to none after each report, so that the same position is a change again.
-    [Test]
-    public async Task AReportOfNoneClearsNothing()
-    {
-        StreamSink<int> requests = Stream.CreateSink<int>();
-        ScrollRequestBindables scroll = Factory.CreateScrollRequest(requests: requests);
-
-        requests.Send(a: 700);
-        scroll.Handled.Value = Maybe<int>.Some(value: 700);
-        requests.Send(a: 700);
-        scroll.Handled.Value = Maybe<int>.None;
-
-        await Assert.That(scroll.Request.Value).IsEqualTo(expected: Maybe<int>.Some(value: 700));
     }
 
     [Test]
@@ -100,8 +85,7 @@ public sealed class ScrollRequestExtensionsTests
         scroll.Request.PropertyChanged += (_, _) => seen.Add(item: scroll.Request.Value);
 
         requests.Send(a: 700);
-        scroll.Handled.Value = Maybe<int>.Some(value: 700);
-        scroll.Handled.Value = Maybe<int>.None;
+        scroll.Handled.Execute(parameter: 700);
         requests.Send(a: 700);
 
         await Assert.That(seen)

@@ -12,7 +12,7 @@ namespace MorseCode.Avalonia.Controls.Tests;
 /// <summary>
 ///     The view model that the documentation of <see cref="VirtualizingItemsControl" /> describes, on a
 ///     real SodaFlow collection. The source comes from <c>CreateVirtualItemsSource</c>, which slices the
-///     collection with the range that the view writes and maps each key in the slice to a row.
+///     collection with the range that the view reports and maps each key in the slice to a row.
 /// </summary>
 // ReSharper disable once InheritdocConsiderUsage - The summary of IVirtualItemsSource does not say what this model builds.
 internal sealed class RecipeModel : IVirtualItemsSource, IDisposable
@@ -89,13 +89,13 @@ internal sealed class RecipeModel : IVirtualItemsSource, IDisposable
     public IOneWayBindableValue<VirtualRows> Rows => this.source.Rows;
 
     /// <inheritdoc />
-    public IOneWayToSourceBindableValue<ReportedRange> Range => this.source.Range;
+    public IBindableAction<ReportedRange> RangeReported => this.source.RangeReported;
 
     /// <inheritdoc />
     public IOneWayBindableValue<Maybe<int>> ScrollRequest => this.source.ScrollRequest;
 
     /// <inheritdoc />
-    public IOneWayToSourceBindableValue<Maybe<int>> ScrollHandled => this.source.ScrollHandled;
+    public IBindableAction<int> ScrollHandled => this.source.ScrollHandled;
 
     /// <summary>
     ///     Gets the rows at the positions that show, as the view model reads them from its source.

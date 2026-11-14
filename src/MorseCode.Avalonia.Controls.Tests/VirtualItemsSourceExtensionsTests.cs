@@ -27,13 +27,14 @@ public sealed class VirtualItemsSourceExtensionsTests
             Cell.CreateSink(
                 initialValue: new VirtualRows(TotalCount: 10, Offset: 2, Items: [new VirtualRow(Position: 2)]));
 
-        CellSink<ReportedRange> range = Cell.CreateSink(initialValue: ReportedRange.Empty);
+        StreamSink<ReportedRange> reports = Stream.CreateSink<ReportedRange>();
+        Cell<ReportedRange> range = reports.Hold(initialValue: ReportedRange.Empty);
         StreamSink<int> requests = Stream.CreateSink<int>();
 
         (IVirtualItemsSource source, ViewModelBase viewModel) =
             Make(
                 make: output =>
-                    output.CreateVirtualItemsSource(rows: rows, reportedRange: range, scrollRequests: requests));
+                    output.CreateVirtualItemsSource(rows: rows, reportedRanges: reports, scrollRequests: requests));
 
         using ViewModelBase owner = viewModel;
 
@@ -41,7 +42,7 @@ public sealed class VirtualItemsSourceExtensionsTests
         await Assert.That(source.Rows.Value.TotalCount).IsEqualTo(expected: 10);
 
         rows.Send(a: rows.Sample() with { TotalCount = 12 });
-        source.Range.Value = Reported(first: 3, count: 4);
+        source.RangeReported.Execute(parameter: Reported(first: 3, count: 4));
 
         await Assert.That(source.Rows.Value.TotalCount).IsEqualTo(expected: 12);
         await Assert.That(range.Sample()).IsEqualTo(expected: Reported(first: 3, count: 4));
@@ -57,7 +58,7 @@ public sealed class VirtualItemsSourceExtensionsTests
                 make: output =>
                     output.CreateVirtualItemsSource(
                         rows: Cell.Constant(VirtualRows.Empty),
-                        reportedRange: Cell.CreateSink(initialValue: ReportedRange.Empty),
+                        reportedRanges: Stream.CreateSink<ReportedRange>(),
                         scrollRequests: requests));
 
         using ViewModelBase owner = viewModel;
@@ -68,7 +69,7 @@ public sealed class VirtualItemsSourceExtensionsTests
 
         await Assert.That(source.ScrollRequest.Value).IsEqualTo(expected: Maybe<int>.Some(value: 5));
 
-        source.ScrollHandled.Value = Maybe<int>.Some(value: 5);
+        source.ScrollHandled.Execute(parameter: 5);
 
         await Assert.That(source.ScrollRequest.Value).IsEqualTo(expected: Maybe<int>.None);
     }
@@ -84,7 +85,7 @@ public sealed class VirtualItemsSourceExtensionsTests
                 make: output =>
                     output.CreateVirtualItemsSource(
                         rows: Cell.Constant(VirtualRows.Empty),
-                        reportedRange: Cell.CreateSink(initialValue: ReportedRange.Empty),
+                        reportedRanges: Stream.CreateSink<ReportedRange>(),
                         scrollRequests: requests,
                         clears: clears));
 
@@ -122,7 +123,7 @@ public sealed class VirtualItemsSourceExtensionsTests
         ];
 
         rows.Send(a: second);
-        source.Range.Value = Reported(first: 1, count: 2);
+        source.RangeReported.Execute(parameter: Reported(first: 1, count: 2));
 
         await Assert.That(source.Rows.Value.TotalCount).IsEqualTo(expected: 5);
         await Assert.That(source.Rows.Value.Offset).IsEqualTo(expected: 0);
@@ -174,7 +175,7 @@ public sealed class VirtualItemsSourceExtensionsTests
                 FirstVisibilityAmount: 0.25,
                 LastVisibilityAmount: 0.75);
 
-        source.Range.Value = reported;
+        source.RangeReported.Execute(parameter: reported);
 
         await Assert.That(source.Reported.Sample()).IsEqualTo(expected: reported);
         await Assert.That(source.FirstVisibilityAmount.Sample()).IsEqualTo(expected: 0.25);
@@ -209,7 +210,7 @@ public sealed class VirtualItemsSourceExtensionsTests
 
         ItemRange visible = new(First: 10, Count: 5);
         ItemRange constructed = new(First: 5, Count: 15);
-        source.Range.Value = Reported(visible: visible, constructed: constructed);
+        source.RangeReported.Execute(parameter: Reported(visible: visible, constructed: constructed));
 
         List<IReadOnlyList<VirtualRow>> constructedValues = [];
         List<IReadOnlyList<VirtualRow>> visibleValues = [];
@@ -221,8 +222,8 @@ public sealed class VirtualItemsSourceExtensionsTests
         IListener lastAmountListener = source.LastVisibilityAmount.Updates().Listen(handler: lastAmounts.Add);
 
         // A different amount of the first row shows. The cell of the amount changes, and the rows do not.
-        source.Range.Value =
-            Reported(visible: visible, constructed: constructed) with { FirstVisibilityAmount = 0.5 };
+        source.RangeReported.Execute(
+            parameter: Reported(visible: visible, constructed: constructed) with { FirstVisibilityAmount = 0.5 });
 
         // A new list, with a different row at a position that the report does not have.
         rows.Send(a: WithANewRowAt(rows: rows.Sample(), position: 50));
@@ -232,11 +233,11 @@ public sealed class VirtualItemsSourceExtensionsTests
 
         // The control wants rows for more positions, and the rows that show stay. The amount is the same
         // number.
-        source.Range.Value =
-            Reported(visible: visible, constructed: new ItemRange(First: 4, Count: 17)) with
+        source.RangeReported.Execute(
+            parameter: Reported(visible: visible, constructed: new ItemRange(First: 4, Count: 17)) with
             {
                 FirstVisibilityAmount = 0.5
-            };
+            });
 
         await Assert.That(constructedValues.Count).IsEqualTo(expected: 1);
         await Assert.That(visibleValues).IsEmpty();
@@ -270,8 +271,10 @@ public sealed class VirtualItemsSourceExtensionsTests
 
         using ViewModelBase owner = viewModel;
 
-        source.Range.Value =
-            Reported(visible: new ItemRange(First: 10, Count: 5), constructed: new ItemRange(First: 5, Count: 15));
+        source.RangeReported.Execute(
+            parameter: Reported(
+                visible: new ItemRange(First: 10, Count: 5),
+                constructed: new ItemRange(First: 5, Count: 15)));
 
         await Assert.That(source.ConstructedRows.Sample().Select(selector: static row => row.Position))
             .IsEquivalentTo(expected: [5, 6, 7, 8, 9, 10, 11], ordering: CollectionOrdering.Matching);
@@ -312,7 +315,7 @@ public sealed class VirtualItemsSourceExtensionsTests
         await Assert.That(source.Rows.Value.Items).IsEmpty();
         await Assert.That(built).IsEmpty();
 
-        source.Range.Value = Reported(first: 10, count: 5);
+        source.RangeReported.Execute(parameter: Reported(first: 10, count: 5));
 
         await Assert.That(source.Rows.Value.Offset).IsEqualTo(expected: 10);
 
@@ -343,8 +346,8 @@ public sealed class VirtualItemsSourceExtensionsTests
 
         using ViewModelBase owner = viewModel;
 
-        source.Range.Value = Reported(first: 10, count: 5);
-        source.Range.Value = Reported(first: 12, count: 5);
+        source.RangeReported.Execute(parameter: Reported(first: 10, count: 5));
+        source.RangeReported.Execute(parameter: Reported(first: 12, count: 5));
 
         await Assert.That(built)
             .IsEquivalentTo(expected: [10, 11, 12, 13, 14, 15, 16], ordering: CollectionOrdering.Matching);
@@ -371,7 +374,7 @@ public sealed class VirtualItemsSourceExtensionsTests
 
         await Assert.That(source.ScrollRequest.Value).IsEqualTo(expected: Maybe<int>.Some(value: 2));
 
-        source.ScrollHandled.Value = Maybe<int>.Some(value: 2);
+        source.ScrollHandled.Execute(parameter: 2);
         requests.Send(a: 10);
 
         await Assert.That(source.ScrollRequest.Value).IsEqualTo(expected: Maybe<int>.Some(value: 0));
@@ -453,7 +456,7 @@ public sealed class VirtualItemsSourceExtensionsTests
                         scrollRequests: Stream.CreateSink<int>(),
                         onEvicted: row => evicted.Add(item: row.Position)));
 
-        source.Range.Value = Reported(first: 10, count: 3);
+        source.RangeReported.Execute(parameter: Reported(first: 10, count: 3));
 
         await Assert.That(evicted).IsEmpty();
 
@@ -490,7 +493,7 @@ public sealed class VirtualItemsSourceExtensionsTests
 
         using ViewModelBase owner = viewModel;
 
-        source.Range.Value = Reported(first: 0, count: 5) with { Ahead = 2 };
+        source.RangeReported.Execute(parameter: Reported(first: 0, count: 5) with { Ahead = 2 });
 
         List<VirtualRows> values = [];
         IListener listener = source.Rows.Cell.Updates().Listen(handler: values.Add);
@@ -520,15 +523,16 @@ public sealed class VirtualItemsSourceExtensionsTests
         using ViewModelBase owner = viewModel;
 
         ItemRange constructed = new(First: 5, Count: 15);
-        source.Range.Value = Reported(visible: new ItemRange(First: 10, Count: 5), constructed: constructed);
+        source.RangeReported.Execute(
+            parameter: Reported(visible: new ItemRange(First: 10, Count: 5), constructed: constructed));
 
         List<VirtualRows> values = [];
         IListener listener = source.Rows.Cell.Updates().Listen(handler: values.Add);
 
         // A different row shows, and then a different amount of a row.
         ReportedRange next = Reported(visible: new ItemRange(First: 11, Count: 5), constructed: constructed);
-        source.Range.Value = next;
-        source.Range.Value = next with { FirstVisibilityAmount = 0.5 };
+        source.RangeReported.Execute(parameter: next);
+        source.RangeReported.Execute(parameter: next with { FirstVisibilityAmount = 0.5 });
         listener.Unlisten();
 
         await Assert.That(values).IsEmpty();
@@ -565,8 +569,8 @@ public sealed class VirtualItemsSourceExtensionsTests
                 FirstVisibilityAmount: 0.25,
                 LastVisibilityAmount: 0.75);
 
-        source.Range.Value = reported;
-        keySource.Range.Value = reported;
+        source.RangeReported.Execute(parameter: reported);
+        keySource.RangeReported.Execute(parameter: reported);
 
         await Assert.That(source.Reported.Sample()).IsEqualTo(expected: reported);
         await Assert.That(keySource.Reported.Sample()).IsEqualTo(expected: reported);
@@ -604,7 +608,8 @@ public sealed class VirtualItemsSourceExtensionsTests
         using ViewModelBase owner = viewModel;
 
         ItemRange visible = new(First: 10, Count: 5);
-        source.Range.Value = Reported(visible: visible, constructed: new ItemRange(First: 5, Count: 15));
+        source.RangeReported.Execute(
+            parameter: Reported(visible: visible, constructed: new ItemRange(First: 5, Count: 15)));
 
         List<IReadOnlyList<VirtualRow>> values = [];
         List<double> amounts = [];
@@ -614,26 +619,28 @@ public sealed class VirtualItemsSourceExtensionsTests
         IListener lastAmountListener = source.LastVisibilityAmount.Updates().Listen(handler: lastAmounts.Add);
 
         // A different amount of the first row shows. The cell of the amount changes, and the rows do not.
-        source.Range.Value =
-            Reported(visible: visible, constructed: new ItemRange(First: 5, Count: 15)) with
+        source.RangeReported.Execute(
+            parameter: Reported(visible: visible, constructed: new ItemRange(First: 5, Count: 15)) with
             {
                 FirstVisibilityAmount = 0.5
-            };
+            });
 
         // The slice moves, and the rows that show stay. The amount is the same number.
-        source.Range.Value =
-            Reported(visible: visible, constructed: new ItemRange(First: 4, Count: 17)) with
+        source.RangeReported.Execute(
+            parameter: Reported(visible: visible, constructed: new ItemRange(First: 4, Count: 17)) with
             {
                 FirstVisibilityAmount = 0.5
-            };
+            });
 
         await Assert.That(values).IsEmpty();
         await Assert.That(amounts).IsEquivalentTo(expected: [0.5], ordering: CollectionOrdering.Matching);
         await Assert.That(lastAmounts).IsEmpty();
 
         // A different row shows.
-        source.Range.Value =
-            Reported(visible: new ItemRange(First: 11, Count: 5), constructed: new ItemRange(First: 4, Count: 17));
+        source.RangeReported.Execute(
+            parameter: Reported(
+                visible: new ItemRange(First: 11, Count: 5),
+                constructed: new ItemRange(First: 4, Count: 17)));
 
         listener.Unlisten();
         amountListener.Unlisten();
@@ -660,16 +667,20 @@ public sealed class VirtualItemsSourceExtensionsTests
 
         using ViewModelBase owner = viewModel;
 
-        source.Range.Value =
-            Reported(visible: new ItemRange(First: 10, Count: 5), constructed: new ItemRange(First: 5, Count: 15));
+        source.RangeReported.Execute(
+            parameter: Reported(
+                visible: new ItemRange(First: 10, Count: 5),
+                constructed: new ItemRange(First: 5, Count: 15)));
 
         await Assert.That(source.VisibleRows.Sample().Select(selector: static row => row.Position))
             .IsEquivalentTo(expected: [10, 11], ordering: CollectionOrdering.Matching);
 
         // A view model can make a report in a test, and the positions that show can start before the
         // rows. Positions 3 and 4 have no row then.
-        source.Range.Value =
-            Reported(visible: new ItemRange(First: 3, Count: 5), constructed: new ItemRange(First: 5, Count: 7));
+        source.RangeReported.Execute(
+            parameter: Reported(
+                visible: new ItemRange(First: 3, Count: 5),
+                constructed: new ItemRange(First: 5, Count: 7)));
 
         await Assert.That(source.VisibleRows.Sample().Select(selector: static row => row.Position))
             .IsEquivalentTo(expected: [5, 6, 7], ordering: CollectionOrdering.Matching);
@@ -680,7 +691,7 @@ public sealed class VirtualItemsSourceExtensionsTests
     {
         StreamSink<int> requests = Stream.CreateSink<int>();
         ReactiveCollection<int, int, int> collection = Collection(total: 1);
-        CellSink<ReportedRange> range = Cell.CreateSink(initialValue: ReportedRange.Empty);
+        StreamSink<ReportedRange> reports = Stream.CreateSink<ReportedRange>();
         Cell<IReadOnlyList<VirtualRow>> wholeList = Cell.Constant<IReadOnlyList<VirtualRow>>([]);
 
         // The nulls are typed variables and not arguments with a null-forgiving operator, which the
@@ -689,7 +700,7 @@ public sealed class VirtualItemsSourceExtensionsTests
         Func<int, VirtualRow> noProject = null!;
         ReactiveCollection<int, int, int> noCollection = null!;
         Cell<VirtualRows> noRows = null!;
-        CellSink<ReportedRange> noRange = null!;
+        StreamSink<ReportedRange> noReports = null!;
         Stream<int> noRequests = null!;
         ViewModelBase.IOutput noOutput = null!;
         Cell<IReadOnlyList<VirtualRow>> noWholeList = null!;
@@ -719,11 +730,11 @@ public sealed class VirtualItemsSourceExtensionsTests
                 scrollRequests: noRequests))),
             Catch(action: () => MakeAndRefuse(make: output => output.CreateVirtualItemsSource(
                 rows: noRows,
-                reportedRange: range,
+                reportedRanges: reports,
                 scrollRequests: requests))),
             Catch(action: () => MakeAndRefuse(make: output => output.CreateVirtualItemsSource(
                 rows: Cell.Constant(VirtualRows.Empty),
-                reportedRange: noRange,
+                reportedRanges: noReports,
                 scrollRequests: requests))),
             Catch(action: () => noOutput.CreateVirtualItemsSource(rows: wholeList)),
             Catch(action: () => MakeAndRefuse(make: output => output.CreateVirtualItemsSource(rows: noWholeList)))
@@ -733,7 +744,7 @@ public sealed class VirtualItemsSourceExtensionsTests
             .IsEquivalentTo(
                 expected:
                 [
-                    "output", "collection", "project", "scrollRequests", "rows", "reportedRange", "output", "rows"
+                    "output", "collection", "project", "scrollRequests", "rows", "reportedRanges", "output", "rows"
                 ],
                 ordering: CollectionOrdering.Matching);
     }

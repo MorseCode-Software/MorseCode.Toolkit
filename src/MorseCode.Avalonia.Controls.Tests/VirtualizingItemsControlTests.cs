@@ -281,10 +281,8 @@ public sealed class VirtualizingItemsControlTests
                 await Assert.That(Texts(shown: shown).Any(predicate: static text => text == "Row 700")).IsTrue();
                 await Assert.That(model.CurrentRequest).IsEqualTo(expected: Maybe<int>.None);
 
-                await Assert.That(model.ScrollWrites)
-                    .IsEquivalentTo(
-                        expected: [Maybe<int>.Some(value: 700), Maybe<int>.None],
-                        ordering: CollectionOrdering.Matching);
+                await Assert.That(model.ScrollReports)
+                    .IsEquivalentTo(expected: [700], ordering: CollectionOrdering.Matching);
             });
 
     [Test]
@@ -301,10 +299,8 @@ public sealed class VirtualizingItemsControlTests
                 await Assert.That(Texts(shown: shown).Any(predicate: static text => text == "Row 700")).IsTrue();
                 await Assert.That(model.CurrentRequest).IsEqualTo(expected: Maybe<int>.None);
 
-                await Assert.That(model.ScrollWrites)
-                    .IsEquivalentTo(
-                        expected: [Maybe<int>.Some(value: 700), Maybe<int>.None],
-                        ordering: CollectionOrdering.Matching);
+                await Assert.That(model.ScrollReports)
+                    .IsEquivalentTo(expected: [700], ordering: CollectionOrdering.Matching);
 
                 await Assert.That(model.Built.Any(predicate: static position => position is > 9 and < 690)).IsFalse();
             });
@@ -323,7 +319,7 @@ public sealed class VirtualizingItemsControlTests
 
                 await Assert.That(Texts(shown: shown)[0]).IsEqualTo(expected: "Row 0");
                 await Assert.That(model.CurrentRequest).IsEqualTo(expected: Maybe<int>.Some(value: 500));
-                await Assert.That(model.ScrollWrites).IsEmpty();
+                await Assert.That(model.ScrollReports).IsEmpty();
 
                 model.Resize(total: 1000);
                 shown.Settle();
@@ -349,10 +345,8 @@ public sealed class VirtualizingItemsControlTests
                 await Assert.That(Texts(shown: shown).Any(predicate: static text => text == "Row 500")).IsTrue();
                 await Assert.That(model.CurrentRequest).IsEqualTo(expected: Maybe<int>.None);
 
-                await Assert.That(model.ScrollWrites)
-                    .IsEquivalentTo(
-                        expected: [Maybe<int>.Some(value: 500), Maybe<int>.None],
-                        ordering: CollectionOrdering.Matching);
+                await Assert.That(model.ScrollReports)
+                    .IsEquivalentTo(expected: [500], ordering: CollectionOrdering.Matching);
             });
 
     // A negative position can never apply, thus the control clears it and does not scroll.
@@ -410,7 +404,7 @@ public sealed class VirtualizingItemsControlTests
                 shown.Settle();
 
                 await Assert.That(Texts(shown: shown).Any(predicate: static text => text == "Row 700")).IsTrue();
-                await Assert.That(model.ScrollWrites.Count).IsEqualTo(expected: 4);
+                await Assert.That(model.ScrollReports.Count).IsEqualTo(expected: 2);
             });
 
     // The view model clears the request when the report reaches it, and that can be later than a change of
@@ -433,10 +427,8 @@ public sealed class VirtualizingItemsControlTests
 
                 await Assert.That(Texts(shown: shown)[0]).IsEqualTo(expected: "Row 0");
 
-                await Assert.That(model.ScrollWrites)
-                    .IsEquivalentTo(
-                        expected: [Maybe<int>.Some(value: 700), Maybe<int>.None],
-                        ordering: CollectionOrdering.Matching);
+                await Assert.That(model.ScrollReports)
+                    .IsEquivalentTo(expected: [700], ordering: CollectionOrdering.Matching);
             });
 
     // A request that replaces a handled one, before the view model clears the old one, is a new request.
@@ -455,14 +447,8 @@ public sealed class VirtualizingItemsControlTests
 
                 await Assert.That(Texts(shown: shown).Any(predicate: static text => text == "Row 700")).IsTrue();
 
-                await Assert.That(model.ScrollWrites)
-                    .IsEquivalentTo(
-                        expected:
-                        [
-                            Maybe<int>.Some(value: 300), Maybe<int>.None, Maybe<int>.Some(value: 700),
-                            Maybe<int>.None
-                        ],
-                        ordering: CollectionOrdering.Matching);
+                await Assert.That(model.ScrollReports)
+                    .IsEquivalentTo(expected: [300, 700], ordering: CollectionOrdering.Matching);
             });
 
     // The control reads the count from its source. A new source replaces the old one, and the old one
@@ -516,7 +502,7 @@ public sealed class VirtualizingItemsControlTests
 
                 await Assert.That(shown.List.Rows.TotalCount).IsEqualTo(expected: 1000);
                 await Assert.That(shown.List.ScrollRequest).IsEqualTo(expected: Maybe<int>.None);
-                await Assert.That(model.ScrollWrites).IsEmpty();
+                await Assert.That(model.ScrollReports).IsEmpty();
 
                 shown.Return();
 
