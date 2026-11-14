@@ -307,11 +307,60 @@ It has these consequences:
   for every row, and values set while building are correct.
 - State that lives in the view and is not bound stays with the position, not with the row. Focus is
   the common case: after a row is removed above it, the focused container shows the next row.
+- The same holds for a scroll. A row that scrolls in gets a view that another row used, as
+  [The row view decides what a scroll costs](#the-row-view-decides-what-a-scroll-costs) describes.
+  A selection in a text box, the scroll position of an inner list, or a running animation comes
+  with it. If a row view has state like that and you can't bind it, set `RecyclesRowViews` to
+  `False`.
 - `ContainerPrepared` fires when Avalonia makes a container for a position. It does not fire when
   the row at a position changes.
 
 An item that is itself a `Control` is its own container, so the control cannot hand it a different
 item. Avalonia replaces the container of such a position, as it does in any `ItemsControl`.
+
+### The row view decides what a scroll costs
+
+The control itself is cheap. With a row view that is a single `TextBlock`, one step of a scroll
+takes a millisecond or less on the UI thread, where a frame at 120 Hz has 8.3 ms. What a scroll
+costs is the row view.
+
+Avalonia reuses the container of a row that scrolls out, but it takes the view out of that
+container. Left to itself, every row that scrolls in would get a new view from the row template,
+and the view that scrolled out would be garbage. The control keeps that view instead and hands it
+to the next row that scrolls in, so a scroll builds no views. It does this for a row template that
+reuses its view: every XAML `DataTemplate`, and a `FuncDataTemplate` created with
+`supportsRecycling: true`.
+
+The view that is handed over still has to be attached, styled, and measured before the frame can
+draw. So the cost still grows with what is in a row, and with how many rows arrive in a frame.
+
+These numbers come from a test with no screen on .NET 10. The list shows 20 rows of 40 px, and each
+case scrolls 600 frames down and 600 back. A frame is late when its work on the UI thread took more
+than 8.3 ms. The speeds assume 120 frames each second.
+
+| Row view | Allocated for each row that scrolls in | Late frames of 600 at 3,000 px/s | Late frames of 600 at 12,000 px/s |
+| --- | --- | --- | --- |
+| One `TextBlock`, built in code | about 30 KB | 0 to 2 | 0 to 3 |
+| A picture, two lines of text, a value, and a button, in XAML | about 125 KB | 0 to 4 | 8 to 31 |
+| The same with four more columns of text, a check box, a progress bar, and two more buttons | about 310 KB | 25 to 56 | 96 to 206 |
+
+The middle row is 12 visuals once Avalonia has applied the control templates, and the last one is
+43. For the middle row the typical frame stays far inside the budget, at under 2 ms even at 12,000
+px/s. Most of its late frames are garbage collections.
+
+With `RecyclesRowViews` set to `False`, every row that scrolls in gets a new view. The same runs
+then allocated about 40 KB, 200 KB, and 650 KB for each row. The middle row had 12 to 33 late
+frames at 3,000 px/s and 53 to 107 at 12,000 px/s.
+
+What follows from that:
+
+- Keep the row view small. The number of visuals in a row moves every number in the table, and
+  nothing else in your hands does.
+- A row that changes while it stays on screen is cheaper again than one that scrolls in, because
+  its view never leaves the tree, as [Bind the row view to its row](#bind-the-row-view-to-its-row)
+  describes. For the middle row that is about 50 KB against 125 KB.
+- Treat the numbers as a guide. They are the work before a frame is drawn, on one machine, and they
+  leave out the drawing itself. The times vary from run to run. The allocations do not.
 
 ### Give the placeholder the height of a row
 
@@ -352,6 +401,10 @@ The control gives Avalonia its own list, one position per item. Setting `ItemsSo
 - **A fast scroll can show placeholders for a moment.** The range goes to the view model, the
   graph runs, and the rows come back through the binding scheduler. That takes a little time. The
   control asks one screen ahead, so only a step longer than a screen shows them.
+- **A heavy row view makes a fast scroll drop frames.** The control reuses the views, but each one
+  is attached and styled again as it scrolls in.
+  [The row view decides what a scroll costs](#the-row-view-decides-what-a-scroll-costs) has the
+  measurements.
 - **Rows are built on the thread that sends the range.** The view sends it from the UI thread.
   `Map` runs inside the transaction, so a row that is heavy to build holds up that one transaction.
 - **Selection is not part of the control.** It is an `ItemsControl` with no selected item. If you

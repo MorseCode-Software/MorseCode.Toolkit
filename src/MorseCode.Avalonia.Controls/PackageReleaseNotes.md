@@ -166,6 +166,19 @@ different row object is at one of its positions, so an edit elsewhere in the lis
 With 0.2.x, an app bound TotalCount and Rows to such a list. Without this overload, 0.3.0 would make
 it pass a sink of the report and a stream of positions that never fires.
 
+New: the control keeps the view of a row that leaves the screen, and gives it to the next row that
+comes on the screen. Thus, a scroll builds no row view. Avalonia uses the container of such a row
+again, but it removes the view, and the presenter asks the row template for a new one when it
+joins the tree again. The control keeps a view only for a row template that uses its view again:
+each XAML DataTemplate, and a FuncDataTemplate with supportsRecycling true. A kept view gets its
+next row as its data context, and it keeps each state that is not bound, as a view does when its
+row changes in place. The new property RecyclesRowViews, true by default, stops this for a row view
+with such state. Measured with no screen on .NET 10, with XAML row templates: one row that comes on
+the screen allocates 124 KB where it allocated 199 KB, for a row view of 12 visuals, and 311 KB
+where it allocated 643 KB, for one of 43. A scroll of 100 px for each step with the row of 12
+visuals had 8 to 31 steps of 600 that took more than 8.33 ms, where it had 53 to 107. The view
+still leaves the tree and joins it again, and that is the larger part of what remains.
+
 0.2.2
 
 Changed: a large change of TotalCount now raises one reset of the list, where it raised an
