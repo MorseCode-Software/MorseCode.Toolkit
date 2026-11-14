@@ -2,10 +2,16 @@
 
 Breaking: VirtualizingItemsControl is now bound through one property, Source, and the
 public properties TotalCount, Rows, VisibleRange, and ScrollRequest are gone. The type of
-Source is the new interface IVirtualItemsSource. It holds the SodaFlow bindable values Rows,
-ScrollRequest, Range, and ScrollHandled. The control attaches to all of them when Source is
-set, so none of them can be left unbound. The two pairs, range with rows and request with report,
-are made together.
+Source is the new interface IVirtualItemsSource. It holds two SodaFlow bindable values, Rows and
+ScrollRequest, and two bindable actions, RangeReported and ScrollHandled. The control attaches to
+all of them when Source is set, so none of them can be left unbound. The two pairs, range with rows
+and request with report, are made together.
+
+The control reports through the two actions and writes no value. No member of
+IVirtualItemsSource is an IOneWayToSourceBindableValue, a type that the next major version of
+SodaFlow.Bindable.ObjectModel no longer has. An action also does nothing once its view model is
+disposed, so a view that outlives its view model can go on reporting. A two-way value would throw
+ObjectDisposedException there.
 
 Breaking: VirtualRows now carries the count of the whole list in TotalCount, next to Offset and
 Items, and there is no separate count. A change of the count and the rows reaches the control as
@@ -18,14 +24,18 @@ and a Stream of scroll positions. It slices the collection with the range that t
 rows for, maps each key in the slice to a row, and counts the keys. It returns an
 IVirtualItemsSource, and it registers the rows with the output, so disposing of the view model
 releases them. The other overload is for a view model that makes its own rows. It takes a Cell of
-VirtualRows, which carries their count, a CellSink that receives what the control reports, and a
-Stream of scroll positions. Both take an optional Stream of clears that withdraw a scroll request.
+VirtualRows, which carries their count, a StreamSink that receives each report of the control, and
+a Stream of scroll positions. Both take an optional Stream of clears that withdraw a scroll request.
 
-The scroll protocol is also new. The control no longer writes none to ScrollRequest. It reports
-the position that it handled in ScrollHandled, and the view model clears a request only if it is
-still that position. A request that the view model made while the report was on its way was
-cleared with the old one before. The control also scrolls once for each request, so a change of
-the count before the view model clears the request does not scroll again.
+The scroll protocol is also new. The control no longer writes none to ScrollRequest. A request is
+now a ScrollRequest: the position, and a number that goes up at each request. The control runs
+ScrollHandled with the request that it handled, and the view model clears a request only if it is
+still that one. A request that the view model made while the report was on its way was cleared
+with the old one before. The control also scrolls once for each request, so a change of the count
+before the view model clears the request does not scroll again. Because of the number, a second
+request for a position is a different value. The control scrolls for it also when it never saw the
+request go to none between the two, which happens when the second request comes before the binding
+thread delivered the clear of the first.
 
 New: CreateVirtualItemsSourceByKey, which takes a Stream of keys instead of a Stream of positions.
 It finds the position of a key in the collection in the transaction of the request, so a view
@@ -101,13 +111,13 @@ placeholder when its step is no longer than the positions on one side, so a fixe
 for one window size only. With 20 rows on screen and Buffer at 10, every step of one screen showed
 placeholders. Remove Buffer from your XAML.
 
-Breaking: the control reports a ReportedRange where it reported an ItemRange, and the value of the
-source is named Range, where it was VisibleRange. A ReportedRange holds two ranges from the same
-instant. Visible is the positions on screen, where a row that is only partly on screen counts, so a
-view model can now tell what the user sees. Constructed is the positions that the control wants
-rows for. Both stay inside the list. On the overload for a view model with its own rows, the
-parameter visibleRange is now reportedRange, a CellSink of ReportedRange, and the view model builds
-rows for Constructed.
+Breaking: the control reports a ReportedRange where it reported an ItemRange, and the member of the
+source is the action RangeReported, where it was the value VisibleRange. A ReportedRange holds two
+ranges from the same instant. Visible is the positions on screen, where a row that is only partly
+on screen counts, so a view model can now tell what the user sees. Constructed is the positions
+that the control wants rows for. Both stay inside the list. On the overload for a view model with
+its own rows, the parameter visibleRange is now reportedRanges, a StreamSink of ReportedRange. The
+view model holds that stream, and builds rows for Constructed.
 
 New: the overloads of CreateVirtualItemsSource for a collection return an IVirtualItemsSource of
 the row type. It is an IVirtualItemsSource, so the view binds to it as before, and it gives the view

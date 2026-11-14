@@ -34,19 +34,23 @@ A position that has no row yet shows the `PlaceholderTemplate` instead, until th
 
 ## The source
 
-The control reads and writes these values. They go in two pairs, and each pair only works when both
-halves are there:
+The control reads two values and runs two actions. They go in two pairs, and each pair only works
+when both halves are there:
 
-| Value | Direction | What it is |
+| Member | Direction | What it is |
 | --- | --- | --- |
 | `Rows` | view model to control | The rows for some of the positions, the position of the first, and the number of positions in the whole list. |
-| `Range` | control to view model | The positions on screen, and the wider range that the control wants rows for. |
-| `ScrollRequest` | view model to control | The position that the view model wants to show, or none. |
-| `ScrollHandled` | control to view model | The position of the request that the control handled. |
+| `RangeReported` | control to view model | An action. The control runs it with the positions on screen, and the wider range that it wants rows for. |
+| `ScrollRequest` | view model to control | The request to show a position, or none. |
+| `ScrollHandled` | control to view model | An action. The control runs it with the request that it handled. |
 
-The values live together in one object, an `IVirtualItemsSource`. The view model gives that object
-to the view, and the view binds one property. The control attaches to all of the values when you set
-`Source`, and detaches when you set it again or clear it.
+They live together in one object, an `IVirtualItemsSource`. The view model gives that object to the
+view, and the view binds one property. The control attaches to all of them when you set `Source`,
+and detaches when you set it again or clear it.
+
+The control reports through bindable actions rather than by writing a value. An action does nothing
+once its view model has been disposed, so a view that is still on screen after its view model is
+gone can go on reporting without an error.
 
 The count of the whole list travels inside `Rows` rather than as a value of its own, so a change of
 both reaches the control as one update and the control never shows a count with the rows of a
@@ -91,7 +95,7 @@ Make a new list for each change.
 
 ### What the control reports
 
-The control writes a `ReportedRange` to the source. Everything in it comes from the same instant.
+The control reports a `ReportedRange` to the source. Everything in it comes from the same instant.
 It holds two ranges:
 
 | Range | What it is |
@@ -147,15 +151,17 @@ rows for a report that leaves `Constructed` as it was.
 ### When the rows do not come from a collection
 
 Another overload leaves the rows to you. You supply one `Cell<VirtualRows>` that
-holds the count, the offset, and the rows, and a `CellSink<ReportedRange>` that receives what the
-control reports. Make that cell from one lift, so the three always agree:
+holds the count, the offset, and the rows, and a `StreamSink<ReportedRange>` that receives each
+report of the control. Hold that stream to get the last report, starting from
+`ReportedRange.Empty`, and make the rows cell from one lift, so the three always agree:
 
 ```csharp
-CellSink<ReportedRange> reported = Cell.CreateSink(ReportedRange.Empty);
+StreamSink<ReportedRange> reports = Stream.CreateSink<ReportedRange>();
+Cell<ReportedRange> reported = reports.Hold(ReportedRange.Empty);
 
 IVirtualItemsSource source = output.CreateVirtualItemsSource(
     rows: rows,
-    reportedRange: reported,
+    reportedRanges: reports,
     scrollRequests: scrollTo);
 ```
 
@@ -229,22 +235,24 @@ Each overload takes an optional `Stream<Unit>` of clears. See
 A view model asks for a scroll through the `ScrollRequest` of its source, and the view doesn't call
 `ScrollIntoView` itself. The request is a value and not an event, so it isn't lost when the view
 model asks before the view is bound, or before the list has laid out. The control keeps the request
-until it can use it, scrolls, and then reports the position it handled in `ScrollHandled`. The
-view model clears the request when it receives the report, and only if the request is still that
-position.
+until it can use it, scrolls, and then runs `ScrollHandled` with the request it handled. The view
+model clears the request when it receives the report, and only if the request is still that one.
 
-`CreateVirtualItemsSource` takes a `Stream<int>` of positions. The request starts as `None`, each
-position makes it `Some(position)`, and a report of that same position clears it. The graph behind
-it is an `Accum` over the positions, the clears, and the reports. You don't make
-the sink for the reports, because it is always the same.
+`CreateVirtualItemsSource` takes a `Stream<int>` of positions. The request starts as `None`, and
+each position makes it `Some` of a `ScrollRequest`: the position, and a number that goes up with
+every request. A report of that same request clears it. The graph behind it is an `Accum` over the
+positions, the clears, and the reports. You don't make the sink for the reports, because it is
+always the same.
+
+The number is what makes a repeat work. Two requests for one position are different values, so the
+control scrolls for the second one even if it never saw the request go back to `None` in between.
+That happens when the second request arrives before the binding thread has delivered the clear of
+the first. The number also means that a report still on its way can't clear a newer request for
+the same position.
 
 Every overload takes an optional `Stream<Unit>` of clears. Each firing of it sets the request to
 `None`, so the view model can withdraw a request that the control didn't use yet. When a request
 and a clear come in one transaction, the request wins.
-
-The control sets `ScrollHandled` to `Some(position)` and then straight back to `None`. The second
-write makes the same position a change again, so a second request for it is reported too. The view
-model ignores the `None`.
 
 Code runs the action with `scrollToAction.Execute(position)`, and a view binds a `Command` to it as it
 does to any `ICommand`.

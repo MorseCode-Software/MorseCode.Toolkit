@@ -10,7 +10,7 @@ namespace MorseCode.Avalonia.Controls.Tests;
 /// <summary>
 ///     A source for a <see cref="VirtualizingItemsControl" />. It does what a <c>Slice</c> followed by
 ///     a <c>Map</c> does. It builds a row for each position that the view wants a row for, and for
-///     no other position. It keeps its own record of each write, so a test can check the protocol of
+///     no other position. It keeps its own record of each report, so a test can check the protocol of
 ///     the control without the graph of a view model.
 /// </summary>
 // ReSharper disable once InheritdocConsiderUsage - The summary of IVirtualItemsSource does not say what this model builds.
@@ -20,7 +20,7 @@ internal sealed class VirtualModel : IVirtualItemsSource
     private readonly CellSink<int> totalCount;
     private readonly StreamSink<int> requests = Stream.CreateSink<int>();
     private readonly StreamSink<Unit> releases = Stream.CreateSink<Unit>();
-    private readonly Cell<Maybe<int>> request;
+    private readonly Cell<Maybe<ScrollRequest>> request;
 
     // SodaFlow holds a listener weakly, so this field keeps the listeners alive.
     // ReSharper disable once NotAccessedField.Local - The field is there for its reference and not for its value.
@@ -38,14 +38,14 @@ internal sealed class VirtualModel : IVirtualItemsSource
     {
         BindableFactory factory = new(bindingScheduler: BindingScheduler.Immediate);
 
-        StreamSink<ReportedRange> rangeWrites = Stream.CreateSink<ReportedRange>();
-        StreamSink<Maybe<int>> handledWrites = Stream.CreateSink<Maybe<int>>();
+        StreamSink<ReportedRange> rangeReports = Stream.CreateSink<ReportedRange>();
+        StreamSink<ScrollRequest> handledReports = Stream.CreateSink<ScrollRequest>();
 
         this.totalCount = Cell.CreateSink(initialValue: total);
 
         // The model is a graph and sends nothing from a listener. The rows are a function of the range,
-        // the count, and the releases, thus they answer in the same transaction as the write.
-        Cell<ReportedRange> range = rangeWrites.Hold(initialValue: ReportedRange.Empty);
+        // the count, and the releases, thus they answer in the same transaction as the report.
+        Cell<ReportedRange> range = rangeReports.Hold(initialValue: ReportedRange.Empty);
         Cell<int> released = this.releases.Map(f: _ => ++this.releaseCount).Hold(initialValue: 0);
 
         Cell<VirtualRows> rowsCell =
@@ -54,49 +54,62 @@ internal sealed class VirtualModel : IVirtualItemsSource
                 c3: released,
                 f: (reported, count, _) => this.Answer(wanted: reported.Constructed, count: count));
 
-        // A report of the position that the request holds clears it, unless the model keeps it.
+        // Each request gets the next number, as in the source of a view model. A report of the request
+        // that the model holds clears it, unless the model keeps it.
         this.request =
-            this.requests.Map(f: static position => Change(f: _ => Maybe<int>.Some(value: position)))
+            this.requests.Map(
+                    f: static position =>
+                        Change(
+                            f: held =>
+                                new Held(
+                                    Request: Maybe<ScrollRequest>.Some(
+                                        value: new ScrollRequest(Position: position, Number: held.Next)),
+                                    Next: held.Next + 1)))
                 .OrElse(
-                    s2: handledWrites.Map(
+                    s2: handledReports.Map(
                         f: handled =>
                             Change(
-                                f: current =>
-                                    !this.KeepsHandledRequest && current.Equals(other: handled)
-                                        ? Maybe<int>.None
-                                        : current)))
-                .Accum(initialState: Maybe<int>.None, f: static (change, current) => change(arg: current));
+                                f: held =>
+                                    !this.KeepsHandledRequest
+                                    && held.Request.Equals(other: Maybe<ScrollRequest>.Some(value: handled))
+                                        ? held with { Request = Maybe<ScrollRequest>.None }
+                                        : held)))
+                .Accum(
+                    initialState: new Held(Request: Maybe<ScrollRequest>.None, Next: 0),
+                    f: static (change, held) => change(arg: held))
+                .Map(f: static held => held.Request);
 
         this.Rows = factory.CreateOneWay(cell: rowsCell);
         this.ScrollRequest = factory.CreateOneWay(cell: this.request);
 
-        this.Range =
-            factory.CreateOneWayToSource(editsStreamSink: rangeWrites, initialValue: ReportedRange.Empty);
-
-        this.ScrollHandled =
-            factory.CreateOneWayToSource(editsStreamSink: handledWrites, initialValue: Maybe<int>.None);
+        this.RangeReported = factory.CreateBindableAction(firingsStreamSink: rangeReports);
+        this.ScrollHandled = factory.CreateBindableAction(firingsStreamSink: handledReports);
 
         // These listeners only record.
-        this.listeners = [rangeWrites.Listen(handler: this.RecordRange), handledWrites.Listen(handler: this.ScrollWrites.Add)];
+        this.listeners =
+        [
+            rangeReports.Listen(handler: this.RecordRange),
+            handledReports.Listen(handler: handled => this.ScrollReports.Add(item: handled.Position))
+        ];
     }
 
     /// <inheritdoc />
     public IOneWayBindableValue<VirtualRows> Rows { get; }
 
     /// <inheritdoc />
-    public IOneWayToSourceBindableValue<ReportedRange> Range { get; }
+    public IBindableAction<ReportedRange> RangeReported { get; }
 
     /// <inheritdoc />
-    public IOneWayBindableValue<Maybe<int>> ScrollRequest { get; }
+    public IOneWayBindableValue<Maybe<ScrollRequest>> ScrollRequest { get; }
 
     /// <inheritdoc />
-    public IOneWayToSourceBindableValue<Maybe<int>> ScrollHandled { get; }
+    public IBindableAction<ScrollRequest> ScrollHandled { get; }
 
     /// <summary>
-    ///     Gets the request that the model holds now. A test makes a request with
+    ///     Gets the position of the request that the model holds now. A test makes a request with
     ///     <see cref="Request" />, and a report of the view can clear it.
     /// </summary>
-    public Maybe<int> CurrentRequest => this.request.Sample();
+    public Maybe<int> CurrentRequest => this.request.Sample().Map(f: static held => held.Position);
 
     /// <summary>
     ///     Gets or sets whether the model leaves the request when the view reports it. This stands for
@@ -111,12 +124,12 @@ internal sealed class VirtualModel : IVirtualItemsSource
     public bool MakesNewRows { get; init; }
 
     /// <summary>
-    ///     Gets each value that the view wrote as the position that it handled, in sequence.
+    ///     Gets the position of each request that the view reported as handled, in sequence.
     /// </summary>
-    public List<Maybe<int>> ScrollWrites { get; } = [];
+    public List<int> ScrollReports { get; } = [];
 
     /// <summary>
-    ///     Gets the range that the view wanted rows for at each write, in sequence.
+    ///     Gets the range that the view wanted rows for at each report, in sequence.
     /// </summary>
     public List<ItemRange> Writes { get; } = [];
 
@@ -147,14 +160,14 @@ internal sealed class VirtualModel : IVirtualItemsSource
     public void Resize(int total) => this.totalCount.Send(a: total);
 
     /// <summary>
-    ///     Asks the view to scroll to a position, as a view model does. It does not count as a write of
-    ///     the view.
+    ///     Asks the view to scroll to a position, as a view model does. It does not count as a report
+    ///     of the view.
     /// </summary>
     /// <param name="position">The position.</param>
     public void Request(int position) => this.requests.Send(a: position);
 
     // Names the type once, so that a lambda that changes the request reads as a value.
-    private static Func<Maybe<int>, Maybe<int>> Change(Func<Maybe<int>, Maybe<int>> f) => f;
+    private static Func<Held, Held> Change(Func<Held, Held> f) => f;
 
     private void RecordRange(ReportedRange value)
     {
@@ -197,4 +210,7 @@ internal sealed class VirtualModel : IVirtualItemsSource
 
         return this.lastRows;
     }
+
+    // The request that the model holds, and the number that the next request gets.
+    private readonly record struct Held(Maybe<ScrollRequest> Request, long Next);
 }

@@ -77,7 +77,8 @@ public static class VirtualItemsSourceExtensions
         return Transaction.Run(
             f: () =>
             {
-                CellSink<ReportedRange> range = Cell.CreateSink(initialValue: ReportedRange.Empty);
+                StreamSink<ReportedRange> reports = Stream.CreateSink<ReportedRange>();
+                Cell<ReportedRange> range = reports.Hold(initialValue: ReportedRange.Empty);
 
                 // The offset and the limit are two views of the one cell. Thus, the slice always reads
                 // both values of the same report. The limit also has the positions that the control
@@ -117,7 +118,7 @@ public static class VirtualItemsSourceExtensions
                     values: Build(
                         bindableFactory: output.BindableFactory,
                         rows: rows,
-                        reportedRange: range,
+                        reportedRanges: reports,
                         scrollRequests: scrollRequests,
                         clears: clears),
                     constructedRows: mapped.Items,
@@ -203,14 +204,15 @@ public static class VirtualItemsSourceExtensions
     }
 
     /// <summary>
-    ///     Makes the source from cells and sinks that the view model already has. Use this when the rows
-    ///     do not come from a <c>ReactiveCollection</c>.
+    ///     Makes the source from a cell and a sink that the view model already has. Use this when the
+    ///     rows do not come from a <c>ReactiveCollection</c>.
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///         The view model reads what the control reports from <paramref name="reportedRange" />
-    ///         and answers in <paramref name="rows" />. Make the count, the rows, and their offset
-    ///         from one cell, so that they always agree.
+    ///         The view model holds what the control reports on <paramref name="reportedRanges" />,
+    ///         with <see cref="ReportedRange.Empty" /> as the first value, and answers in
+    ///         <paramref name="rows" />. Make the count, the rows, and their offset from one cell, so
+    ///         that they always agree.
     ///     </para>
     ///     <para>
     ///         Build rows for <see cref="ReportedRange.Constructed" />. That range is inside the list
@@ -225,24 +227,24 @@ public static class VirtualItemsSourceExtensions
     /// </remarks>
     /// <param name="output">The output of the view model. The source makes its values with the factory of the output.</param>
     /// <param name="rows">The rows for some of the positions, with the position of the first and the number of positions in the whole list.</param>
-    /// <param name="reportedRange">The cell that receives what the control reports.</param>
+    /// <param name="reportedRanges">The sink that receives each report of the control.</param>
     /// <param name="scrollRequests">The positions to scroll to.</param>
     /// <param name="clears">The events that withdraw a request that the control did not use yet. None by default.</param>
     /// <returns>The source. Expose it on the view model, and bind <see cref="VirtualizingItemsControl.Source" /> to it.</returns>
     /// <exception cref="ArgumentNullException">
-    ///     <paramref name="output" />, <paramref name="rows" />, <paramref name="reportedRange" />, or
+    ///     <paramref name="output" />, <paramref name="rows" />, <paramref name="reportedRanges" />, or
     ///     <paramref name="scrollRequests" /> is null.
     /// </exception>
     public static IVirtualItemsSource CreateVirtualItemsSource(
         this ViewModelBase.IOutput output,
         Cell<VirtualRows> rows,
-        CellSink<ReportedRange> reportedRange,
+        StreamSink<ReportedRange> reportedRanges,
         Stream<int> scrollRequests,
         Stream<Unit>? clears = null)
     {
         ArgumentNullException.ThrowIfNull(argument: output);
         ArgumentNullException.ThrowIfNull(argument: rows);
-        ArgumentNullException.ThrowIfNull(argument: reportedRange);
+        ArgumentNullException.ThrowIfNull(argument: reportedRanges);
         ArgumentNullException.ThrowIfNull(argument: scrollRequests);
 
         return Transaction.Run(
@@ -250,7 +252,7 @@ public static class VirtualItemsSourceExtensions
                 Build(
                     bindableFactory: output.BindableFactory,
                     rows: rows,
-                    reportedRange: reportedRange,
+                    reportedRanges: reportedRanges,
                     scrollRequests: scrollRequests,
                     clears: clears));
     }
@@ -299,7 +301,8 @@ public static class VirtualItemsSourceExtensions
         return Transaction.Run(
             f: () =>
             {
-                CellSink<ReportedRange> range = Cell.CreateSink(initialValue: ReportedRange.Empty);
+                StreamSink<ReportedRange> reports = Stream.CreateSink<ReportedRange>();
+                Cell<ReportedRange> range = reports.Hold(initialValue: ReportedRange.Empty);
 
                 // The rows start at position zero. Thus, a range of the report is a place in the list.
                 return new VirtualItemsSource<TRow>(
@@ -307,7 +310,7 @@ public static class VirtualItemsSourceExtensions
                         bindableFactory: output.BindableFactory,
                         rows: rows.Map(
                             f: static list => new VirtualRows(TotalCount: list.Count, Offset: 0, Items: list)),
-                        reportedRange: range,
+                        reportedRanges: reports,
                         scrollRequests: scrollRequests ?? Stream.Never<int>(),
                         clears: clears),
                     constructedRows: RowsAt(items: rows, place: range.Map(f: static reported => reported.Constructed)),
@@ -342,7 +345,7 @@ public static class VirtualItemsSourceExtensions
     private static VirtualItemsSource Build(
         IBindableFactory bindableFactory,
         Cell<VirtualRows> rows,
-        CellSink<ReportedRange> reportedRange,
+        StreamSink<ReportedRange> reportedRanges,
         Stream<int> scrollRequests,
         Stream<Unit>? clears)
     {
@@ -353,7 +356,7 @@ public static class VirtualItemsSourceExtensions
 
         return new VirtualItemsSource(
             rows: bindableFactory.CreateOneWay(cell: rows),
-            range: bindableFactory.CreateOneWayToSource(sink: reportedRange),
+            rangeReported: bindableFactory.CreateBindableAction(firingsStreamSink: reportedRanges),
             scrollRequest: scroll.Request,
             scrollHandled: scroll.Handled);
     }
