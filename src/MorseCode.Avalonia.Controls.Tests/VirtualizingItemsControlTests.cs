@@ -87,7 +87,7 @@ public sealed class VirtualizingItemsControlTests
 
                 await Assert.That(Texts(shown: shown)).Contains(expected: "Row 300");
                 await Assert.That(Texts(shown: shown)).DoesNotContain(expected: Placeholder);
-                await Assert.That(source.ScrollRequest.Value).IsEqualTo(expected: Maybe<int>.None);
+                await Assert.That(source.ScrollRequest.Value).IsEqualTo(expected: Maybe<ScrollRequest>.None);
 
                 await Assert.That(source.VisibleRows.Sample().Select(selector: static row => row.Text))
                     .IsEquivalentTo(expected: Texts(shown: shown), ordering: CollectionOrdering.Matching);
@@ -451,6 +451,33 @@ public sealed class VirtualizingItemsControlTests
                     .IsEquivalentTo(expected: [300, 700], ordering: CollectionOrdering.Matching);
             });
 
+    // The view model holds a handled request, and asks for the same position again. Thus, the
+    // control sees no none between the two requests, as with a binding thread that took the clear and
+    // the second request together. The second request has a different number, and the control scrolls.
+    [Test]
+    public Task ASecondRequestForAPositionScrollsAgainWhenTheControlSawNoNoneBetweenTheTwo() =>
+        TestApplication.Run(
+            test: static async () =>
+            {
+                VirtualModel model = new(total: 1000) { KeepsHandledRequest = true };
+                using ShownVirtual shown = new(model: model, buffer: 0);
+
+                model.Request(position: 700);
+                shown.Settle();
+                shown.Scroller.Offset = new Vector(x: 0, y: 0);
+                shown.Settle();
+
+                await Assert.That(Texts(shown: shown)[0]).IsEqualTo(expected: "Row 0");
+
+                model.Request(position: 700);
+                shown.Settle();
+
+                await Assert.That(Texts(shown: shown).Any(predicate: static text => text == "Row 700")).IsTrue();
+
+                await Assert.That(model.ScrollReports)
+                    .IsEquivalentTo(expected: [700, 700], ordering: CollectionOrdering.Matching);
+            });
+
     // The control reads the count from its source. A new source replaces the old one, and the old one
     // no longer reaches the control. A control with no source shows nothing.
     [Test]
@@ -481,7 +508,7 @@ public sealed class VirtualizingItemsControlTests
                 second.Resize(total: 70);
 
                 await Assert.That(list.Rows.TotalCount).IsEqualTo(expected: 0);
-                await Assert.That(list.ScrollRequest).IsEqualTo(expected: Maybe<int>.None);
+                await Assert.That(list.ScrollRequest).IsEqualTo(expected: Maybe<ScrollRequest>.None);
             });
 
     // A view model can outlive its view: a tab closes, a page navigates away, and the view model stays.
@@ -501,7 +528,7 @@ public sealed class VirtualizingItemsControlTests
                 shown.Settle();
 
                 await Assert.That(shown.List.Rows.TotalCount).IsEqualTo(expected: 1000);
-                await Assert.That(shown.List.ScrollRequest).IsEqualTo(expected: Maybe<int>.None);
+                await Assert.That(shown.List.ScrollRequest).IsEqualTo(expected: Maybe<ScrollRequest>.None);
                 await Assert.That(model.ScrollReports).IsEmpty();
 
                 shown.Return();

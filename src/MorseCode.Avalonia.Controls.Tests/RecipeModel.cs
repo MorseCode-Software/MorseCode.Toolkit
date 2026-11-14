@@ -92,10 +92,10 @@ internal sealed class RecipeModel : IVirtualItemsSource, IDisposable
     public IBindableAction<ReportedRange> RangeReported => this.source.RangeReported;
 
     /// <inheritdoc />
-    public IOneWayBindableValue<Maybe<int>> ScrollRequest => this.source.ScrollRequest;
+    public IOneWayBindableValue<Maybe<ScrollRequest>> ScrollRequest => this.source.ScrollRequest;
 
     /// <inheritdoc />
-    public IBindableAction<int> ScrollHandled => this.source.ScrollHandled;
+    public IBindableAction<ScrollRequest> ScrollHandled => this.source.ScrollHandled;
 
     /// <summary>
     ///     Gets the rows at the positions that show, as the view model reads them from its source.

@@ -51,20 +51,21 @@ public interface IVirtualItemsSource
     IBindableAction<ReportedRange> RangeReported { get; }
 
     /// <summary>
-    ///     Gets the position that the view model wants to show, or none.
+    ///     Gets the request of the view model to show a position, or none.
     /// </summary>
     /// <remarks>
     ///     The view model keeps the request until the control reports it. Thus, a request made before
-    ///     the control is bound or laid out is not lost.
+    ///     the control is bound or laid out is not lost. Each request has a number of its own, thus a
+    ///     second request for a position is a different value.
     /// </remarks>
-    IOneWayBindableValue<Maybe<int>> ScrollRequest { get; }
+    IOneWayBindableValue<Maybe<ScrollRequest>> ScrollRequest { get; }
 
     /// <summary>
-    ///     Gets the action that the control runs with the position of a request that it handled.
+    ///     Gets the action that the control runs with a request that it handled.
     /// </summary>
     /// <remarks>
     ///     The control runs the action one time for each request that it handles. The view model
-    ///     clears the request only if the request is still that position.
+    ///     clears the request only if the request is still that one.
     /// </remarks>
-    IBindableAction<int> ScrollHandled { get; }
+    IBindableAction<ScrollRequest> ScrollHandled { get; }
 }

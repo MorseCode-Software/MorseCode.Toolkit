@@ -20,7 +20,7 @@ internal sealed class VirtualModel : IVirtualItemsSource
     private readonly CellSink<int> totalCount;
     private readonly StreamSink<int> requests = Stream.CreateSink<int>();
     private readonly StreamSink<Unit> releases = Stream.CreateSink<Unit>();
-    private readonly Cell<Maybe<int>> request;
+    private readonly Cell<Maybe<ScrollRequest>> request;
 
     // SodaFlow holds a listener weakly, so this field keeps the listeners alive.
     // ReSharper disable once NotAccessedField.Local - The field is there for its reference and not for its value.
@@ -39,7 +39,7 @@ internal sealed class VirtualModel : IVirtualItemsSource
         BindableFactory factory = new(bindingScheduler: BindingScheduler.Immediate);
 
         StreamSink<ReportedRange> rangeReports = Stream.CreateSink<ReportedRange>();
-        StreamSink<int> handledReports = Stream.CreateSink<int>();
+        StreamSink<ScrollRequest> handledReports = Stream.CreateSink<ScrollRequest>();
 
         this.totalCount = Cell.CreateSink(initialValue: total);
 
@@ -54,19 +54,30 @@ internal sealed class VirtualModel : IVirtualItemsSource
                 c3: released,
                 f: (reported, count, _) => this.Answer(wanted: reported.Constructed, count: count));
 
-        // A report of the position that the request holds clears it, unless the model keeps it.
+        // Each request gets the next number, as in the source of a view model. A report of the request
+        // that the model holds clears it, unless the model keeps it.
         this.request =
-            this.requests.Map(f: static position => Change(f: _ => Maybe<int>.Some(value: position)))
+            this.requests.Map(
+                    f: static position =>
+                        Change(
+                            f: held =>
+                                new Held(
+                                    Request: Maybe<ScrollRequest>.Some(
+                                        value: new ScrollRequest(Position: position, Number: held.Next)),
+                                    Next: held.Next + 1)))
                 .OrElse(
                     s2: handledReports.Map(
                         f: handled =>
                             Change(
-                                f: current =>
+                                f: held =>
                                     !this.KeepsHandledRequest
-                                    && current.Equals(other: Maybe<int>.Some(value: handled))
-                                        ? Maybe<int>.None
-                                        : current)))
-                .Accum(initialState: Maybe<int>.None, f: static (change, current) => change(arg: current));
+                                    && held.Request.Equals(other: Maybe<ScrollRequest>.Some(value: handled))
+                                        ? held with { Request = Maybe<ScrollRequest>.None }
+                                        : held)))
+                .Accum(
+                    initialState: new Held(Request: Maybe<ScrollRequest>.None, Next: 0),
+                    f: static (change, held) => change(arg: held))
+                .Map(f: static held => held.Request);
 
         this.Rows = factory.CreateOneWay(cell: rowsCell);
         this.ScrollRequest = factory.CreateOneWay(cell: this.request);
@@ -77,7 +88,8 @@ internal sealed class VirtualModel : IVirtualItemsSource
         // These listeners only record.
         this.listeners =
         [
-            rangeReports.Listen(handler: this.RecordRange), handledReports.Listen(handler: this.ScrollReports.Add)
+            rangeReports.Listen(handler: this.RecordRange),
+            handledReports.Listen(handler: handled => this.ScrollReports.Add(item: handled.Position))
         ];
     }
 
@@ -88,16 +100,16 @@ internal sealed class VirtualModel : IVirtualItemsSource
     public IBindableAction<ReportedRange> RangeReported { get; }
 
     /// <inheritdoc />
-    public IOneWayBindableValue<Maybe<int>> ScrollRequest { get; }
+    public IOneWayBindableValue<Maybe<ScrollRequest>> ScrollRequest { get; }
 
     /// <inheritdoc />
-    public IBindableAction<int> ScrollHandled { get; }
+    public IBindableAction<ScrollRequest> ScrollHandled { get; }
 
     /// <summary>
-    ///     Gets the request that the model holds now. A test makes a request with
+    ///     Gets the position of the request that the model holds now. A test makes a request with
     ///     <see cref="Request" />, and a report of the view can clear it.
     /// </summary>
-    public Maybe<int> CurrentRequest => this.request.Sample();
+    public Maybe<int> CurrentRequest => this.request.Sample().Map(f: static held => held.Position);
 
     /// <summary>
     ///     Gets or sets whether the model leaves the request when the view reports it. This stands for
@@ -155,7 +167,7 @@ internal sealed class VirtualModel : IVirtualItemsSource
     public void Request(int position) => this.requests.Send(a: position);
 
     // Names the type once, so that a lambda that changes the request reads as a value.
-    private static Func<Maybe<int>, Maybe<int>> Change(Func<Maybe<int>, Maybe<int>> f) => f;
+    private static Func<Held, Held> Change(Func<Held, Held> f) => f;
 
     private void RecordRange(ReportedRange value)
     {
@@ -198,4 +210,7 @@ internal sealed class VirtualModel : IVirtualItemsSource
 
         return this.lastRows;
     }
+
+    // The request that the model holds, and the number that the next request gets.
+    private readonly record struct Held(Maybe<ScrollRequest> Request, long Next);
 }

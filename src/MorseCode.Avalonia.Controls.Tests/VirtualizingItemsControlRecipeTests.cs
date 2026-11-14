@@ -64,7 +64,7 @@ public sealed class VirtualizingItemsControlRecipeTests
                 shown.Settle();
 
                 await Assert.That(shown.Shown().Any(predicate: static pair => pair.Text == "Row 700")).IsTrue();
-                await Assert.That(model.ScrollRequest.Value).IsEqualTo(expected: Maybe<int>.None);
+                await Assert.That(model.ScrollRequest.Value).IsEqualTo(expected: Maybe<ScrollRequest>.None);
             });
 
     // The same, when the view model asks before the view binds.
@@ -80,7 +80,7 @@ public sealed class VirtualizingItemsControlRecipeTests
                 using ShownVirtual shown = new(model: model, buffer: 0);
 
                 await Assert.That(shown.Shown().Any(predicate: static pair => pair.Text == "Row 700")).IsTrue();
-                await Assert.That(model.ScrollRequest.Value).IsEqualTo(expected: Maybe<int>.None);
+                await Assert.That(model.ScrollRequest.Value).IsEqualTo(expected: Maybe<ScrollRequest>.None);
             });
 
     // A view can outlive its view model. The control reports from the dispatcher, where a throw stops

@@ -12,21 +12,23 @@ internal sealed class ScrollRequestBindables
     /// <summary>
     ///     Makes the pair.
     /// </summary>
-    /// <param name="request">The position to show, or none.</param>
-    /// <param name="handled">The action that the control runs with the position that it handled.</param>
-    internal ScrollRequestBindables(IOneWayBindableValue<Maybe<int>> request, IBindableAction<int> handled)
+    /// <param name="request">The request to show a position, or none.</param>
+    /// <param name="handled">The action that the control runs with the request that it handled.</param>
+    internal ScrollRequestBindables(
+        IOneWayBindableValue<Maybe<ScrollRequest>> request,
+        IBindableAction<ScrollRequest> handled)
     {
         this.Request = request;
         this.Handled = handled;
     }
 
     /// <summary>
-    ///     Gets the position to show, or none. Bind it one way to the control.
+    ///     Gets the request to show a position, or none.
     /// </summary>
-    internal IOneWayBindableValue<Maybe<int>> Request { get; }
+    internal IOneWayBindableValue<Maybe<ScrollRequest>> Request { get; }
 
     /// <summary>
-    ///     Gets the action that the control runs with the position that it handled.
+    ///     Gets the action that the control runs with the request that it handled.
     /// </summary>
-    internal IBindableAction<int> Handled { get; }
+    internal IBindableAction<ScrollRequest> Handled { get; }
 }

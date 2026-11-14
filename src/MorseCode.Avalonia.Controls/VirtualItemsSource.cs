@@ -13,8 +13,8 @@ internal sealed class VirtualItemsSource : IVirtualItemsSource
     internal VirtualItemsSource(
         IOneWayBindableValue<VirtualRows> rows,
         IBindableAction<ReportedRange> rangeReported,
-        IOneWayBindableValue<Maybe<int>> scrollRequest,
-        IBindableAction<int> scrollHandled)
+        IOneWayBindableValue<Maybe<ScrollRequest>> scrollRequest,
+        IBindableAction<ScrollRequest> scrollHandled)
     {
         this.Rows = rows;
         this.RangeReported = rangeReported;
@@ -29,8 +29,8 @@ internal sealed class VirtualItemsSource : IVirtualItemsSource
     public IBindableAction<ReportedRange> RangeReported { get; }
 
     /// <inheritdoc />
-    public IOneWayBindableValue<Maybe<int>> ScrollRequest { get; }
+    public IOneWayBindableValue<Maybe<ScrollRequest>> ScrollRequest { get; }
 
     /// <inheritdoc />
-    public IBindableAction<int> ScrollHandled { get; }
+    public IBindableAction<ScrollRequest> ScrollHandled { get; }
 }

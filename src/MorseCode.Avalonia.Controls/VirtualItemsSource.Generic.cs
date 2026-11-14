@@ -27,10 +27,10 @@ internal sealed class VirtualItemsSource<TRow>(
     public IBindableAction<ReportedRange> RangeReported { get; } = values.RangeReported;
 
     /// <inheritdoc />
-    public IOneWayBindableValue<Maybe<int>> ScrollRequest { get; } = values.ScrollRequest;
+    public IOneWayBindableValue<Maybe<ScrollRequest>> ScrollRequest { get; } = values.ScrollRequest;
 
     /// <inheritdoc />
-    public IBindableAction<int> ScrollHandled { get; } = values.ScrollHandled;
+    public IBindableAction<ScrollRequest> ScrollHandled { get; } = values.ScrollHandled;
 
     /// <inheritdoc />
     public Cell<IReadOnlyList<TRow>> ConstructedRows { get; } = constructedRows;

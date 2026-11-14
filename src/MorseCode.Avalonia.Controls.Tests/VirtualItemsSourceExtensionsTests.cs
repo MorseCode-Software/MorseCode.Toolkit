@@ -63,15 +63,15 @@ public sealed class VirtualItemsSourceExtensionsTests
 
         using ViewModelBase owner = viewModel;
 
-        await Assert.That(source.ScrollRequest.Value).IsEqualTo(expected: Maybe<int>.None);
+        await Assert.That(source.ScrollRequest.Value).IsEqualTo(expected: Maybe<ScrollRequest>.None);
 
         requests.Send(a: 5);
 
-        await Assert.That(source.ScrollRequest.Value).IsEqualTo(expected: Maybe<int>.Some(value: 5));
+        await Assert.That(source.ScrollRequest.Value).IsEqualTo(expected: Asked(position: 5, number: 0));
 
-        source.ScrollHandled.Execute(parameter: 5);
+        source.ScrollHandled.Execute(parameter: new ScrollRequest(Position: 5, Number: 0));
 
-        await Assert.That(source.ScrollRequest.Value).IsEqualTo(expected: Maybe<int>.None);
+        await Assert.That(source.ScrollRequest.Value).IsEqualTo(expected: Maybe<ScrollRequest>.None);
     }
 
     [Test]
@@ -94,7 +94,7 @@ public sealed class VirtualItemsSourceExtensionsTests
         requests.Send(a: 5);
         clears.Send(a: Unit.Value);
 
-        await Assert.That(source.ScrollRequest.Value).IsEqualTo(expected: Maybe<int>.None);
+        await Assert.That(source.ScrollRequest.Value).IsEqualTo(expected: Maybe<ScrollRequest>.None);
     }
 
     // A list that has all of its rows. The count is the count of the list, and the rows start at position zero.
@@ -149,8 +149,8 @@ public sealed class VirtualItemsSourceExtensionsTests
 
         requests.Send(a: 0);
 
-        await Assert.That(withRequests.ScrollRequest.Value).IsEqualTo(expected: Maybe<int>.Some(value: 0));
-        await Assert.That(withoutRequests.ScrollRequest.Value).IsEqualTo(expected: Maybe<int>.None);
+        await Assert.That(withRequests.ScrollRequest.Value).IsEqualTo(expected: Asked(position: 0, number: 0));
+        await Assert.That(withoutRequests.ScrollRequest.Value).IsEqualTo(expected: Maybe<ScrollRequest>.None);
     }
 
     // The source of a list that has all of its rows has the type of the rows. The view model reads the
@@ -372,12 +372,12 @@ public sealed class VirtualItemsSourceExtensionsTests
 
         requests.Send(a: 30);
 
-        await Assert.That(source.ScrollRequest.Value).IsEqualTo(expected: Maybe<int>.Some(value: 2));
+        await Assert.That(source.ScrollRequest.Value).IsEqualTo(expected: Asked(position: 2, number: 0));
 
-        source.ScrollHandled.Execute(parameter: 2);
+        source.ScrollHandled.Execute(parameter: new ScrollRequest(Position: 2, Number: 0));
         requests.Send(a: 10);
 
-        await Assert.That(source.ScrollRequest.Value).IsEqualTo(expected: Maybe<int>.Some(value: 0));
+        await Assert.That(source.ScrollRequest.Value).IsEqualTo(expected: Asked(position: 0, number: 1));
     }
 
     [Test]
@@ -397,7 +397,7 @@ public sealed class VirtualItemsSourceExtensionsTests
 
         requests.Send(a: 25);
 
-        await Assert.That(source.ScrollRequest.Value).IsEqualTo(expected: Maybe<int>.None);
+        await Assert.That(source.ScrollRequest.Value).IsEqualTo(expected: Maybe<ScrollRequest>.None);
     }
 
     [Test]
@@ -523,6 +523,7 @@ public sealed class VirtualItemsSourceExtensionsTests
         using ViewModelBase owner = viewModel;
 
         ItemRange constructed = new(First: 5, Count: 15);
+
         source.RangeReported.Execute(
             parameter: Reported(visible: new ItemRange(First: 10, Count: 5), constructed: constructed));
 
@@ -608,6 +609,7 @@ public sealed class VirtualItemsSourceExtensionsTests
         using ViewModelBase owner = viewModel;
 
         ItemRange visible = new(First: 10, Count: 5);
+
         source.RangeReported.Execute(
             parameter: Reported(visible: visible, constructed: new ItemRange(First: 5, Count: 15)));
 
@@ -748,6 +750,9 @@ public sealed class VirtualItemsSourceExtensionsTests
                 ],
                 ordering: CollectionOrdering.Matching);
     }
+
+    private static Maybe<ScrollRequest> Asked(int position, long number) =>
+        Maybe<ScrollRequest>.Some(value: new ScrollRequest(Position: position, Number: number));
 
     // A report of a control with no positions on each side: it wants rows for the positions that show.
     private static ReportedRange Reported(int first, int count) =>

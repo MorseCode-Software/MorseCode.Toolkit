@@ -80,10 +80,10 @@ public class VirtualizingItemsControl : ItemsControl
             name: nameof(Rows),
             defaultValue: VirtualRows.Empty);
 
-    internal static readonly StyledProperty<Maybe<int>> ScrollRequestProperty =
-        AvaloniaProperty.Register<VirtualizingItemsControl, Maybe<int>>(
+    internal static readonly StyledProperty<Maybe<ScrollRequest>> ScrollRequestProperty =
+        AvaloniaProperty.Register<VirtualizingItemsControl, Maybe<ScrollRequest>>(
             name: nameof(ScrollRequest),
-            defaultValue: Maybe<int>.None);
+            defaultValue: Maybe<ScrollRequest>.None);
 
     /// <summary>
     ///     Defines the <see cref="PlaceholderTemplate" /> property.
@@ -195,12 +195,13 @@ public class VirtualizingItemsControl : ItemsControl
         set => this.SetValue(property: PlaceholderTemplateProperty, value: value);
     }
 
-    // The position that the view model wants to show. The control scrolls to it and then reports the
-    // position to the source. It scrolls once for each value of this property. If the view model has not
+    // The request of the view model to show a position. The control scrolls to the position and then
+    // reports the request to the source. It scrolls once for each value of this property. A request
+    // has a number, thus a second request for a position is a new value. If the view model has not
     // cleared the request yet, a change of the count does not scroll again. A request beyond the count
     // stays until the count grows. A negative position can never apply, so the control reports it at once
     // and does not scroll.
-    internal Maybe<int> ScrollRequest
+    internal Maybe<ScrollRequest> ScrollRequest
     {
         get => this.GetValue(property: ScrollRequestProperty);
         set => this.SetValue(property: ScrollRequestProperty, value: value);
@@ -428,27 +429,27 @@ public class VirtualizingItemsControl : ItemsControl
         }
 
         this.ScrollRequest.MatchSome(
-            onSome: position =>
+            onSome: request =>
             {
-                if (position < 0)
+                if (request.Position < 0)
                 {
-                    this.Handle(position: position);
+                    this.Handle(request: request);
                 }
-                else if (this.IsLoaded && this.ItemsPanelRoot is not null && position < this.items.Count)
+                else if (this.IsLoaded && this.ItemsPanelRoot is not null && request.Position < this.items.Count)
                 {
-                    this.ScrollIntoView(index: position);
-                    this.Handle(position: position);
+                    this.ScrollIntoView(index: request.Position);
+                    this.Handle(request: request);
                 }
             });
     }
 
-    private void Handle(int position)
+    private void Handle(ScrollRequest request)
     {
         // The flag comes first. The report can make the view model clear or replace the request at once,
         // and that change of the request resets the flag.
         this.isRequestHandled = true;
 
-        this.source?.ScrollHandled.Execute(parameter: position);
+        this.source?.ScrollHandled.Execute(parameter: request);
     }
 
     private void AttachSource(IVirtualItemsSource? newSource)
@@ -460,7 +461,7 @@ public class VirtualizingItemsControl : ItemsControl
         if (newSource is null)
         {
             // A control with no source shows nothing and has no request.
-            this.ScrollRequest = Maybe<int>.None;
+            this.ScrollRequest = Maybe<ScrollRequest>.None;
             this.Rows = VirtualRows.Empty;
 
             return;

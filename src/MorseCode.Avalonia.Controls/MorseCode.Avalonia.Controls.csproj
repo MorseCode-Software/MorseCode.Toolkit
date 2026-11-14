@@ -63,6 +63,7 @@
         <Compile Include="MaybeConverter.cs"/>
         <Compile Include="MaybeConverter.Generic.cs"/>
         <Compile Include="RowPlaceholder.cs"/>
+        <Compile Include="ScrollRequest.cs"/>
         <Compile Include="ScrollRequestBindables.cs"/>
         <Compile Include="ScrollRequestExtensions.cs"/>
         <Compile Include="VirtualizingItemsControl.cs"/>

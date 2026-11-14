@@ -22,10 +22,10 @@ internal sealed class GivenRowsModel : IVirtualItemsSource
         BindableFactory factory = new(bindingScheduler: BindingScheduler.Immediate);
 
         this.Rows = factory.CreateOneWay(cell: this.rows);
-        this.ScrollRequest = factory.CreateOneWay(cell: Cell.Constant(value: Maybe<int>.None));
+        this.ScrollRequest = factory.CreateOneWay(cell: Cell.Constant(value: Maybe<ScrollRequest>.None));
 
         this.RangeReported = factory.CreateBindableAction(firingsStreamSink: Stream.CreateSink<ReportedRange>());
-        this.ScrollHandled = factory.CreateBindableAction(firingsStreamSink: Stream.CreateSink<int>());
+        this.ScrollHandled = factory.CreateBindableAction(firingsStreamSink: Stream.CreateSink<ScrollRequest>());
     }
 
     /// <inheritdoc />
@@ -35,10 +35,10 @@ internal sealed class GivenRowsModel : IVirtualItemsSource
     public IBindableAction<ReportedRange> RangeReported { get; }
 
     /// <inheritdoc />
-    public IOneWayBindableValue<Maybe<int>> ScrollRequest { get; }
+    public IOneWayBindableValue<Maybe<ScrollRequest>> ScrollRequest { get; }
 
     /// <inheritdoc />
-    public IBindableAction<int> ScrollHandled { get; }
+    public IBindableAction<ScrollRequest> ScrollHandled { get; }
 
     /// <summary>
     ///     Gives the rows to the control.
