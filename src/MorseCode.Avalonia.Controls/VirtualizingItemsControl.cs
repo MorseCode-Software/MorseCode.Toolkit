@@ -108,8 +108,9 @@ public class VirtualizingItemsControl : ItemsControl
     // True from a request to scroll until the dispatcher runs it.
     private bool isScrollPending;
 
-    // True from the moment that the control handled the request that it holds until the request changes.
-    // The view model clears the request after it receives the report, and that can take a moment.
+    // True from the moment that the control handled the request that it holds until the request or the
+    // source changes. The view model clears the request after it receives the report, and that can take a
+    // moment.
     private bool isRequestHandled;
 
     // The source that the control reads and reports to.
@@ -458,6 +459,10 @@ public class VirtualizingItemsControl : ItemsControl
 
         this.source = newSource;
 
+        // The control handled no request of the new source. The clear of the previous source can come after
+        // this change, and the control does not follow that source now. Thus, the mark must not wait for it.
+        this.isRequestHandled = false;
+
         if (newSource is null)
         {
             // A control with no source shows nothing and has no request.
@@ -473,6 +478,10 @@ public class VirtualizingItemsControl : ItemsControl
         }
 
         this.ReadSource(source: newSource);
+
+        // A request of the new source can equal the request that the control handled before. Then, the
+        // value does not change, and no change asks for a scroll.
+        this.RequestScroll();
 
         // The new source has no report yet.
         this.ReportedRange = ReportedRange.Empty;

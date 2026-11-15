@@ -478,6 +478,39 @@ public sealed class VirtualizingItemsControlTests
                     .IsEquivalentTo(expected: [700, 700], ordering: CollectionOrdering.Matching);
             });
 
+    // The first source keeps its request, as when its clear has not reached the control. Each source numbers
+    // its requests from 0. Thus, the first request of the second source equals the request that the control
+    // handled. The value of the request does not change, but the control must scroll.
+    [Test]
+    public Task ANewSourceWhoseRequestEqualsTheHandledRequestScrolls() =>
+        TestApplication.Run(
+            test: static async () =>
+            {
+                VirtualModel first = new(total: 1000) { KeepsHandledRequest = true };
+                using ShownVirtual shown = new(model: first, buffer: 0);
+
+                first.Request(position: 700);
+                shown.Settle();
+                shown.Scroller.Offset = new Vector(x: 0, y: 0);
+                shown.Settle();
+
+                await Assert.That(Texts(shown: shown)[0]).IsEqualTo(expected: "Row 0");
+
+                VirtualModel second = new(total: 1000);
+                second.Request(position: 700);
+                shown.List.Source = second;
+                shown.Settle();
+
+                await Assert.That(Texts(shown: shown).Any(predicate: static text => text == "Row 700")).IsTrue();
+                await Assert.That(second.CurrentRequest).IsEqualTo(expected: Maybe<int>.None);
+
+                await Assert.That(second.ScrollReports)
+                    .IsEquivalentTo(expected: [700], ordering: CollectionOrdering.Matching);
+
+                await Assert.That(first.ScrollReports)
+                    .IsEquivalentTo(expected: [700], ordering: CollectionOrdering.Matching);
+            });
+
     // The control reads the count from its source. A new source replaces the old one, and the old one
     // no longer reaches the control. A control with no source shows nothing.
     [Test]
