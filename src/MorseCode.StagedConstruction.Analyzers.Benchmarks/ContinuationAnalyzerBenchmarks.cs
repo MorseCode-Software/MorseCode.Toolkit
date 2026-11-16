@@ -29,6 +29,9 @@ namespace MorseCode.StagedConstruction.Analyzers.Benchmarks;
 ///         LocalsAndBranches returns a local variable that a loop, branches, a
 ///         conditional expression, and a <c>try</c> statement write. That is the
 ///         most work for an analysis that finds the values of a local variable.
+///         HandleLocals keeps the handle in local variables that a loop and
+///         branches write, and calls <c>Construct</c> on one of them. The
+///         analyzer must find out if each read of those variables is the handle.
 ///     </para>
 /// </remarks>
 [MemoryDiagnoser]
@@ -74,7 +77,13 @@ public class ContinuationAnalyzerBenchmarks
         ///     A continuation that returns a local variable with many writes. See
         ///     the remarks of the class.
         /// </summary>
-        LocalsAndBranches
+        LocalsAndBranches,
+
+        /// <summary>
+        ///     A continuation that keeps the handle in local variables with many
+        ///     writes. See the remarks of the class.
+        /// </summary>
+        HandleLocals
     }
 
     /// <summary>The code of each continuation.</summary>
@@ -106,6 +115,7 @@ public class ContinuationAnalyzerBenchmarks
                 {
                     ContinuationShape.Typical => Typical(index: index),
                     ContinuationShape.LocalsAndBranches => LocalsAndBranches(index: index),
+                    ContinuationShape.HandleLocals => HandleLocals(index: index),
                     _ => throw new InvalidOperationException(message: $"No code for the shape {this.Shape}.")
                 });
         }
@@ -191,6 +201,35 @@ public class ContinuationAnalyzerBenchmarks
                           Constructed<Thing> result = made;
 
                           return result;
+                      });
+          """;
+
+    // A continuation that keeps the handle in local variables, which a loop and branches write. Each value is
+    // the handle or a Select of it.
+    private static string HandleLocals(int index) =>
+        $$"""
+              public static Thing Handles{{index}}(bool flag, int count) =>
+                  Base.Create(
+                      continuation: (output, construct) =>
+                      {
+                          Constructor<Values> next = construct;
+
+                          for (int step = 0; step < count; step++)
+                          {
+                              if (flag && step % 3 == {{index % 3}})
+                              {
+                                  next = next.Select(selector: static values => values);
+                              }
+                              else if (step % 5 == 0)
+                              {
+                                  Constructor<Values> other = construct;
+                                  next = other;
+                              }
+                          }
+
+                          Constructor<Values> chosen = next;
+
+                          return chosen.Construct(constructor: static values => new Thing(values: values));
                       });
           """;
 
