@@ -164,7 +164,10 @@ New: the control keeps the view of a row that leaves the screen, and gives it to
 comes on the screen. Thus, a scroll builds no row view. Avalonia uses the container of such a row
 again, but it removes the view, and the presenter asks the row template for a new one when it
 joins the tree again. The control keeps a view only for a row template that uses its view again:
-each XAML DataTemplate, and a FuncDataTemplate with supportsRecycling true. A kept view gets its
+each XAML DataTemplate, and a FuncDataTemplate with supportsRecycling true. It keeps only a view that
+the row template built. An item that the row template does not match, such as an item of another
+type with a typed template, is shown by a template that Avalonia finds, and that view goes to no
+other row. A kept view gets its
 next row as its data context, and it keeps each state that is not bound, as a view does when its
 row changes in place. The new property RecyclesRowViews, true by default, stops this for a row view
 with such state. Measured with no screen on .NET 10, with XAML row templates: one row that comes on
