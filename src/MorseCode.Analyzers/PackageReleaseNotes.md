@@ -7,6 +7,17 @@ of order in these two places gave no report. A name with an equals sign in an at
 property and is not part of the order. The rule, its message, and its id are as before. Because it
 now reports more, a build with -warnaserror can fail where it passed with 0.1.2.
 
+Fixed: MC0002 said that a cast is not needed wherever an implicit conversion exists, but a cast can
+choose something even then. (double)sum / count divides doubles and not integers, (object)a ==
+(object)b compares references and not text, and ((IShape)square).Sides reaches a member that the
+class implements explicitly; without the cast, each does something else or does not compile. The
+message now says the cast is not needed only where the value goes straight to a destination of the
+cast's type: a variable or property with that declared type, a simple assignment, or the return of a
+method of that type. Elsewhere it says to put the value in a variable of that type in place of the
+cast. A cast from dynamic no longer says it is not needed at all: the cast runs an explicit
+conversion when the code runs and the code without it an implicit one, so a long in a dynamic
+converts to int with the cast and throws without it. The rule still reports every cast.
+
 New: code fixes for MC0001 and MC0003, in a second assembly, MorseCode.Analyzers.CodeFixes, beside
 the analyzer under analyzers/dotnet/cs. An editor loads it, and the compiler does not, because a
 code fix needs the Roslyn workspaces. For MC0001, the fix puts the arguments in the order of the
