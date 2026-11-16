@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <!--
+        net10.0 only, as the analyzer tests. The benchmark compiles generated code against the
+        assemblies of the runtime that runs it, and the analyzer has one netstandard2.0 build.
+    -->
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <OutputType>Exe</OutputType>
+        <LangVersion>14</LangVersion>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+    <PropertyGroup>
+        <AssemblyName>MorseCode.StagedConstruction.Analyzers.Benchmarks</AssemblyName>
+        <RootNamespace>MorseCode.StagedConstruction.Analyzers.Benchmarks</RootNamespace>
+        <IsPackable>false</IsPackable>
+    </PropertyGroup>
+    <!--
+        The compiler is the one that the analyzer tests use, which is later than the Roslyn of the
+        analyzer, as the compiler of a user is. SodaFlow is here because the generated code calls it.
+    -->
+    <ItemGroup>
+        <PackageReference Include="BenchmarkDotNet" Version="0.15.8"/>
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.14.0"/>
+        <PackageReference Include="SodaFlow" Version="5.0.1"/>
+    </ItemGroup>
+    <ItemGroup>
+        <Compile Include="ContinuationAnalyzerBenchmarks.cs"/>
+        <Compile Include="Program.cs"/>
+    </ItemGroup>
+    <!--
+        The generated code compiles against the library itself. The reference puts its assembly beside
+        the benchmark, where the benchmark finds it with the assemblies of the runtime.
+    -->
+    <ItemGroup>
+        <ProjectReference Include="..\MorseCode.StagedConstruction.Analyzers\MorseCode.StagedConstruction.Analyzers.csproj"/>
+        <ProjectReference Include="..\MorseCode.StagedConstruction\MorseCode.StagedConstruction.csproj"/>
+    </ItemGroup>
+</Project>
