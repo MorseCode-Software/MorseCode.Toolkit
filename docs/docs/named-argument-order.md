@@ -72,7 +72,10 @@ order can change what runs first. The title of the fix says which case you're in
 - **Put the arguments in the order of the parameters** when the new order can't change anything: no
   argument has an effect, or one has and every other one is a constant. Reading a variable, a
   parameter, or a field has no effect. A cast that can throw, such as unboxing with `(int)value`,
-  counts as an effect.
+  counts as an effect. So does a delegate made from a method of an instance that can be null, such
+  as `holder.Get` or `new Func<int>(holder.Get)`: it throws `ArgumentException` when `holder` is
+  null, where reading `holder.Value` would throw `NullReferenceException`. A delegate from a static
+  method, from `this`, or from a value doesn't.
 - **Put the arguments in the order of the parameters, which changes the order in which they run** in
   every other case, such as `Pair(b: Next(), a: x)`, where `Next()` might change `x`.
 

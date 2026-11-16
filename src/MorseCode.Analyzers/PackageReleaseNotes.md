@@ -25,7 +25,10 @@ document, a project, and a solution.
 In the MC0001 fix, each argument takes its comments with it while each position keeps its line. The
 fix is not offered where a directive such as #if is between the arguments, or where a comment to the
 end of a line would come to rest before a closing parenthesis on its line. For its title, an
-explicit cast that can throw, such as an unbox, counts as an effect.
+explicit cast that can throw, such as an unbox, counts as an effect. So does a delegate from a
+method of an instance that can be null, also when it is written with new or a cast, because it
+throws ArgumentException where a field read would throw NullReferenceException. A delegate from a
+static method, from this, or from a value does not count, also as a method group.
 
 0.1.2
 
