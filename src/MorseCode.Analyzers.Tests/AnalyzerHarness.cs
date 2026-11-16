@@ -52,7 +52,7 @@ internal static class AnalyzerHarness
             libraryCompilation = Compile(assemblyName: "Library", text: library, references: references);
 
             using MemoryStream image = new();
-            _ = libraryCompilation.Emit(peStream: image);
+            _ = libraryCompilation.Emit(peStream: image, cancellationToken: cancellationToken);
             references.Add(item: MetadataReference.CreateFromImage(peImage: [.. image.ToArray()]));
         }
 
