@@ -22,6 +22,13 @@ of the caller, a constant, or an element of an array. Such a caller fails with C
 project it is. Scoped in keeps the reference in the constructor and leaves every such caller as it
 was. The rule's id and severity are unchanged.
 
+Fixed: MC0003 reported a ref, out, or ref readonly parameter, such as class Doubled(ref int value).
+The compiler already refuses a member that captures such a parameter (CS9109), so it cannot become
+the hidden state the rule is about, and a write through ref or out changes the caller's variable,
+which is what the modifier is for. Changing it to in would change that contract, so the code fix
+never offered it, and only a suppression removed the warning. The rule now reports only a parameter
+with no modifier.
+
 Changed: MC0001 now also checks the arguments of an indexer, such as grid[column: 2, row: 1], and
 the constructor arguments of an attribute, such as [Range(maximum: 9, minimum: 1)]. Before, it
 checked calls of methods, local functions, delegates, and constructors only, so named arguments out
