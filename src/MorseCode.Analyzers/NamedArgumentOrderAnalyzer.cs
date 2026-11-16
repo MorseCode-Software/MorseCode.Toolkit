@@ -166,7 +166,9 @@ public sealed class NamedArgumentOrderAnalyzer : DiagnosticAnalyzer
 
     private static void CheckAttribute(SyntaxNodeAnalysisContext context)
     {
-        if (context.Node is not AttributeSyntax { ArgumentList: { } list } attribute
+        AttributeSyntax attribute = (AttributeSyntax)context.Node;
+
+        if (attribute.ArgumentList is not { } list
             || context.SemanticModel.GetSymbolInfo(
                     attributeSyntax: attribute,
                     cancellationToken: context.CancellationToken)
@@ -199,7 +201,9 @@ public sealed class NamedArgumentOrderAnalyzer : DiagnosticAnalyzer
         return;
 
         // An attribute binds a named argument by its name, and a positional argument by its position. A
-        // positional value past the last parameter goes into a params array, which is the last parameter.
+        // positional value past the last parameter goes into a params array, which is the last parameter. A
+        // constructor binds only when each name is the name of a parameter. Thus, the fallback for a name is a
+        // guard, and no test can make it run.
         int Ordinal(AttributeArgumentSyntax argument, int position) =>
             argument.NameColon is { } name
                 ? parameters.FirstOrDefault(predicate: parameter => parameter.Name == name.Name.Identifier.ValueText)
