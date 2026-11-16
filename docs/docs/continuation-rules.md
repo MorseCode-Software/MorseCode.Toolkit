@@ -11,7 +11,7 @@ rules report the usual ways to get it wrong in the build, before anything runs.
 
 The analyzer ships inside the `MorseCode.StagedConstruction` package, so there is nothing to
 install. A project that references that package gets the rules. So does a project that references
-`MorseCode.Mvvm` or `MorseCode.Avalonia.Controls`, because both depend on it.
+`MorseCode.Mvvm` or `MorseCode.Controls.UI.Avalonia`, because both depend on it.
 
 It examines each lambda that becomes a `StageContinuation` and whose second parameter is a
 `Constructor<T>` or a `Stage<,,>`. That parameter is the handle. A stage can hand its continuation

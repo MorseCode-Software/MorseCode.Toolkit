@@ -4,7 +4,7 @@ title: ComboBox
 
 # ComboBox
 
-`MorseCode.Avalonia.Controls.ComboBox` replaces Avalonia's `ComboBox` in views that bind to view
+`MorseCode.Controls.UI.Avalonia.ComboBox` replaces Avalonia's `ComboBox` in views that bind to view
 models on SodaFlow. Use it everywhere you would use Avalonia's. It is a drop-in replacement: the
 same properties, bindings, theme, and template, with changes that make it behave correctly when its
 values come from a SodaFlow graph.
@@ -17,7 +17,7 @@ view model that changes both in one update keeps the selection it chose.
 Add the namespace to the view, and write `mc:ComboBox` where you would write `ComboBox`:
 
 ```xml
-<UserControl xmlns:mc="clr-namespace:MorseCode.Avalonia.Controls;assembly=MorseCode.Avalonia.Controls">
+<UserControl xmlns:mc="clr-namespace:MorseCode.Controls.UI.Avalonia;assembly=MorseCode.Controls.UI.Avalonia">
 
     <mc:ComboBox ItemsSource="{Binding Courses.Value}"
                  SelectedItem="{Binding Course.Value, Mode=TwoWay}" />
@@ -34,7 +34,7 @@ were missed.
 ### In C#
 
 The two classes have the same name. A file that imports both `Avalonia.Controls` and
-`MorseCode.Avalonia.Controls` and writes a plain `ComboBox` does not compile (CS0104). Write
+`MorseCode.Controls.UI.Avalonia` and writes a plain `ComboBox` does not compile (CS0104). Write
 `global::Avalonia.Controls.ComboBox` for Avalonia's, or use a `using` alias for one of them.
 
 ## The problem it solves
@@ -79,7 +79,7 @@ combo box. Avalonia treats it as the same property as the base's for styles and 
 a binding sets the value through whichever of the two it was created with:
 
 - A XAML binding on an `mc:ComboBox` uses the control's own property, so it is batched.
-- In code, bind `MorseCode.Avalonia.Controls.ComboBox.SelectedItemProperty`. A binding made with
+- In code, bind `MorseCode.Controls.UI.Avalonia.ComboBox.SelectedItemProperty`. A binding made with
   Avalonia's `ComboBox.SelectedItemProperty` or `SelectingItemsControl.SelectedItemProperty` goes
   straight to the base and is not batched.
 - Setting `SelectedItem` through a variable typed as Avalonia's `ComboBox` also skips the batch,
