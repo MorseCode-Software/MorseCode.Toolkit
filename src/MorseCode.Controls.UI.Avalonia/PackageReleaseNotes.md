@@ -82,6 +82,16 @@ of the new rows. With 30 old rows and 30 new rows, one update took about 1.2 to 
 when they were 450,000 positions apart, and about 17 to 19 milliseconds at 9,000,000 apart. It now
 takes about 4 microseconds at any distance, and it finds the same changed positions.
 
+Fixed: DisplayMemberBinding was ignored, and each row showed the ToString of its object. The base
+sets its template for the binding on a container only where no template is set, and the control
+then set the template of the container to ItemTemplate, which is null with DisplayMemberBinding.
+The base keeps its template private, and the control sets the template of a container again when a
+placeholder and a row change places, so keeping the base's template would have fixed only the first
+screen. The control now makes its own template for the binding, a TextBlock whose text the binding
+gives, as the base's template is, and uses it wherever it uses ItemTemplate. The binding is the only
+state of that view, so the template reuses its view, and display-member rows take part in the
+keeping of row views. A new DisplayMemberBinding gives a new template.
+
 Fixed: after a jump, an edit could send the list to a different part and back, and a view model
 that makes new row objects never settled. The list raised a Replace for each position whose item
 changed, and the panel of Avalonia then built each of those containers again. A panel with no
