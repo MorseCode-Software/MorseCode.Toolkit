@@ -36,8 +36,8 @@
     </ItemGroup>
 
     <!--
-        MaybeConverter converts the Maybe of SodaFlow view models. The control reads and writes the
-        bindable values of SodaFlow.
+        MaybeConverter converts the Maybe of SodaFlow view models. The control reads the bindable
+        values of SodaFlow and runs its bindable actions.
     -->
     <ItemGroup>
         <PackageReference Include="SodaFlow.Bindable.ObjectModel" Version="4.0.0"/>

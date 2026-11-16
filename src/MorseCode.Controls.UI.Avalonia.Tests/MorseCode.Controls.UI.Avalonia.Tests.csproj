@@ -60,8 +60,10 @@
         <Compile Include="TestApplication.cs"/>
         <Compile Include="VirtualizingItemsControlEditTests.cs"/>
         <Compile Include="VirtualizingItemsControlInPlaceTests.cs"/>
+        <Compile Include="VirtualizingItemsControlLateBindingThreadTests.cs"/>
         <Compile Include="VirtualizingItemsControlPanelTests.cs"/>
         <Compile Include="VirtualizingItemsControlRecipeTests.cs"/>
+        <Compile Include="VirtualizingItemsControlRowViewTests.cs"/>
         <Compile Include="VirtualizingItemsControlTests.cs"/>
         <Compile Include="VirtualizingItemsControlVisibilityTests.cs"/>
         <Compile Include="VirtualModel.cs"/>

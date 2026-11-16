@@ -6,8 +6,9 @@ holds your view models references it and no UI package. MorseCode.Controls.UI.Av
 VirtualizingItemsControl, depends on it, so a project of views gets it too. Its first version is
 0.3.0 so that the two packages have the same version.
 
-Moved: IVirtualItemsSource, VirtualRows, ReportedRange, ItemRange, CreateVirtualItemsSource, and
-CreateVirtualItemsSourceByKey are here, in the namespace MorseCode.Controls.ViewModels. VirtualRows
+Moved: IVirtualItemsSource, VirtualRows, ReportedRange, ItemRange, ScrollRequest,
+CreateVirtualItemsSource, and CreateVirtualItemsSourceByKey are here, in the namespace
+MorseCode.Controls.ViewModels. VirtualRows
 and ItemRange were in MorseCode.Avalonia.Controls 0.2.x, in the namespace of that package. The
 others are new in 0.3.0 and no other package released them. To move from 0.2.x: reference this
 package from the project of the view models, and change each using of MorseCode.Avalonia.Controls
@@ -20,8 +21,9 @@ and a Stream of scroll positions. It slices the collection with the range that t
 rows for, maps each key in the slice to a row, and counts the keys. It returns an
 IVirtualItemsSource, and it registers the rows with the output, so disposing of the view model
 releases them. Another overload is for a view model that makes its own rows. It takes a Cell of
-VirtualRows, which carries their count, a CellSink that receives what the control reports, and a
-Stream of scroll positions. Each takes an optional Stream of clears that withdraw a scroll request.
+VirtualRows, which carries their count, a StreamSink that receives each report of the control, and
+a Stream of scroll positions. Each takes an optional Stream of clears that withdraw a scroll
+request.
 
 New: CreateVirtualItemsSourceByKey, which takes a Stream of keys instead of a Stream of positions.
 It finds the position of a key in the collection in the transaction of the request, so a view

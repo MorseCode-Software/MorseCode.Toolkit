@@ -390,6 +390,202 @@ Task("Inspect-Sample")
         $"the {sampleName} sample");
 });
 
+// The package of each MinVerTagPrefix under src, with its project. Read from the projects, where
+// MinVerTagPrefix and PackageId already live, rather than kept as a second copy here that could
+// drift from them.
+Dictionary<string, (string Id, FilePath Project)> PackagesByPrefix()
+{
+    var packages = new Dictionary<string, (string Id, FilePath Project)>(StringComparer.Ordinal);
+    foreach (var project in GetFiles("./src/**/*.csproj"))
+    {
+        var document = XDocument.Load(project.FullPath);
+        var prefix = document.Descendants("MinVerTagPrefix").FirstOrDefault();
+        var id = document.Descendants("PackageId").FirstOrDefault();
+        if (prefix != null && id != null)
+        {
+            packages[prefix.Value] = (id.Value, project);
+        }
+    }
+
+    if (packages.Count == 0)
+    {
+        throw new Exception("Found no project under src declaring both MinVerTagPrefix and PackageId.");
+    }
+
+    return packages;
+}
+
+// The prefixes that a tag starts with. The rest of the tag is the version, so it has to start with
+// a digit; otherwise morsecode-mvvm- would claim morsecode-mvvm-wpf-1.0.0.
+List<string> PrefixesOf(string tag, IEnumerable<string> prefixes) =>
+    prefixes
+        .Where(p => IsTagOf(tag, p))
+        .OrderBy(p => p, StringComparer.Ordinal)
+        .ToList();
+
+bool IsTagOf(string tag, string prefix) =>
+    tag.StartsWith(prefix, StringComparison.Ordinal) && tag.Length > prefix.Length && char.IsDigit(tag[prefix.Length]);
+
+// The projects that a project file names in a ProjectReference. The references that
+// src/Directory.Build.props adds are analyzers, which a package does not depend on, and they are not
+// in the project file.
+List<FilePath> ProjectReferencesOf(FilePath project) =>
+    XDocument.Load(project.FullPath)
+        .Descendants("ProjectReference")
+        .Select(reference => reference.Attribute("Include")?.Value)
+        .Where(include => !string.IsNullOrEmpty(include))
+        .Select(include => new FilePath(System.IO.Path.GetFullPath(
+            System.IO.Path.Combine(project.GetDirectory().FullPath, include.Replace('\\', '/')))))
+        .ToList();
+
+// The last tag of a package: the highest version with its prefix, of the tags in the history of this
+// commit. With MinVerIgnoreHeight, that is the version that MinVer gives the package here.
+string LastTag(string prefix)
+{
+    var exitCode = StartProcess(
+        "git",
+        new ProcessSettings
+        {
+            Arguments = new ProcessArgumentBuilder()
+                .Append("tag").Append("--merged").Append("HEAD")
+                .Append("--list").AppendQuoted(prefix + "*")
+                .Append("--sort=-v:refname"),
+            RedirectStandardOutput = true,
+        },
+        out var tags);
+
+    if (exitCode != 0)
+    {
+        throw new Exception($"git tag failed with exit code {exitCode}.");
+    }
+
+    return tags.FirstOrDefault(tag => IsTagOf(tag, prefix));
+}
+
+// True when a folder is different at this commit and at a tag.
+bool ChangedSince(string tag, DirectoryPath folder)
+{
+    // git diff --quiet gives 1 for a difference and 0 for none. A larger code is a failure of git.
+    var exitCode = StartProcess(
+        "git",
+        new ProcessSettings
+        {
+            Arguments = new ProcessArgumentBuilder()
+                .Append("diff").Append("--quiet").Append(tag).Append("HEAD")
+                .Append("--").AppendQuoted(folder.FullPath),
+        });
+
+    if (exitCode > 1)
+    {
+        throw new Exception($"git diff failed with exit code {exitCode}.");
+    }
+
+    return exitCode == 1;
+}
+
+// Each package of this repository that a project compiles against, directly or through a different
+// project, and that changed after its last tag. The list puts a package after the packages that it
+// compiles against, which is the order to release them in.
+List<string> UnreleasedReferences(FilePath project, Dictionary<string, (string Id, FilePath Project)> packages)
+{
+    var prefixByProject = packages.ToDictionary(
+        package => package.Value.Project.FullPath,
+        package => package.Key,
+        StringComparer.OrdinalIgnoreCase);
+    var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    var unreleased = new List<string>();
+
+    void Visit(FilePath reference)
+    {
+        if (!visited.Add(reference.FullPath))
+        {
+            return;
+        }
+
+        foreach (var next in ProjectReferencesOf(reference))
+        {
+            Visit(next);
+        }
+
+        if (!prefixByProject.TryGetValue(reference.FullPath, out var prefix))
+        {
+            return;
+        }
+
+        var id = packages[prefix].Id;
+        var folder = Context.Environment.WorkingDirectory.GetRelativePath(reference.GetDirectory());
+        var lastTag = LastTag(prefix);
+        if (lastTag == null)
+        {
+            unreleased.Add($"{id}: there is no tag {prefix}<version> in the history of this commit.");
+        }
+        else if (ChangedSince(lastTag, folder))
+        {
+            unreleased.Add($"{id}: {folder.FullPath} changed after {lastTag}.");
+        }
+    }
+
+    foreach (var reference in ProjectReferencesOf(project))
+    {
+        Visit(reference);
+    }
+
+    return unreleased;
+}
+
+// A tag build packs all packages from the source at its commit. A package that the tagged package
+// references declares the version of its last tag. But the build compiles the tagged package against
+// the source of that package at this commit. If that source changed after its last tag, the release
+// names a version of it that does not have what the build used. Nobody can replace a version after
+// it is on nuget.org. Thus, a tag build runs this check before it builds, and the check names each
+// package to release first.
+//
+// The check compares the folder of each project that the tagged project references, directly or
+// through a different project, with the last tag of that project. It does not see a change that is
+// not in those folders, for example in src/Directory.Build.props.
+Task("Verify-Release-Order")
+    .Description("Fails when the tagged package compiles against a package here that changed after its last tag.")
+    .Does(() =>
+{
+    // With --tag, the check runs for a tag before the push.
+    var tag = Argument(
+        "tag",
+        BuildSystem.IsRunningOnGitHubActions &&
+        GitHubActions.Environment.Workflow.RefType == GitHubActionsRefType.Tag
+            ? GitHubActions.Environment.Workflow.RefName
+            : string.Empty);
+
+    if (string.IsNullOrEmpty(tag))
+    {
+        Information("Not a tag build, and no --tag was given - nothing to check.");
+        return;
+    }
+
+    var packages = PackagesByPrefix();
+    var prefixes = PrefixesOf(tag, packages.Keys);
+
+    // Publish refuses a tag that names more than one package, and skips one that names none.
+    if (prefixes.Count != 1)
+    {
+        Information("Tag '{0}' does not name exactly one package - nothing to check.", tag);
+        return;
+    }
+
+    var (packageId, project) = packages[prefixes[0]];
+    var unreleased = UnreleasedReferences(project, packages);
+
+    if (unreleased.Count > 0)
+    {
+        throw new Exception(
+            $"Tag '{tag}' releases {packageId}, which compiles against packages of this repository that " +
+            "changed after their last tag. Release them first, in this order:" + Environment.NewLine +
+            string.Join(Environment.NewLine, unreleased.Select(entry => "  " + entry)) + Environment.NewLine +
+            "Tag each one on this commit and wait for its package to publish. Then run this build again.");
+    }
+
+    Information("Tag '{0}' releases {1}, and each package that it compiles against is released.", tag, packageId);
+});
+
 Task("Publish")
     .Description("Pushes the one package this build's tag names to nuget.org.")
     .Does(() =>
@@ -426,42 +622,18 @@ Task("Publish")
             + "by the MorseCodeSoftware organization.");
     }
 
-    // Read from the projects, where MinVerTagPrefix and PackageId already live, rather than kept as
-    // a second copy here that could drift from them.
-    var packageIdByPrefix = new Dictionary<string, string>(StringComparer.Ordinal);
-    foreach (var project in GetFiles("./src/**/*.csproj"))
-    {
-        var document = XDocument.Load(project.FullPath);
-        var prefix = document.Descendants("MinVerTagPrefix").FirstOrDefault();
-        var id = document.Descendants("PackageId").FirstOrDefault();
-        if (prefix != null && id != null)
-        {
-            packageIdByPrefix[prefix.Value] = id.Value;
-        }
-    }
+    var packagesByPrefix = PackagesByPrefix();
 
-    if (packageIdByPrefix.Count == 0)
-    {
-        throw new Exception("Found no project under src declaring both MinVerTagPrefix and PackageId.");
-    }
-
-    // The rest of the tag is the version, so it has to start with a digit; otherwise morsecode-mvvm-
-    // would claim morsecode-mvvm-wpf-1.0.0. More than one match is refused rather than tie-broken,
-    // because publishing the wrong package cannot be undone.
-    var prefixes = packageIdByPrefix.Keys
-        .Where(p =>
-            tag.StartsWith(p, StringComparison.Ordinal) &&
-            tag.Length > p.Length &&
-            char.IsDigit(tag[p.Length]))
-        .OrderBy(p => p, StringComparer.Ordinal)
-        .ToList();
+    // More than one match is refused rather than tie-broken, because publishing the wrong package
+    // cannot be undone.
+    var prefixes = PrefixesOf(tag, packagesByPrefix.Keys);
 
     if (prefixes.Count == 0)
     {
         Information("Tag '{0}' does not name a package in this repository - skipping NuGet push.", tag);
         Information(
             "Known prefixes: {0}",
-            string.Join(", ", packageIdByPrefix.Keys.OrderBy(p => p, StringComparer.Ordinal)));
+            string.Join(", ", packagesByPrefix.Keys.OrderBy(p => p, StringComparer.Ordinal)));
         return;
     }
 
@@ -472,7 +644,7 @@ Task("Publish")
             "Rename one of them so that neither extends the other.");
     }
 
-    var packageId = packageIdByPrefix[prefixes[0]];
+    var packageId = packagesByPrefix[prefixes[0]].Id;
     Information("Tag '{0}' releases {1}.", tag, packageId);
 
     // Matched by name rather than by glob, which would also match every package whose id extends

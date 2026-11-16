@@ -12,30 +12,40 @@ and they name it as it was.
 
 Breaking: what a view model uses is now in a second package, MorseCode.Controls.ViewModels, which
 has no dependency on a UI framework. That is IVirtualItemsSource, VirtualRows, ReportedRange,
-ItemRange, CreateVirtualItemsSource, and CreateVirtualItemsSourceByKey, in the namespace
-MorseCode.Controls.ViewModels. This package depends on that one, so a project of views gets both.
-A project of view models references that one alone, and gets no Avalonia. Before, a view model
-that named VirtualRows or ItemRange had to reference this package. The notes of
+ItemRange, ScrollRequest, CreateVirtualItemsSource, and CreateVirtualItemsSourceByKey, in the
+namespace MorseCode.Controls.ViewModels. This package depends on that one, so a project of views
+gets both. A project of view models references that one alone, and gets no Avalonia. Before, a view
+model that named VirtualRows or ItemRange had to reference this package. The notes of
 MorseCode.Controls.ViewModels 0.3.0 say what is new in the methods that build a source. The entries
 below say what changed in the control, and in the values that it reads and writes.
 
 Breaking: VirtualizingItemsControl is now bound through one property, Source, and the
 public properties TotalCount, Rows, VisibleRange, and ScrollRequest are gone. The type of
-Source is the new interface IVirtualItemsSource. It holds the SodaFlow bindable values Rows,
-ScrollRequest, Range, and ScrollHandled. The control attaches to all of them when Source is
-set, so none of them can be left unbound. The two pairs, range with rows and request with report,
-are made together.
+Source is the new interface IVirtualItemsSource. It holds two SodaFlow bindable values, Rows and
+ScrollRequest, and two bindable actions, RangeReported and ScrollHandled. The control attaches to
+all of them when Source is set, so none of them can be left unbound. The two pairs, range with rows
+and request with report, are made together.
+
+The control reports through the two actions and writes no value. No member of
+IVirtualItemsSource is an IOneWayToSourceBindableValue, a type that the next major version of
+SodaFlow.Bindable.ObjectModel no longer has. An action also does nothing once its view model is
+disposed, so a view that outlives its view model can go on reporting. A two-way value would throw
+ObjectDisposedException there.
 
 Breaking: VirtualRows now carries the count of the whole list in TotalCount, next to Offset and
 Items, and there is no separate count. A change of the count and the rows reaches the control as
 one value, so the control applies both in one update and never shows a count with the rows of a
 different instant. Before, the two arrived one after the other, and the list was updated twice.
 
-The scroll protocol is also new. The control no longer writes none to ScrollRequest. It reports
-the position that it handled in ScrollHandled, and the view model clears a request only if it is
-still that position. A request that the view model made while the report was on its way was
-cleared with the old one before. The control also scrolls once for each request, so a change of
-the count before the view model clears the request does not scroll again.
+The scroll protocol is also new. The control no longer writes none to ScrollRequest. A request is
+now a ScrollRequest: the position, and a number that goes up at each request. The control runs
+ScrollHandled with the request that it handled, and the view model clears a request only if it is
+still that one. A request that the view model made while the report was on its way was cleared
+with the old one before. The control also scrolls once for each request, so a change of the count
+before the view model clears the request does not scroll again. Because of the number, a second
+request for a position is a different value. The control scrolls for it also when it never saw the
+request go to none between the two, which happens when the second request comes before the binding
+thread delivered the clear of the first.
 
 The control follows its source only while it is in a visual tree. When it leaves the tree, it
 removes its handlers from the values of the source, so a view model that outlives its view does
@@ -102,13 +112,13 @@ placeholder when its step is no longer than the positions on one side, so a fixe
 for one window size only. With 20 rows on screen and Buffer at 10, every step of one screen showed
 placeholders. Remove Buffer from your XAML.
 
-Breaking: the control reports a ReportedRange where it reported an ItemRange, and the value of the
-source is named Range, where it was VisibleRange. A ReportedRange holds two ranges from the same
-instant. Visible is the positions on screen, where a row that is only partly on screen counts, so a
-view model can now tell what the user sees. Constructed is the positions that the control wants
-rows for. Both stay inside the list. On the overload for a view model with its own rows, the
-parameter visibleRange is now reportedRange, a CellSink of ReportedRange, and the view model builds
-rows for Constructed.
+Breaking: the control reports a ReportedRange where it reported an ItemRange, and the member of the
+source is the action RangeReported, where it was the value VisibleRange. A ReportedRange holds two
+ranges from the same instant. Visible is the positions on screen, where a row that is only partly
+on screen counts, so a view model can now tell what the user sees. Constructed is the positions
+that the control wants rows for. Both stay inside the list. On the overload for a view model with
+its own rows, the parameter visibleRange is now reportedRanges, a StreamSink of ReportedRange. The
+view model holds that stream, and builds rows for Constructed.
 
 A row that is added at an end of the list that is on screen no longer shows as a placeholder first.
 A source made from a collection slices past the end of the list by the positions that the control
@@ -149,6 +159,19 @@ Avalonia. It reports IL2091 inside SodaFlow.Core 5, which this package depends o
 SodaFlow.Core gives a value factory to Lazy<T>. That is SodaFlow code, which the mark of this
 package does not cover. That publish ran when the control and the methods that build a source
 were one assembly.
+
+New: the control keeps the view of a row that leaves the screen, and gives it to the next row that
+comes on the screen. Thus, a scroll builds no row view. Avalonia uses the container of such a row
+again, but it removes the view, and the presenter asks the row template for a new one when it
+joins the tree again. The control keeps a view only for a row template that uses its view again:
+each XAML DataTemplate, and a FuncDataTemplate with supportsRecycling true. A kept view gets its
+next row as its data context, and it keeps each state that is not bound, as a view does when its
+row changes in place. The new property RecyclesRowViews, true by default, stops this for a row view
+with such state. Measured with no screen on .NET 10, with XAML row templates: one row that comes on
+the screen allocates 124 KB where it allocated 199 KB, for a row view of 12 visuals, and 311 KB
+where it allocated 643 KB, for one of 43. A scroll of 100 px for each step with the row of 12
+visuals had 8 to 31 steps of 600 that took more than 8.33 ms, where it had 53 to 107. The view
+still leaves the tree and joins it again, and that is the larger part of what remains.
 
 0.2.2
 

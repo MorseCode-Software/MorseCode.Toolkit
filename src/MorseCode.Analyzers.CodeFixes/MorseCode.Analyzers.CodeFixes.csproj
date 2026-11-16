@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <!--
+        The code fixes of MorseCode.Analyzers. An editor loads them, and the compiler does not: a fix
+        needs the Roslyn workspaces, which the compiler does not have. Thus, they are in an assembly of
+        their own, and the analyzers keep only what the compiler gives. netstandard2.0 for the same
+        reason as the analyzers: Visual Studio runs on .NET Framework, and the other editors on .NET.
+    -->
+    <PropertyGroup>
+        <TargetFramework>netstandard2.0</TargetFramework>
+        <LangVersion>14</LangVersion>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+
+    <!--
+        Not a package. The dll ships inside the MorseCode.Analyzers package, under analyzers/dotnet/cs,
+        which MorseCode.Analyzers.csproj packs from the output of this project. The compiler looks in
+        each assembly there for an analyzer and finds none in this one, thus it does not load it.
+    -->
+    <PropertyGroup>
+        <AssemblyName>MorseCode.Analyzers.CodeFixes</AssemblyName>
+        <RootNamespace>MorseCode.Analyzers.CodeFixes</RootNamespace>
+        <IsPackable>false</IsPackable>
+    </PropertyGroup>
+
+    <!--
+        The same floor as the analyzers, Roslyn 4.4, which is in Visual Studio 2022 17.4 and each later
+        one. An editor gives these assemblies, and PrivateAssets keeps them out of the package.
+    -->
+    <ItemGroup>
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="4.4.0" PrivateAssets="all"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <Compile Include="NamedArgumentOrderCodeFixProvider.cs"/>
+        <Compile Include="PrimaryConstructorParameterCodeFixProvider.cs"/>
+    </ItemGroup>
+
+</Project>

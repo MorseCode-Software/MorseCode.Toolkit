@@ -50,6 +50,7 @@
         <Compile Include="IVirtualItemsSource.Generic.cs"/>
         <Compile Include="ItemRange.cs"/>
         <Compile Include="ReportedRange.cs"/>
+        <Compile Include="ScrollRequest.cs"/>
         <Compile Include="ScrollRequestBindables.cs"/>
         <Compile Include="ScrollRequestExtensions.cs"/>
         <Compile Include="VirtualRows.cs"/>

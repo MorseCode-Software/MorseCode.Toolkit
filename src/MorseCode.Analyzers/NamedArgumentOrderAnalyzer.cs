@@ -56,6 +56,12 @@ public sealed class NamedArgumentOrderAnalyzer : DiagnosticAnalyzer
                          + "the arguments have names.",
             helpLinkUri: "https://morsecode-software.github.io/MorseCode.Toolkit/docs/named-argument-order.html");
 
+    /// <summary>
+    ///     The name of the property of a report that holds the order of the
+    ///     parameters. MorseCode.Analyzers.CodeFixes reads it by this name.
+    /// </summary>
+    private const string OrderProperty = "Order";
+
     /// <inheritdoc />
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => ImmutableArray.Create(item: Rule);
 
@@ -166,7 +172,9 @@ public sealed class NamedArgumentOrderAnalyzer : DiagnosticAnalyzer
 
     private static void CheckAttribute(SyntaxNodeAnalysisContext context)
     {
-        if (context.Node is not AttributeSyntax { ArgumentList: { } list } attribute
+        AttributeSyntax attribute = (AttributeSyntax)context.Node;
+
+        if (attribute.ArgumentList is not { } list
             || context.SemanticModel.GetSymbolInfo(
                     attributeSyntax: attribute,
                     cancellationToken: context.CancellationToken)
@@ -199,7 +207,9 @@ public sealed class NamedArgumentOrderAnalyzer : DiagnosticAnalyzer
         return;
 
         // An attribute binds a named argument by its name, and a positional argument by its position. A
-        // positional value past the last parameter goes into a params array, which is the last parameter.
+        // positional value past the last parameter goes into a params array, which is the last parameter. A
+        // constructor binds only when each name is the name of a parameter. Thus, the fallback for a name is a
+        // guard, and no test can make it run.
         int Ordinal(AttributeArgumentSyntax argument, int position) =>
             argument.NameColon is { } name
                 ? parameters.FirstOrDefault(predicate: parameter => parameter.Name == name.Name.Identifier.ValueText)
@@ -224,12 +234,21 @@ public sealed class NamedArgumentOrderAnalyzer : DiagnosticAnalyzer
             return;
         }
 
+        // The position of each argument in the order of the parameters, as the index of the argument that goes
+        // there. The sort is stable, thus the values of a params array keep their order. The code fix reads the
+        // order from the report, thus it maps the arguments to the parameters as the rule does.
+        string order = string.Join(
+            separator: ",",
+            values: Enumerable.Range(start: 0, count: ordinals.Count).OrderBy(keySelector: index => ordinals[index]));
+
         // The argument list, and not the whole call. A call on a long receiver, or a new with an initializer,
         // would mark text that the rule is not about.
         report(
             obj: Diagnostic.Create(
                 descriptor: Rule,
                 location: list.GetLocation(),
+                properties: ImmutableDictionary.CreateRange(
+                    items: [new KeyValuePair<string, string?>(key: OrderProperty, value: order)]),
                 messageArgs:
                 [
                     target.ToDisplayString(format: SymbolDisplayFormat.CSharpShortErrorMessageFormat),

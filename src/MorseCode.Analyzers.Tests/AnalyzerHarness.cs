@@ -16,8 +16,9 @@ namespace MorseCode.Analyzers.Tests;
 internal static class AnalyzerHarness
 {
     /// <summary>
-    ///     Compiles the source, and gives what the analyzer reports, in the order of the source. The sample
-    ///     must compile, because an analyzer does not examine code that does not bind.
+    ///     Compiles the source, and gives what the analyzer reports, in the order of the source. A sample
+    ///     without <paramref name="errors" /> must compile. A sample with them stands for code that an
+    ///     editor analyzes before it compiles, and it must have those errors and no others.
     /// </summary>
     /// <param name="analyzer">The analyzer.</param>
     /// <param name="source">The sample.</param>
@@ -25,11 +26,18 @@ internal static class AnalyzerHarness
     ///     The source of a second assembly that the sample references, or null. It stands for a package: the
     ///     compiler reads its members from metadata.
     /// </param>
-    /// <returns>The diagnostics of the analyzer.</returns>
+    /// <param name="errors">
+    ///     The identifiers of the compiler errors that the sample must have, in the order of the source, or
+    ///     null for a sample that compiles. The library must always compile.
+    /// </param>
+    /// <returns>
+    ///     The diagnostics of the analyzer. If the analyzer throws, this includes the AD0001 that tells it.
+    /// </returns>
     public static async Task<IReadOnlyList<Diagnostic>> Analyze(
         DiagnosticAnalyzer analyzer,
         string source,
-        string? library = null)
+        string? library = null,
+        IReadOnlyList<string>? errors = null)
     {
         List<MetadataReference> references = [.. PlatformReferences()];
         CSharpCompilation? libraryCompilation = null;
@@ -45,16 +53,27 @@ internal static class AnalyzerHarness
 
         CSharpCompilation compilation = Compile(assemblyName: "Sample", text: source, references: references);
 
-        ImmutableArray<Diagnostic> errors =
-        [
-            .. compilation.GetDiagnostics()
-                .Concat(second: libraryCompilation?.GetDiagnostics() ?? [])
-                .Where(predicate: static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
-        ];
+        ImmutableArray<Diagnostic> libraryErrors = ErrorsOf(compilation: libraryCompilation);
 
-        if (errors.Length > 0)
+        if (libraryErrors.Length > 0)
         {
-            throw new InvalidOperationException(message: $"The sample does not compile: {errors[0]}");
+            throw new InvalidOperationException(message: $"The library does not compile: {libraryErrors[0]}");
+        }
+
+        ImmutableArray<Diagnostic> sampleErrors = ErrorsOf(compilation: compilation);
+        string[] sampleErrorIds = [.. sampleErrors.Select(selector: static diagnostic => diagnostic.Id)];
+
+        if (errors is null && sampleErrors.Length > 0)
+        {
+            throw new InvalidOperationException(message: $"The sample does not compile: {sampleErrors[0]}");
+        }
+
+        if (errors is not null && !sampleErrorIds.SequenceEqual(second: errors))
+        {
+            throw new InvalidOperationException(
+                message:
+                $"The sample has the errors {string.Join(separator: ", ", value: sampleErrorIds)}, and not "
+                + $"{string.Join(separator: ", ", values: errors)}.");
         }
 
         ImmutableArray<Diagnostic> found =
@@ -64,6 +83,14 @@ internal static class AnalyzerHarness
 
         return [.. found.OrderBy(keySelector: static diagnostic => diagnostic.Location.SourceSpan.Start)];
     }
+
+    // The errors of a compilation, in the order of the source.
+    private static ImmutableArray<Diagnostic> ErrorsOf(Compilation? compilation) =>
+    [
+        .. (compilation?.GetDiagnostics() ?? [])
+            .Where(predicate: static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+            .OrderBy(keySelector: static diagnostic => diagnostic.Location.SourceSpan.Start)
+    ];
 
     private static CSharpCompilation Compile(
         string assemblyName,
