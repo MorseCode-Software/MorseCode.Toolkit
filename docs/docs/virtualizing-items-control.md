@@ -329,7 +329,9 @@ It has these consequences:
   the row at a position changes.
 
 An item that is itself a `Control` is its own container, so the control cannot hand it a different
-item. Avalonia replaces the container of such a position, as it does in any `ItemsControl`.
+item. Avalonia replaces the container of such a position, as it does in any `ItemsControl`. The
+control leaves such an item as it is: a `Button` or a `UserControl` shows its own content with its
+own template, and `ItemTemplate` does not apply to it.
 
 ### The row view decides what a scroll costs
 
