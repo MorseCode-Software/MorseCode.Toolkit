@@ -233,6 +233,85 @@ internal sealed class NamedArgumentOrderCodeFixTests
                 ordering: CollectionOrdering.Matching);
     }
 
+    // A directive between two arguments guards the argument at its position. Before, the fix moved the arguments
+    // and left the directive. Thus, the directive guarded a different argument. The provider offers no fix for
+    // such a list. The second call has no directive, and gets its fix. The analyzer reports the two calls.
+    [Test]
+    public async Task NoFixIsOfferedWhereADirectiveIsBetweenTheArguments()
+    {
+        const string body =
+            """
+                    result = Calls.Pair(
+            #if !NOT_DEFINED
+                        b: 2,
+            #endif
+                        a: 1);
+                    result = Calls.Pair(b: 2, a: 1);
+            """;
+
+        IReadOnlyList<CodeFixHarness.Offer> offers =
+            await Offers(body: body).ConfigureAwait(continueOnCapturedContext: false);
+
+        await Assert.That(offers.Select(selector: static offer => offer.Result))
+            .IsEquivalentTo(
+                expected: [Source(body: body.Replace(oldValue: "Pair(b: 2, a: 1)", newValue: "Pair(a: 1, b: 2)"))],
+                ordering: CollectionOrdering.Matching);
+    }
+
+    // A comment goes with its argument, and the whitespace stays at its position. That is so for a comment in the
+    // argument, for a comment on the line above it, and for a comment after its comma. Before, each comment
+    // stayed at its position and then described a different argument. A comment to the end of the line cannot
+    // go before a closing parenthesis on the same line. Thus, the provider offers no fix for the third call.
+    [Test]
+    public async Task CommentsMoveWithTheirArguments()
+    {
+        const string body =
+            """
+                    result = Calls.Pair(b: 2 /* second */, a: 1 /* first */);
+                    result = Calls.Three(
+                        // the third
+                        c: 3, // three
+                        a: 1, // one
+                        b: 2
+                    );
+                    result = Calls.Pair(
+                        b: 2, // two
+                        a: 1);
+            """;
+
+        IReadOnlyList<CodeFixHarness.Offer> offers =
+            await Offers(body: body).ConfigureAwait(continueOnCapturedContext: false);
+
+        await Assert.That(offers.Select(selector: static offer => offer.Result))
+            .IsEquivalentTo(
+                expected:
+                [
+                    Source(
+                        body: body.Replace(
+                            oldValue: "Pair(b: 2 /* second */, a: 1 /* first */)",
+                            newValue: "Pair(a: 1 /* first */, b: 2 /* second */)")),
+                    Source(
+                        body: body.Replace(
+                            oldValue: """
+                                      Three(
+                                                  // the third
+                                                  c: 3, // three
+                                                  a: 1, // one
+                                                  b: 2
+                                              );
+                                      """,
+                            newValue: """
+                                      Three(
+                                                  a: 1, // one
+                                                  b: 2,
+                                                  // the third
+                                                  c: 3 // three
+                                              );
+                                      """))
+                ],
+                ordering: CollectionOrdering.Matching);
+    }
+
     // One argument declares a variable, and a different argument names it. A new order can put the use before the
     // declaration, thus the provider offers no fix.
     [Test]

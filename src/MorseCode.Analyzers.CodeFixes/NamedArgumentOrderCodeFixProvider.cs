@@ -26,8 +26,15 @@ namespace MorseCode.Analyzers.CodeFixes;
 ///     </para>
 ///     <para>
 ///         The analyzer puts the new order into each report. Thus, the fix maps
-///         the arguments to the parameters as the rule does. Each position of the
-///         list keeps its own trivia, thus the layout of the list stays as it was.
+///         the arguments to the parameters as the rule does. Each argument takes
+///         its comments with it, and each position keeps its whitespace and its
+///         line breaks. Thus, the layout of the list stays as it was.
+///     </para>
+///     <para>
+///         The provider offers no fix where a directive is between the arguments,
+///         because the directive guards the argument at its position. It offers
+///         no fix where the move puts a comment to the end of a line before a
+///         token on the same line.
 ///     </para>
 /// </remarks>
 [ExportCodeFixProvider(LanguageNames.CSharp, Name = nameof(NamedArgumentOrderCodeFixProvider))]
@@ -71,6 +78,7 @@ public sealed class NamedArgumentOrderCodeFixProvider : CodeFixProvider
         foreach (Diagnostic diagnostic in context.Diagnostics)
         {
             if (Find(root: root, diagnostic: diagnostic) is not { } target
+                || !KeepsTrivia(target: target)
                 || CanMove(model: model, list: target.List) is not { } keepsEvaluation)
             {
                 continue;
@@ -120,7 +128,8 @@ public sealed class NamedArgumentOrderCodeFixProvider : CodeFixProvider
                 .OfType<Target>()
                 .Where(
                     predicate: target =>
-                        CanMove(model: model, list: target.List) is { } keepsEvaluation
+                        KeepsTrivia(target: target)
+                        && CanMove(model: model, list: target.List) is { } keepsEvaluation
                         && (keepsEvaluation || !onlyWhereEvaluationStays))
         ];
 
@@ -275,28 +284,174 @@ public sealed class NamedArgumentOrderCodeFixProvider : CodeFixProvider
                 rewritten switch
                 {
                     BaseArgumentListSyntax list => list.WithArguments(
-                        arguments: Reorder(arguments: list.Arguments, order: orders[original])),
+                        arguments: Rearrange(arguments: list.Arguments, order: orders[original]).Arguments),
                     AttributeArgumentListSyntax list => list.WithArguments(
-                        arguments: Reorder(arguments: list.Arguments, order: orders[original])),
+                        arguments: Rearrange(arguments: list.Arguments, order: orders[original]).Arguments),
                     _ => rewritten
                 });
     }
 
-    // An order shorter than the list covers the constructor arguments of an attribute, which come before the
-    // assignments of its properties. Those assignments stay where they are.
-    private static SeparatedSyntaxList<TArgument> Reorder<TArgument>(
+    // False when the new order puts a directive or a comment in an incorrect position. A directive between the
+    // arguments guards the argument at its position, thus a move gives it to a different argument. A comment to
+    // the end of a line must have a line break after it, also at its new position.
+    private static bool KeepsTrivia(Target target) =>
+        target.List switch
+        {
+            BaseArgumentListSyntax list => KeepsTrivia(list: list, arguments: list.Arguments, order: target.Order),
+            AttributeArgumentListSyntax list => KeepsTrivia(list: list, arguments: list.Arguments, order: target.Order),
+            _ => false
+        };
+
+    private static bool KeepsTrivia<TArgument>(
+        SyntaxNode list,
         SeparatedSyntaxList<TArgument> arguments,
         IReadOnlyList<int> order)
         where TArgument : SyntaxNode =>
-        SyntaxFactory.SeparatedList(
-            nodes: arguments.Select(
-                selector: (argument, position) =>
-                    position < order.Count
-                        ? arguments[index: order[position]]
-                            .WithLeadingTrivia(trivia: argument.GetLeadingTrivia())
-                            .WithTrailingTrivia(trivia: argument.GetTrailingTrivia())
-                        : argument),
-            separators: arguments.GetSeparators());
+        !arguments
+            .SelectMany(
+                selector: static argument => argument.GetLeadingTrivia().Concat(second: argument.GetTrailingTrivia()))
+            .Concat(
+                second: arguments.GetSeparators()
+                    .SelectMany(selector: static comma => comma.LeadingTrivia.Concat(second: comma.TrailingTrivia)))
+            .Concat(second: list.GetFirstToken().TrailingTrivia)
+            .Concat(second: list.GetLastToken().LeadingTrivia)
+            .Any(predicate: static trivia => trivia.IsDirective || trivia.IsKind(kind: SyntaxKind.DisabledTextTrivia))
+        && Rearrange(arguments: arguments, order: order).KeepsComments;
+
+    // The arguments in the new order. Each argument takes its comments with it. Those are the comments on the
+    // lines above it, the comments after it, and the comment after its comma. Each position keeps its
+    // whitespace and its line breaks. An order shorter than the list covers the constructor arguments of an
+    // attribute, which come before the assignments of its properties. Those assignments stay where they are.
+    // KeepsComments is false when a comment to the end of a line has no line break after it at its new position.
+    private static (SeparatedSyntaxList<TArgument> Arguments, bool KeepsComments) Rearrange<TArgument>(
+        SeparatedSyntaxList<TArgument> arguments,
+        IReadOnlyList<int> order)
+        where TArgument : SyntaxNode
+    {
+        SyntaxToken[] commas = [.. arguments.GetSeparators()];
+        List<TArgument> nodes = [];
+        List<SyntaxToken> separators = [];
+        bool keepsComments = true;
+
+        for (int position = 0; position < arguments.Count; position++)
+        {
+            TArgument here = arguments[index: position];
+
+            if (position >= order.Count)
+            {
+                nodes.Add(item: here);
+
+                if (position < commas.Length)
+                {
+                    separators.Add(item: commas[position]);
+                }
+
+                continue;
+            }
+
+            int from = order[position];
+            TArgument moved = arguments[index: from];
+
+            SyntaxTriviaList leading =
+                LayoutBeforeComments(trivia: here.GetLeadingTrivia())
+                    .AddRange(trivia: CommentsAndAfter(trivia: moved.GetLeadingTrivia()));
+
+            SyntaxTriviaList movedAfter = BeforeLineBreak(trivia: moved.GetTrailingTrivia());
+            SyntaxTriviaList hereLineBreak = FromLineBreak(trivia: here.GetTrailingTrivia());
+
+            SyntaxTriviaList movedCommaComment =
+                from < commas.Length
+                    ? CommentAfterComma(trivia: commas[from].TrailingTrivia)
+                    : SyntaxFactory.TriviaList();
+
+            SyntaxTriviaList trailing;
+
+            if (position < commas.Length)
+            {
+                trailing = movedAfter.AddRange(trivia: hereLineBreak);
+
+                SyntaxTriviaList commaTrailing =
+                    movedCommaComment.AddRange(trivia: LayoutAfterComma(trivia: commas[position].TrailingTrivia));
+
+                separators.Add(item: commas[position].WithTrailingTrivia(trivia: commaTrailing));
+                keepsComments &= EndsEachLineComment(trivia: commaTrailing);
+            }
+            else
+            {
+                trailing = movedAfter.AddRange(trivia: movedCommaComment).AddRange(trivia: hereLineBreak);
+            }
+
+            keepsComments &= EndsEachLineComment(trivia: trailing);
+            nodes.Add(item: moved.WithLeadingTrivia(trivia: leading).WithTrailingTrivia(trivia: trailing));
+        }
+
+        return (SyntaxFactory.SeparatedList(nodes: nodes, separators: separators), keepsComments);
+    }
+
+    private static bool IsLayout(SyntaxTrivia trivia) =>
+        trivia.IsKind(kind: SyntaxKind.WhitespaceTrivia) || trivia.IsKind(kind: SyntaxKind.EndOfLineTrivia);
+
+    // The whitespace and the line breaks before the first comment, or all of the trivia when it has no comment.
+    private static SyntaxTriviaList LayoutBeforeComments(SyntaxTriviaList trivia) =>
+        SyntaxFactory.TriviaList(trivias: trivia.TakeWhile(predicate: IsLayout));
+
+    // The trivia from the first comment to the end, or nothing when it has no comment.
+    private static SyntaxTriviaList CommentsAndAfter(SyntaxTriviaList trivia) =>
+        SyntaxFactory.TriviaList(trivias: trivia.SkipWhile(predicate: IsLayout));
+
+    private static SyntaxTriviaList BeforeLineBreak(SyntaxTriviaList trivia) =>
+        SyntaxFactory.TriviaList(
+            trivias: trivia.TakeWhile(predicate: static item => !item.IsKind(kind: SyntaxKind.EndOfLineTrivia)));
+
+    private static SyntaxTriviaList FromLineBreak(SyntaxTriviaList trivia) =>
+        SyntaxFactory.TriviaList(
+            trivias: trivia.SkipWhile(predicate: static item => !item.IsKind(kind: SyntaxKind.EndOfLineTrivia)));
+
+    // The comment on the line of a comma, after the comma, without the whitespace after it.
+    private static SyntaxTriviaList CommentAfterComma(SyntaxTriviaList trivia)
+    {
+        SyntaxTrivia[] beforeLineBreak = [.. BeforeLineBreak(trivia: trivia)];
+
+        return beforeLineBreak.All(predicate: IsLayout)
+            ? SyntaxFactory.TriviaList()
+            : SyntaxFactory.TriviaList(
+                trivias: beforeLineBreak.Reverse().SkipWhile(predicate: IsLayout).Reverse());
+    }
+
+    // The whitespace after a comma when the comma has no comment. With a comment, the line break, or one space
+    // when the line does not end there.
+    private static SyntaxTriviaList LayoutAfterComma(SyntaxTriviaList trivia)
+    {
+        if (CommentAfterComma(trivia: trivia).Count == 0)
+        {
+            return trivia;
+        }
+
+        SyntaxTriviaList lineBreak = FromLineBreak(trivia: trivia);
+
+        return lineBreak.Count > 0 ? lineBreak : SyntaxFactory.TriviaList(trivia: SyntaxFactory.Space);
+    }
+
+    // True when a line break comes after the last comment to the end of a line.
+    private static bool EndsEachLineComment(SyntaxTriviaList trivia)
+    {
+        int lastComment = -1;
+        int lastLineBreak = -1;
+
+        for (int index = 0; index < trivia.Count; index++)
+        {
+            if (trivia[index: index].IsKind(kind: SyntaxKind.SingleLineCommentTrivia))
+            {
+                lastComment = index;
+            }
+            else if (trivia[index: index].IsKind(kind: SyntaxKind.EndOfLineTrivia))
+            {
+                lastLineBreak = index;
+            }
+        }
+
+        return lastComment < lastLineBreak || lastComment < 0;
+    }
 
     private enum Evaluation
     {
