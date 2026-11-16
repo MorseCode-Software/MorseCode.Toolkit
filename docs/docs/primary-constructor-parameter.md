@@ -57,6 +57,8 @@ It doesn't report:
 
 - A record or a record struct. A positional parameter makes a property, and can't be `in`.
 - A `params` parameter, which can't be `in`.
+- A parameter of an attribute. C# won't apply an attribute whose constructor has an `in` parameter
+  (CS8358), so `in` would break every use of it.
 - A type with an ordinary constructor.
 
 The warning marks the name of the parameter.
