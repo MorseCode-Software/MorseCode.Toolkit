@@ -114,21 +114,122 @@ public sealed class ContinuationAnalyzer : DiagnosticAnalyzer
     // MC1003 and MC1004, for each value that the continuation can return.
     private static IEnumerable<Diagnostic> ReturnedValues(
         Continuation continuation,
-        CancellationToken cancellationToken) =>
-        from result in continuation.Operations.OfType<IReturnOperation>()
-        where IsResultOf(continuation: continuation, function: OperationTree.Owner(operation: result))
-        from leaf in OperationTree.Leaves(value: result.ReturnedValue)
-        from diagnostic in ReturnedValue(continuation: continuation, leaf: leaf, cancellationToken: cancellationToken)
-        select diagnostic;
+        CancellationToken cancellationToken)
+    {
+        HashSet<IOperation> functions =
+            ResultFunctions(continuation: continuation, cancellationToken: cancellationToken);
 
-    // A return in the lambda itself gives the result of the continuation. So does a return in a lambda
-    // in its body that returns a Constructed, such as the function of Transaction.Run. The analyzer
-    // examines by itself a lambda in the body that is a continuation with its own handle.
-    private static bool IsResultOf(Continuation continuation, IOperation? function) =>
-        ReferenceEquals(objA: function, objB: continuation.Lambda)
-        || (function is IAnonymousFunctionOperation inner
-            && continuation.Symbols.IsConstructed(type: inner.Symbol.ReturnType)
-            && !continuation.IsContinuation(function: inner));
+        return
+            from result in continuation.Operations.OfType<IReturnOperation>()
+            where OperationTree.Owner(operation: result) is { } owner && functions.Contains(item: owner)
+            from leaf in OperationTree.Leaves(value: result.ReturnedValue)
+            from diagnostic in ReturnedValue(
+                continuation: continuation,
+                leaf: leaf,
+                cancellationToken: cancellationToken)
+            select diagnostic;
+    }
+
+    // The functions whose returns give the result of the continuation. The search starts at the
+    // continuation. A call in a result can give the value of a lambda that it gets, as Transaction.Run
+    // does. Thus, the search also reads the returns of that lambda. A lambda whose value does not get to
+    // the result is not in the set, also when it returns a Constructed. A continuation in the body is not
+    // in the set either, because the analyzer examines it with its own handle.
+    private static HashSet<IOperation> ResultFunctions(Continuation continuation, CancellationToken cancellationToken)
+    {
+        HashSet<IOperation> functions = [continuation.Lambda];
+        HashSet<ILocalSymbol> readLocals = new(comparer: SymbolEqualityComparer.Default);
+        Stack<IOperation> toRead = new(collection: [continuation.Lambda]);
+
+        while (toRead.Count > 0)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            IOperation function = toRead.Pop();
+
+            IEnumerable<IAnonymousFunctionOperation> lambdas =
+                from result in continuation.Operations.OfType<IReturnOperation>()
+                where ReferenceEquals(objA: OperationTree.Owner(operation: result), objB: function)
+                from leaf in OperationTree.Leaves(value: result.ReturnedValue)
+                from lambda in LambdasOfTheValue(
+                    continuation: continuation,
+                    value: leaf,
+                    readLocals: readLocals,
+                    cancellationToken: cancellationToken)
+                select lambda;
+
+            // The set takes each lambda one time. Thus, the search reads each lambda one time, and it ends.
+            foreach (IAnonymousFunctionOperation lambda in lambdas.Where(predicate: functions.Add))
+            {
+                toRead.Push(item: lambda);
+            }
+        }
+
+        return functions;
+    }
+
+    // The lambdas that a call gets for its value. Each is an argument that is a lambda, or a local variable
+    // that a lambda initializes. Each returns a Constructed and is not a continuation. For a local variable
+    // that holds the value, the search reads its initial value. The search reads each local variable one
+    // time. Thus, it ends also at a local variable that reads its own value.
+    private static IEnumerable<IAnonymousFunctionOperation> LambdasOfTheValue(
+        Continuation continuation,
+        IOperation value,
+        ISet<ILocalSymbol> readLocals,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        switch (OperationTree.Unwrap(operation: value))
+        {
+            case ILocalReferenceOperation local:
+                if (!readLocals.Add(item: local.Local)
+                    || continuation.InitialValue(local: local.Local) is not { } initial)
+                {
+                    return [];
+                }
+
+                return
+                [
+                    .. OperationTree.Leaves(value: initial)
+                        .SelectMany(
+                            selector: leaf => LambdasOfTheValue(
+                                continuation: continuation,
+                                value: leaf,
+                                readLocals: readLocals,
+                                cancellationToken: cancellationToken))
+                ];
+            case IInvocationOperation call:
+                return
+                [
+                    .. from argument in call.Arguments
+                    let lambda = Lambda(continuation: continuation, argument: argument.Value, readLocals: readLocals)
+                    where lambda is not null
+                          && continuation.Symbols.IsConstructed(type: lambda.Symbol.ReturnType)
+                          && !continuation.IsContinuation(function: lambda)
+                    select lambda
+                ];
+            default:
+                return [];
+        }
+    }
+
+    // The lambda that an argument gives: the lambda itself, or a local variable that a lambda initializes.
+    private static IAnonymousFunctionOperation? Lambda(
+        Continuation continuation,
+        IOperation? argument,
+        ISet<ILocalSymbol> readLocals) =>
+        OperationTree.Unwrap(operation: argument) switch
+        {
+            IDelegateCreationOperation { Target: IAnonymousFunctionOperation lambda } => lambda,
+            IAnonymousFunctionOperation lambda => lambda,
+            ILocalReferenceOperation local when readLocals.Add(item: local.Local) =>
+                Lambda(
+                    continuation: continuation,
+                    argument: continuation.InitialValue(local: local.Local),
+                    readLocals: readLocals),
+            _ => null
+        };
 
     private static IEnumerable<Diagnostic> ReturnedValue(
         Continuation continuation,
