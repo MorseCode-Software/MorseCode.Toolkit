@@ -312,6 +312,23 @@ internal sealed class NamedArgumentOrderCodeFixTests
                 ordering: CollectionOrdering.Matching);
     }
 
+    // A cast that can throw, such as an unbox, is an effect. With a second effect, the new order can change which
+    // exception the call throws, thus the title says that the order of evaluation changes. Before, the fix read
+    // the cast as its operand, which is a constant here, and kept the title that says it does not.
+    [Test]
+    public async Task ACastThatCanThrowIsAnEffect()
+    {
+        IReadOnlyList<CodeFixHarness.Offer> offers =
+            await Offers(body: """        result = Calls.Pair(b: Calls.Next(), a: (int)(object)"text");""")
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        await Assert.That(offers.Select(selector: static offer => offer.Title))
+            .IsEquivalentTo(expected: [InOrderAndChangesEvaluation], ordering: CollectionOrdering.Matching);
+
+        await Assert.That(offers.Select(selector: static offer => offer.Key ?? string.Empty))
+            .IsEquivalentTo(expected: [ChangesEvaluationKey], ordering: CollectionOrdering.Matching);
+    }
+
     // One argument declares a variable, and a different argument names it. A new order can put the use before the
     // declaration, thus the provider offers no fix.
     [Test]

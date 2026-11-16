@@ -261,7 +261,11 @@ public sealed class NamedArgumentOrderCodeFixProvider : CodeFixProvider
             IFieldReferenceOperation { Instance: null } => Evaluation.Read,
             IFieldReferenceOperation { Instance: { } instance } =>
                 Stronger(first: Evaluation.Read, second: EvaluationOf(operation: instance)),
-            IConversionOperation { OperatorMethod: null } conversion => EvaluationOf(operation: conversion.Operand),
+            // An implicit conversion, and a conversion with as, cannot throw. An explicit conversion can: an unbox, a
+            // cast to a derived type, or a numeric conversion of a value that does not fit. Thus, it is an effect.
+            IConversionOperation { OperatorMethod: null } conversion
+                when conversion.Conversion.IsImplicit || conversion.IsTryCast =>
+                EvaluationOf(operation: conversion.Operand),
             _ => Evaluation.Effect
         };
     }
