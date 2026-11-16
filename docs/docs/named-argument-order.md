@@ -55,6 +55,8 @@ It reads the argument list as the source has it, and asks the compiler which par
 argument goes to. So an optional parameter that a call leaves out, and an empty `params` array,
 never cause a report, and neither does a call that the compiler makes for an interpolated string. A
 value that goes into a `params` array counts as the `params` parameter, which is always the last.
+An argument keeps its position when it is in parentheses, in `checked(...)` or `unchecked(...)`, or
+has the null-forgiving operator, as in `Three(a: (x), b: 2, c: 3)`.
 
 The warning marks the argument list, such as `(second: 2, first: 1)`, or the brackets of an indexer,
 and not the whole call. A call on a long receiver doesn't underline the receiver.
