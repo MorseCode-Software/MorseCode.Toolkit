@@ -28,7 +28,10 @@ namespace MorseCode.Analyzers;
 ///         <c>in</c> either. It does not report a parameter of an attribute, because
 ///         C# refuses a use of an attribute with an <c>in</c> parameter. It does
 ///         not report a by-value <c>scoped</c> parameter, because no spelling with
-///         <c>in</c> keeps its value scoped.
+///         <c>in</c> keeps its value scoped. It does not report a <c>ref</c>,
+///         <c>out</c>, or <c>ref readonly</c> parameter. The compiler refuses a
+///         member that captures it, and <c>in</c> changes what it means for the
+///         caller.
 ///     </para>
 ///     <para>
 ///         The analyzer uses nullable types and not Maybe, because it runs in the
@@ -168,17 +171,12 @@ public sealed class PrimaryConstructorParameterAnalyzer : DiagnosticAnalyzer
         return false;
     }
 
-    // The rule does not report a params parameter, because it cannot be in. It does not report a by-value scoped
-    // parameter either. Scoped in limits the reference and not the value, thus no spelling with in keeps the value
-    // scoped. The compiler refuses a member that uses a ref-like parameter (CS9110), and a field that a scoped value
-    // initializes (CS8352). Thus, the parameter cannot become hidden state.
-    private static bool IsNotIn(ParameterSyntax parameter) =>
-        !parameter.Modifiers.Any(kind: SyntaxKind.InKeyword)
-        && !parameter.Modifiers.Any(kind: SyntaxKind.ParamsKeyword)
-        && !IsScopedByValue(parameter: parameter);
-
-    private static bool IsScopedByValue(BaseParameterSyntax parameter) =>
-        parameter.Modifiers.Any(kind: SyntaxKind.ScopedKeyword)
-        && !parameter.Modifiers.Any(kind: SyntaxKind.RefKeyword)
-        && !parameter.Modifiers.Any(kind: SyntaxKind.OutKeyword);
+    // The rule reports only a parameter with no modifier. Each modifier of a primary constructor parameter is a
+    // reason not to report it. A params parameter cannot be in. The compiler refuses a member that uses a
+    // parameter by reference, which is ref, out, ref readonly, or in (CS9109). A write through ref or out
+    // changes the variable of the caller, which is what the modifier is for, and in changes that contract.
+    // Scoped in limits the reference and not the value, thus no spelling with in keeps a by-value scoped value
+    // scoped. The compiler refuses a member that uses a ref-like parameter (CS9110), and a field that a scoped
+    // value initializes (CS8352).
+    private static bool IsNotIn(BaseParameterSyntax parameter) => parameter.Modifiers.Count == 0;
 }
