@@ -57,6 +57,17 @@ for no content. The base clears the content of a container before its template, 
 ContentPresenter of Avalonia 12 builds an explicit template also when the content is null. The
 control now clears the template first.
 
+Fixed: a scroll request made while the list was hidden was reported as handled, and the list
+never scrolled. The control checked only that it was loaded and had a panel. The panel of Avalonia
+does nothing in ScrollIntoView while it is not effectively visible, so the control reported a
+scroll that never happened and the view model cleared the request. A list in a collapsed Expander,
+or under a panel bound to IsVisible, lost its request this way. A list hidden from the start had a
+second gap: it had no panel at its Loaded event, and nothing asked for the scroll again once it
+showed, so its request waited for good and the list stayed at the top. The control now scrolls only
+while the list and every parent are visible. After each layout, it asks again for a request that
+waits and can now apply, which is how it finds that the list has shown or that its panel exists.
+Avalonia 12.1.3 has no public event for a change of IsEffectivelyVisible.
+
 Fixed: a change of a row on screen could make the control and the view model exchange ranges and
 rows without end. The panel of Avalonia recycles the container of a replaced item at once and makes
 it again at the next layout. The control measured between the two, found fewer containers, and
