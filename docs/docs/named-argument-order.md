@@ -63,14 +63,16 @@ and not the whole call. A call on a long receiver doesn't underline the receiver
 
 From version 0.1.3, an editor that offers the code fixes of Roslyn analyzers, such as Visual Studio,
 offers a fix that puts the arguments in the order of the parameters. Each position of the list keeps
-its line, so a call with one argument on each line stays that way.
+its line, so a call with one argument on each line stays that way. Each argument takes its comments
+with it: a comment on the line above it, a comment after it, and a comment after its comma.
 
 C# runs the arguments of a call in the order they're written, also when they have names, so a new
 order can change what runs first. The title of the fix says which case you're in:
 
 - **Put the arguments in the order of the parameters** when the new order can't change anything: no
   argument has an effect, or one has and every other one is a constant. Reading a variable, a
-  parameter, or a field has no effect.
+  parameter, or a field has no effect. A cast that can throw, such as unboxing with `(int)value`,
+  counts as an effect.
 - **Put the arguments in the order of the parameters, which changes the order in which they run** in
   every other case, such as `Pair(b: Next(), a: x)`, where `Next()` might change `x`.
 
@@ -79,7 +81,10 @@ chose. The first takes only the reports where nothing can change, and the second
 An argument list inside another one is fixed in the same step.
 
 The fix isn't offered when one argument declares a variable, as `out int value` does, and another
-argument uses it, because a new order could put the use first.
+argument uses it, because a new order could put the use first. It isn't offered either when a
+directive such as `#if` sits between the arguments, because the directive would end up guarding a
+different argument, or when the move would put a `//` comment before a closing parenthesis on the
+same line.
 
 ## Changing its severity
 

@@ -22,6 +22,11 @@ is not offered for a parameter that a member captures, that a lambda uses, or th
 does not change a ref, out, or ref readonly parameter. Each fix has a fix of all reports for a
 document, a project, and a solution.
 
+In the MC0001 fix, each argument takes its comments with it while each position keeps its line. The
+fix is not offered where a directive such as #if is between the arguments, or where a comment to the
+end of a line would come to rest before a closing parenthesis on its line. For its title, an
+explicit cast that can throw, such as an unbox, counts as an effect.
+
 0.1.2
 
 New rule: MC0003 reports a primary constructor parameter of a class or a struct that is not
