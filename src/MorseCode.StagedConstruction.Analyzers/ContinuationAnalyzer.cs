@@ -161,9 +161,12 @@ public sealed class ContinuationAnalyzer : DiagnosticAnalyzer
     }
 
     // The operation that made a handle. The search goes back through each Select and through each local
-    // variable.
+    // variable. If the search finds a local variable a second time, the variable reads its own value in
+    // its declaration. That does not compile, but an editor analyzes the code while the user types it.
+    // Thus, the search stops there, and the handle has no source.
     private static IOperation? Source(Continuation continuation, IOperation? handle)
     {
+        HashSet<ILocalSymbol> visited = new(comparer: SymbolEqualityComparer.Default);
         IOperation? current = OperationTree.Unwrap(operation: handle);
 
         while (true)
@@ -174,6 +177,11 @@ public sealed class ContinuationAnalyzer : DiagnosticAnalyzer
                     current = OperationTree.Unwrap(operation: select.Instance);
                     break;
                 case ILocalReferenceOperation local when continuation.InitialValue(local: local.Local) is { } initial:
+                    if (!visited.Add(item: local.Local))
+                    {
+                        return null;
+                    }
+
                     current = initial;
                     break;
                 default:

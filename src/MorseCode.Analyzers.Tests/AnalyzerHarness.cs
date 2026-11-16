@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -30,6 +31,9 @@ internal static class AnalyzerHarness
     ///     The identifiers of the compiler errors that the sample must have, in the order of the source, or
     ///     null for a sample that compiles. The library must always compile.
     /// </param>
+    /// <param name="cancellationToken">
+    ///     The token that stops the analysis. A test with a time limit gives its own token.
+    /// </param>
     /// <returns>
     ///     The diagnostics of the analyzer. If the analyzer throws, this includes the AD0001 that tells it.
     /// </returns>
@@ -37,7 +41,8 @@ internal static class AnalyzerHarness
         DiagnosticAnalyzer analyzer,
         string source,
         string? library = null,
-        IReadOnlyList<string>? errors = null)
+        IReadOnlyList<string>? errors = null,
+        CancellationToken cancellationToken = default)
     {
         List<MetadataReference> references = [.. PlatformReferences()];
         CSharpCompilation? libraryCompilation = null;
@@ -78,7 +83,7 @@ internal static class AnalyzerHarness
 
         ImmutableArray<Diagnostic> found =
             await compilation.WithAnalyzers(analyzers: [analyzer])
-                .GetAnalyzerDiagnosticsAsync()
+                .GetAnalyzerDiagnosticsAsync(cancellationToken: cancellationToken)
                 .ConfigureAwait(continueOnCapturedContext: false);
 
         return [.. found.OrderBy(keySelector: static diagnostic => diagnostic.Location.SourceSpan.Start)];
