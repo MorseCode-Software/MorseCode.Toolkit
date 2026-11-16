@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Presenters;
 using Avalonia.Controls.Templates;
+using Avalonia.Threading;
 using MorseCode.Controls.ViewModels;
 using TUnit.Assertions;
 using TUnit.Assertions.Enums;
@@ -285,6 +287,80 @@ public sealed class VirtualizingItemsControlRowViewTests
                         ordering: CollectionOrdering.Matching);
             });
 
+    // The control marks each view of the row template in a weak table. Here the row template builds a
+    // view for each row and does not use the kept view that it gets. Thus, only the mark refers to the
+    // views of the first rows, and the collector must remove them while the control and its template stay.
+    [Test]
+    public Task TheMarkOfARowViewDoesNotKeepTheViewAlive() =>
+        TestApplication.Run(
+            test: static async () =>
+            {
+                GivenRowsModel model = new();
+                model.Give(value: Given(first: 0, count: RowsOnTheScreen));
+                using ShownVirtual shown = new(model: model, buffer: 0);
+
+                NewViewForEachRow template = new();
+                shown.List.ItemTemplate = template;
+                shown.Settle();
+
+                model.Give(value: VirtualRows.Empty with { TotalCount = 1000 });
+                shown.Settle();
+
+                int firstViews = template.Built.Count;
+
+                await Assert.That(firstViews).IsGreaterThanOrEqualTo(minimum: RowsOnTheScreen);
+                await Assert.That(shown.List.KeptRowViews.Count).IsEqualTo(expected: firstViews);
+
+                // Each row takes a kept view, and the row template does not use it.
+                model.Give(value: Given(first: 100, count: RowsOnTheScreen));
+                shown.Settle();
+
+                await Assert.That(shown.List.KeptRowViews.Count).IsEqualTo(expected: 0);
+
+                await Assert.That(Texts(shown: shown))
+                    .IsEquivalentTo(
+                        expected: Rows(first: 100, count: RowsOnTheScreen),
+                        ordering: CollectionOrdering.Matching);
+
+                List<WeakReference<Control>> dropped = [.. template.Built.Take(count: firstViews)];
+
+                await Assert.That(await CollectAll(views: dropped)).IsTrue();
+
+                // The control and its template must be alive while the collector runs, because the
+                // table of the marks is in the template of the control.
+                await Assert.That(shown.List.ItemTemplate).IsSameReferenceAs(expected: template);
+            });
+
+    // The table of the marks belongs to the template of the control. A view that the app keeps after
+    // the control is gone must not keep the control through its mark. A mark on the view itself, such as
+    // a property that refers to the template, does that.
+    [Test]
+    public Task AKeptViewThatOutlivesTheControlDoesNotKeepTheControlAlive() =>
+        TestApplication.Run(
+            test: static async () =>
+            {
+                GivenRowsModel model = new();
+
+                (WeakReference<VirtualizingItemsControl> control, List<Control> kept) =
+                    ShowKeepViewsAndRemove(model: model);
+
+                await Assert.That(kept.Count).IsGreaterThanOrEqualTo(minimum: RowsOnTheScreen);
+
+                // A job of the dispatcher that the window left behind can hold the control for one more
+                // turn. A leak holds it for all of them.
+                for (int attempt = 0; attempt < 50 && IsAlive(reference: control); attempt++)
+                {
+                    await Collect();
+                }
+
+                await Assert.That(IsAlive(reference: control)).IsFalse();
+
+                // The views and the source must be alive while the collector runs, because they are what
+                // can keep the control.
+                GC.KeepAlive(obj: kept);
+                GC.KeepAlive(obj: model);
+            });
+
     [Test]
     public Task TheControlKeepsNoMoreViewsThanThePanelHadContainers() =>
         TestApplication.Run(
@@ -352,11 +428,92 @@ public sealed class VirtualizingItemsControlRowViewTests
         return view;
     }
 
+    // A separate frame makes the control, the window, and the kept views. Thus, no slot of the stack of
+    // the test holds the control.
+    [MethodImpl(methodImplOptions: MethodImplOptions.NoInlining)]
+    private static (WeakReference<VirtualizingItemsControl> Control, List<Control> Kept) ShowKeepViewsAndRemove(
+        GivenRowsModel model)
+    {
+        ShownVirtual shown = new(model: model, buffer: 0);
+
+        // The template of the test host refers to the host, and the host refers to the control. This
+        // template refers to nothing.
+        shown.List.ItemTemplate =
+            new FuncDataTemplate<object>(
+                build: static (_, _) => new TextBlock { Height = RowHeight },
+                supportsRecycling: true);
+
+        model.Give(value: Given(first: 0, count: RowsOnTheScreen));
+        shown.Settle();
+        model.Give(value: VirtualRows.Empty with { TotalCount = 1000 });
+        shown.Settle();
+
+        List<Control> kept = [.. shown.List.KeptRowViews];
+        WeakReference<VirtualizingItemsControl> control = new(target: shown.List);
+
+        shown.Remove();
+        shown.Dispose();
+
+        // A report or a scroll that the control posted holds the control until the dispatcher runs it.
+        Dispatcher.UIThread.RunJobs();
+
+        return (control, kept);
+    }
+
+    // Runs the collector until no view is alive, or until the attempts end.
+    private static async Task<bool> CollectAll(IReadOnlyCollection<WeakReference<Control>> views)
+    {
+        for (int attempt = 0; attempt < 50 && AnyIsAlive(references: views); attempt++)
+        {
+            await Collect();
+        }
+
+        return !AnyIsAlive(references: views);
+    }
+
+    private static async Task Collect()
+    {
+        await Task.Delay(millisecondsDelay: 10);
+        Dispatcher.UIThread.RunJobs();
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+    }
+
+    // TryGetTarget gives a strong reference. In a frame of its own, that reference is gone when the call
+    // returns, and the collector does not see it.
+    [MethodImpl(methodImplOptions: MethodImplOptions.NoInlining)]
+    private static bool AnyIsAlive(IEnumerable<WeakReference<Control>> references) =>
+        references.Any(predicate: static reference => reference.TryGetTarget(target: out _));
+
+    [MethodImpl(methodImplOptions: MethodImplOptions.NoInlining)]
+    private static bool IsAlive(WeakReference<VirtualizingItemsControl> reference) =>
+        reference.TryGetTarget(target: out _);
+
     private static List<Control?> Views(ShownVirtual shown) =>
     [
         .. shown.List.GetRealizedContainers()
             .Select(selector: static container => (container as ContentPresenter)?.Child)
     ];
+
+    // A row template that builds a view for each row and does not use the view that it gets. It refers
+    // to each view that it built only through a weak reference.
+    private sealed class NewViewForEachRow : IRecyclingDataTemplate
+    {
+        public List<WeakReference<Control>> Built { get; } = [];
+
+        public bool Match(object? data) => data is VirtualRow;
+
+        public Control Build(object? param) => this.Build(data: param, existing: null);
+
+        public Control Build(object? data, Control? existing)
+        {
+            TextBlock view = new() { Height = RowHeight, Text = (data as VirtualRow)?.Text };
+            this.Built.Add(item: new WeakReference<Control>(target: view));
+
+            return view;
+        }
+    }
 
     // A row template that records the view that it receives for each row.
     private sealed class Recording(in IRecyclingDataTemplate inner, in List<Control?> received) : IRecyclingDataTemplate
