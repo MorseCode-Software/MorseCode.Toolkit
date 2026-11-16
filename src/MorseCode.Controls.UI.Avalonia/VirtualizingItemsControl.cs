@@ -6,6 +6,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.Presenters;
 using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Templates;
+using Avalonia.Data;
 using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Threading;
@@ -138,6 +139,11 @@ public class VirtualizingItemsControl : ItemsControl
 
     // The source that the control reads and reports to.
     private IVirtualItemsSource? source;
+
+    // The template for DisplayMemberBinding, and the binding that it shows. The template is the same object
+    // until the binding changes, so that the row views that it built stay usable.
+    private IRecyclingDataTemplate? displayMemberTemplate;
+    private BindingBase? displayMemberTemplateBinding;
 
     // The handlers on the values of the source. They are set only while the control follows the source,
     // which is while it is in a visual tree. A handler is a reference from the source to the control, and
@@ -276,12 +282,14 @@ public class VirtualizingItemsControl : ItemsControl
     {
         get
         {
-            if (!this.RecyclesRowViews || this.ItemTemplate is not IRecyclingDataTemplate rowTemplate)
+            IDataTemplate? itemTemplate = this.EffectiveItemTemplate;
+
+            if (!this.RecyclesRowViews || itemTemplate is not IRecyclingDataTemplate rowTemplate)
             {
                 this.rowViews.Clear();
                 this.rowViewTemplate = null;
 
-                return this.ItemTemplate;
+                return itemTemplate;
             }
 
             // A kept view came from the row template of that time. A different row template cannot
@@ -294,6 +302,41 @@ public class VirtualizingItemsControl : ItemsControl
             }
 
             return this.rowViewTemplate;
+        }
+    }
+
+    // The template that shows a row: ItemTemplate, or a template for DisplayMemberBinding. The base makes
+    // its own template for the binding, but it sets that template only when it prepares a container. The
+    // control changes the template of a container when a placeholder and a row change places, and the
+    // template of the base is private. Thus, the control makes a template that does the same: a TextBlock
+    // whose text the binding gives. The binding is the only state of the view. Thus, the template can use
+    // a view again, and the control can keep its views.
+    private IDataTemplate? EffectiveItemTemplate
+    {
+        get
+        {
+            if (this.ItemTemplate is { } itemTemplate)
+            {
+                return itemTemplate;
+            }
+
+            if (this.DisplayMemberBinding is not { } binding)
+            {
+                return null;
+            }
+
+            if (this.displayMemberTemplate is null
+                || !ReferenceEquals(objA: this.displayMemberTemplateBinding, objB: binding))
+            {
+                this.displayMemberTemplateBinding = binding;
+
+                this.displayMemberTemplate =
+                    new FuncDataTemplate<object?>(
+                        build: (_, _) => new TextBlock { [!TextBlock.TextProperty] = binding },
+                        supportsRecycling: true);
+            }
+
+            return this.displayMemberTemplate;
         }
     }
 
@@ -401,7 +444,7 @@ public class VirtualizingItemsControl : ItemsControl
 
                 break;
             case ContentControl control:
-                control.ContentTemplate = isPlaceholder ? this.PlaceholderTemplate : this.ItemTemplate;
+                control.ContentTemplate = isPlaceholder ? this.PlaceholderTemplate : this.EffectiveItemTemplate;
 
                 break;
         }
@@ -509,7 +552,7 @@ public class VirtualizingItemsControl : ItemsControl
         }
         else
         {
-            IDataTemplate? rowTemplate = container is ContentPresenter ? this.RowTemplate : this.ItemTemplate;
+            IDataTemplate? rowTemplate = container is ContentPresenter ? this.RowTemplate : this.EffectiveItemTemplate;
 
             container.SetCurrentValue(property: content, value: itemChange.After);
             container.SetValue(property: contentTemplate, value: rowTemplate);
