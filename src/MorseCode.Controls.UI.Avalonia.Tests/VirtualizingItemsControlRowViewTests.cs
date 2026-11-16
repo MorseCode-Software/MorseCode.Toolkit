@@ -227,6 +227,64 @@ public sealed class VirtualizingItemsControlRowViewTests
                 await Assert.That(received.Any(predicate: keptBefore.Contains)).IsFalse();
             });
 
+    // A typed row template does not match an item of a different type. The presenter then shows that item
+    // with a template that it finds itself, and the view of that template must not go to a row. Before,
+    // the control kept each view that left a presenter of its template, and the next row showed the
+    // view of the default template.
+    [Test]
+    public Task TheControlKeepsOnlyTheViewsThatTheRowTemplateBuilt() =>
+        TestApplication.Run(
+            test: static async () =>
+            {
+                GivenRowsModel model = new();
+                using ShownVirtual shown = new(model: model, buffer: 0);
+
+                shown.List.ItemTemplate =
+                    new FuncDataTemplate<VirtualRow>(build: static (_, _) => TypedRowView(), supportsRecycling: true);
+
+                // The rows at the even positions are of the row template, and the rows at the odd positions
+                // are text.
+                model.Give(
+                    value: new VirtualRows(
+                        TotalCount: 1000,
+                        Offset: 0,
+                        Items:
+                        [
+                            .. Enumerable.Range(start: 0, count: RowsOnTheScreen)
+                                .Select<int, object?>(selector: static position =>
+                                    position % 2 == 0 ? new VirtualRow(Position: position) : $"text {position}")
+                        ]));
+
+                shown.Settle();
+
+                // The panel also has a container beyond the screen, which shows a placeholder.
+                List<Control?> typedViews =
+                [
+                    .. shown.List.GetRealizedContainers()
+                        .OfType<ContentPresenter>()
+                        .Where(predicate: static presenter => presenter.Content is VirtualRow)
+                        .Select(selector: static presenter => presenter.Child)
+                ];
+
+                await Assert.That(typedViews.Count).IsEqualTo(expected: RowsOnTheScreen / 2);
+
+                model.Give(value: VirtualRows.Empty with { TotalCount = 1000 });
+                shown.Settle();
+
+                await Assert.That(
+                        shown.List.KeptRowViews.ToHashSet(comparer: ReferenceEqualityComparer.Instance)
+                            .SetEquals(other: typedViews))
+                    .IsTrue();
+
+                model.Give(value: Given(first: 100, count: RowsOnTheScreen));
+                shown.Settle();
+
+                await Assert.That(Texts(shown: shown))
+                    .IsEquivalentTo(
+                        expected: Rows(first: 100, count: RowsOnTheScreen),
+                        ordering: CollectionOrdering.Matching);
+            });
+
     [Test]
     public Task TheControlKeepsNoMoreViewsThanThePanelHadContainers() =>
         TestApplication.Run(
@@ -276,6 +334,23 @@ public sealed class VirtualizingItemsControlRowViewTests
 
     private static List<string> Texts(ShownVirtual shown) =>
         [.. shown.Shown().Select(selector: static pair => pair.Text)];
+
+    // A view of a typed row template that reads its row from its data context, as a binding does.
+    private static TextBlock TypedRowView()
+    {
+        TextBlock view = new() { Height = RowHeight };
+
+        view.DataContextChanged +=
+            static (sender, _) =>
+            {
+                if (sender is TextBlock shownView)
+                {
+                    shownView.Text = (shownView.DataContext as VirtualRow)?.Text ?? "no row";
+                }
+            };
+
+        return view;
+    }
 
     private static List<Control?> Views(ShownVirtual shown) =>
     [
