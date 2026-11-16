@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Operations;
@@ -76,7 +77,8 @@ public sealed class ContinuationAnalyzer : DiagnosticAnalyzer
 
         IEnumerable<Diagnostic> found =
             HandleNotUsed(continuation: continuation)
-                .Concat(second: ReturnedValues(continuation: continuation))
+                .Concat(
+                    second: ReturnedValues(continuation: continuation, cancellationToken: context.CancellationToken))
                 .Concat(second: Calls(continuation: continuation))
                 .Concat(second: HandleLeaves(continuation: continuation));
 
@@ -110,11 +112,13 @@ public sealed class ContinuationAnalyzer : DiagnosticAnalyzer
     }
 
     // MC1003 and MC1004, for each value that the continuation can return.
-    private static IEnumerable<Diagnostic> ReturnedValues(Continuation continuation) =>
+    private static IEnumerable<Diagnostic> ReturnedValues(
+        Continuation continuation,
+        CancellationToken cancellationToken) =>
         from result in continuation.Operations.OfType<IReturnOperation>()
         where IsResultOf(continuation: continuation, function: OperationTree.Owner(operation: result))
         from leaf in OperationTree.Leaves(value: result.ReturnedValue)
-        from diagnostic in ReturnedValue(continuation: continuation, leaf: leaf)
+        from diagnostic in ReturnedValue(continuation: continuation, leaf: leaf, cancellationToken: cancellationToken)
         select diagnostic;
 
     // A return in the lambda itself gives the result of the continuation. So does a return in a lambda
@@ -126,7 +130,10 @@ public sealed class ContinuationAnalyzer : DiagnosticAnalyzer
             && continuation.Symbols.IsConstructed(type: inner.Symbol.ReturnType)
             && !continuation.IsContinuation(function: inner));
 
-    private static IEnumerable<Diagnostic> ReturnedValue(Continuation continuation, IOperation leaf)
+    private static IEnumerable<Diagnostic> ReturnedValue(
+        Continuation continuation,
+        IOperation leaf,
+        CancellationToken cancellationToken)
     {
         if (leaf is IDefaultValueOperation || leaf.ConstantValue is { HasValue: true, Value: null })
         {
@@ -145,7 +152,8 @@ public sealed class ContinuationAnalyzer : DiagnosticAnalyzer
 
         if (value is IInvocationOperation call
             && continuation.Symbols.IsConstruct(method: call.TargetMethod)
-            && Source(continuation: continuation, handle: call.Instance) is IInvocationOperation source
+            && Source(continuation: continuation, handle: call.Instance, cancellationToken: cancellationToken) is
+                IInvocationOperation source
             && continuation.Symbols.IsConstructorFrom(method: source.TargetMethod))
         {
             return
@@ -163,14 +171,20 @@ public sealed class ContinuationAnalyzer : DiagnosticAnalyzer
     // The operation that made a handle. The search goes back through each Select and through each local
     // variable. If the search finds a local variable a second time, the variable reads its own value in
     // its declaration. That does not compile, but an editor analyzes the code while the user types it.
-    // Thus, the search stops there, and the handle has no source.
-    private static IOperation? Source(Continuation continuation, IOperation? handle)
+    // Thus, the search stops there, and the handle has no source. The search also stops when the compiler
+    // cancels the analysis.
+    private static IOperation? Source(
+        Continuation continuation,
+        IOperation? handle,
+        CancellationToken cancellationToken)
     {
         HashSet<ILocalSymbol> visited = new(comparer: SymbolEqualityComparer.Default);
         IOperation? current = OperationTree.Unwrap(operation: handle);
 
         while (true)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             switch (current)
             {
                 case IInvocationOperation select when continuation.Symbols.IsSelect(method: select.TargetMethod):
