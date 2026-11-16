@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using Microsoft.CodeAnalysis;
@@ -48,13 +49,21 @@ public sealed class PrimaryConstructorParameterAnalyzer : DiagnosticAnalyzer
         new DiagnosticDescriptor(
             id: "MC0003",
             title: "A primary constructor parameter is not in",
-            messageFormat: "The primary constructor parameter {0} of {1} is not in: write in, or copy the value to a field",
+            messageFormat: "The primary constructor parameter {0} of {1} is not in: write {2}, or copy the value to a field",
             category: "Style",
             defaultSeverity: DiagnosticSeverity.Warning,
             isEnabledByDefault: true,
             description: "Write each primary constructor parameter of a class or a struct as in, so that it is "
-                         + "readonly and no member can capture it. A member that needs the value reads it from a field.",
+                         + "readonly and no member can capture it. A member that needs the value reads it from a field. "
+                         + "On a ref struct, write scoped in, so that what the constructor makes does not hold the "
+                         + "reference and a caller can return it.",
             helpLinkUri: "https://morsecode-software.github.io/MorseCode.Toolkit/docs/primary-constructor-parameter.html");
+
+    /// <summary>
+    ///     The name of the property of a report that holds the modifiers to write.
+    ///     MorseCode.Analyzers.CodeFixes reads it by this name.
+    /// </summary>
+    private const string InProperty = "In";
 
     /// <inheritdoc />
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => ImmutableArray.Create(item: Rule);
@@ -107,15 +116,28 @@ public sealed class PrimaryConstructorParameterAnalyzer : DiagnosticAnalyzer
             return;
         }
 
+        // An in parameter of the constructor of a ref struct lets what the constructor makes hold the reference.
+        // Then a caller cannot return it when the argument does not live after the call. Such an argument is a
+        // parameter of the caller, a constant, or an element of an array. Scoped in keeps the reference in the
+        // constructor. The code fix reads the modifiers from the report, thus it writes what the message says.
+        string modifiers = IsRefStruct(type: type) ? "scoped in" : "in";
+
+        ImmutableDictionary<string, string?> properties =
+            ImmutableDictionary.CreateRange(items: [new KeyValuePair<string, string?>(key: InProperty, value: modifiers)]);
+
         foreach (ParameterSyntax parameter in notIn)
         {
             context.ReportDiagnostic(
                 diagnostic: Diagnostic.Create(
                     descriptor: Rule,
                     location: parameter.Identifier.GetLocation(),
-                    messageArgs: [parameter.Identifier.Text, type.Identifier.Text]));
+                    properties: properties,
+                    messageArgs: [parameter.Identifier.Text, type.Identifier.Text, modifiers]));
         }
     }
+
+    private static bool IsRefStruct(MemberDeclarationSyntax type) =>
+        type is StructDeclarationSyntax && type.Modifiers.Any(kind: SyntaxKind.RefKeyword);
 
     // C# refuses a use of an attribute whose constructor has an in parameter (CS8358). Thus, a parameter of an
     // attribute cannot be in, and the rule does not report it. The code fix then breaks each use. A use is frequently

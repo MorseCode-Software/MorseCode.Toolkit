@@ -78,6 +78,61 @@ internal sealed class PrimaryConstructorParameterCodeFixTests
                 ordering: CollectionOrdering.Matching);
     }
 
+    // On a parameter of a ref struct, plain in lets the result of the constructor capture the reference. A caller
+    // in a different type that returns the result then does not compile. The check of the fix reads only the
+    // parts of the type, thus it does not see the caller. Scoped in keeps each such caller. The harness compiles
+    // the full result, thus a fix that writes plain in fails here.
+    [Test]
+    public async Task TheFixWritesScopedInOnAParameterOfARefStruct()
+    {
+        const string source =
+            """
+            using System;
+
+            public ref struct Number(int value)
+            {
+                public int Value { get; } = value;
+            }
+
+            public readonly ref struct Open(ReadOnlySpan<int> values)
+            {
+                public int Length { get; } = values.Length;
+            }
+
+            public static class Callers
+            {
+                public static Number FromParameter(int input) => new Number(value: input);
+
+                public static Number FromConstant() => new Number(value: 3);
+
+                public static Open FromArray(int[] array) => new Open(values: array);
+            }
+            """;
+
+        IReadOnlyList<CodeFixHarness.Offer> offers =
+            await CodeFixHarness.Offers(
+                    analyzer: new PrimaryConstructorParameterAnalyzer(),
+                    provider: new PrimaryConstructorParameterCodeFixProvider(),
+                    source: source)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        await Assert.That(offers.Select(selector: static offer => offer.Title))
+            .IsEquivalentTo(
+                expected: ["Make the parameter scoped in", "Make the parameter scoped in"],
+                ordering: CollectionOrdering.Matching);
+
+        await Assert.That(offers.Select(selector: static offer => offer.Result))
+            .IsEquivalentTo(
+                expected:
+                [
+                    source.Replace(oldValue: "Number(int value)", newValue: "Number(scoped in int value)"),
+                    source.Replace(
+                        oldValue: "Open(ReadOnlySpan<int> values)",
+                        newValue: "Open(scoped in ReadOnlySpan<int> values)")
+                ],
+                ordering: CollectionOrdering.Matching);
+    }
+
     // The compiler refuses in where a member captures the parameter, where a lambda uses it, and where code
     // writes it. It also refuses in where a part of a partial type in a different document captures it. MC0003
     // reports each one, and the provider offers the fix for none.
