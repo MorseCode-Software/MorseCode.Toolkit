@@ -329,6 +329,67 @@ public sealed class VirtualizingItemsControlTests
                 await Assert.That(model.CurrentRequest).IsEqualTo(expected: Maybe<int>.None);
             });
 
+    // A panel that is not visible does not scroll. Thus, the control keeps the request while the list does
+    // not show, and scrolls and reports it when the list shows. A hidden parent hides the list as its own
+    // visible value does.
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public Task ARequestMadeWhileTheListIsHiddenScrollsWhenTheListShows(bool hiddenByAParent) =>
+        TestApplication.Run(
+            test: async () =>
+            {
+                VirtualModel model = new(total: 1000);
+                using ShownVirtual shown = new(model: model, buffer: 0);
+
+                Visual hidden = hiddenByAParent ? shown.PutInAParent() : shown.List;
+                hidden.IsVisible = false;
+                shown.Settle();
+
+                model.Request(position: 700);
+                shown.Settle();
+
+                await Assert.That(model.ScrollReports).IsEmpty();
+                await Assert.That(model.CurrentRequest).IsEqualTo(expected: Maybe<int>.Some(value: 700));
+
+                hidden.IsVisible = true;
+                shown.Settle();
+
+                await Assert.That(Texts(shown: shown).Any(predicate: static text => text == "Row 700")).IsTrue();
+                await Assert.That(model.CurrentRequest).IsEqualTo(expected: Maybe<int>.None);
+
+                await Assert.That(model.ScrollReports)
+                    .IsEquivalentTo(expected: [700], ordering: CollectionOrdering.Matching);
+            });
+
+    // A list that the view hides from the start has no template, thus it has no panel at the Loaded event. The
+    // request stays until the list shows and its panel exists.
+    [Test]
+    public Task ARequestToAListThatIsHiddenFromTheStartScrollsWhenTheListShows() =>
+        TestApplication.Run(
+            test: static async () =>
+            {
+                VirtualModel model = new(total: 1000);
+                using ShownVirtual shown = ShownVirtual.HiddenAtTheStart(model: model, buffer: 0);
+
+                model.Request(position: 700);
+                shown.Settle();
+
+                await Assert.That(shown.List.IsLoaded).IsTrue();
+                await Assert.That(shown.List.ItemsPanelRoot).IsNull();
+                await Assert.That(model.ScrollReports).IsEmpty();
+                await Assert.That(model.CurrentRequest).IsEqualTo(expected: Maybe<int>.Some(value: 700));
+
+                shown.List.IsVisible = true;
+                shown.Settle();
+
+                await Assert.That(Texts(shown: shown).Any(predicate: static text => text == "Row 700")).IsTrue();
+                await Assert.That(model.CurrentRequest).IsEqualTo(expected: Maybe<int>.None);
+
+                await Assert.That(model.ScrollReports)
+                    .IsEquivalentTo(expected: [700], ordering: CollectionOrdering.Matching);
+            });
+
     // The request and the count change in one turn of the dispatcher, before the posted scroll runs. The
     // second change finds the scroll already posted, and the scroll reads both values when it runs.
     [Test]
