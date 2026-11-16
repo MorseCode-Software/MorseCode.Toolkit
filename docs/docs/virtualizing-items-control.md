@@ -269,7 +269,8 @@ that are on screen. The scroll brings the position into view, as `ScrollIntoView
 
 A view model usually knows the key of the item it wants to show, not its position, and positions
 move when the collection changes. `CreateVirtualItemsSourceByKey` takes a `Stream<TKey>` instead of
-a `Stream<int>`, and looks the position up in the collection inside the transaction of the request:
+a `Stream<int>`, and looks the position up in the collection inside the transaction of the request,
+after that transaction's edits. A view model can therefore add an item and scroll to it in one step:
 
 ```csharp
 StreamSink<OrderId> scrollTo = Stream.CreateSink<OrderId>();
@@ -281,10 +282,10 @@ IVirtualItemsSource source = output.CreateVirtualItemsSourceByKey(
     onEvicted: static row => row.Dispose());
 ```
 
-A key that the collection doesn't have at that instant makes no request. Everything else is the
-same as with positions: the request waits for the control, the control reports it, and `clears`
-withdraw it. The method has its own name rather than being an overload, because a collection keyed
-by `int` would make the two overloads indistinguishable.
+A key that the collection doesn't have once those edits are applied makes no request. Everything
+else is the same as with positions: the request waits for the control, the control reports it, and
+`clears` withdraw it. The method has its own name rather than being an overload, because a
+collection keyed by `int` would make the two overloads indistinguishable.
 
 - A request for a position beyond `TotalCount` waits until the count grows, and it stays until then.
   If the list is reloaded later and is long enough by then, the control scrolls to the old position
