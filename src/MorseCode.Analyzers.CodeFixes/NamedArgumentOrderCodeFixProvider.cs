@@ -249,12 +249,13 @@ public sealed class NamedArgumentOrderCodeFixProvider : CodeFixProvider
                 or IDiscardOperation
                 or IDeclarationExpressionOperation =>
                 Evaluation.Constant,
-            IDelegateCreationOperation
-                {
-                    Target: IAnonymousFunctionOperation or IMethodReferenceOperation { Instance: null }
-                } =>
-                Evaluation.Constant,
-            IDelegateCreationOperation { Target: IMethodReferenceOperation { Instance: { } instance } } =>
+            IDelegateCreationOperation { Target: IAnonymousFunctionOperation } => Evaluation.Constant,
+            IDelegateCreationOperation { Target: IMethodReferenceOperation reference } =>
+                EvaluationOf(operation: reference),
+            IMethodReferenceOperation { Instance: null } => Evaluation.Constant,
+            // A delegate from a method of a null instance throws ArgumentException, but a field read through it throws
+            // NullReferenceException. Thus, the delegate is an effect unless its instance cannot be null.
+            IMethodReferenceOperation { Instance: { } instance } when CannotBeNull(instance: instance) =>
                 Stronger(first: Evaluation.Read, second: EvaluationOf(operation: instance)),
             ILocalReferenceOperation or IParameterReferenceOperation or IInstanceReferenceOperation =>
                 Evaluation.Read,
@@ -271,6 +272,11 @@ public sealed class NamedArgumentOrderCodeFixProvider : CodeFixProvider
     }
 
     private static Evaluation Stronger(Evaluation first, Evaluation second) => first > second ? first : second;
+
+    // This, and a value of a type that is not Nullable<T>. A null Nullable<T> boxes to null.
+    private static bool CannotBeNull(IOperation instance) =>
+        instance is IInstanceReferenceOperation
+        || instance.Type is { IsValueType: true, OriginalDefinition.SpecialType: not SpecialType.System_Nullable_T };
 
     // The argument lists of the targets, each in its order. The replacement changes an inner list first, and the
     // outer list then moves the changed list. The count and the positions of the arguments of a list do not
