@@ -5,12 +5,10 @@ using System.Linq;
 using System.Runtime;
 using System.Threading;
 using System.Threading.Tasks;
-using MorseCode.StagedConstruction;
 using SodaFlow;
 using SodaFlow.Bindable.ObjectModel;
 using SodaFlow.Functional;
 using TUnit.Assertions;
-using TUnit.Assertions.Enums;
 using TUnit.Assertions.Extensions;
 using TUnit.Core;
 
@@ -133,11 +131,13 @@ public sealed class ViewModelBaseConcurrencyTests
         await Assert.That(accepted).IsGreaterThan(minimum: 0);
     }
 
-    // The mapped cell gets its first value when SodaFlow first samples it. In one transaction, that
-    // sample occurs while the factory makes the one-way value, as a view model does in its own
-    // Transaction.Run. The function of the cell calls Construct there. Thus, the seal occurs between the
-    // two checks of the factory. A one-way value that stays attached posts to the scheduler when its
-    // cell changes.
+    // SodaFlow runs one transaction at a time across the process. The constructing thread is in a
+    // transaction, as a view model is in its own Transaction.Run. A second thread calls the factory. It
+    // goes through the first check of the factory, and then it waits in SodaFlow for that transaction.
+    // The constructing thread calls Construct during that wait. Thus, the seal occurs between the two
+    // checks of the factory. The test does not use the moment at which SodaFlow first runs the function
+    // of a cell, which is different between versions of SodaFlow. A one-way value that stays attached
+    // posts to the scheduler when its cell changes.
     //
     // A one-way value holds its listener weakly. The garbage collector can remove an attached one-way
     // value that nothing refers to, and then the test cannot see it. Thus, the test prevents garbage
@@ -154,8 +154,9 @@ public sealed class ViewModelBaseConcurrencyTests
     {
         CellSink<int> source = Cell.CreateSink(initialValue: 1);
         CountingScheduler scheduler = new();
-        List<string> log = [];
+        List<Thread> factoryCalls = [];
         List<Exception> caught = [];
+        bool waitedInTheFactory = false;
         int postsBeforeTheChange;
         int postsAfterTheChange;
         bool collectionPrevented = GC.TryStartNoGCRegion(totalSize: 64 * 1024 * 1024);
@@ -171,40 +172,48 @@ public sealed class ViewModelBaseConcurrencyTests
                             bindingScheduler: scheduler,
                             continuation: (output, construct) =>
                             {
-                                List<Constructed<ViewModelBase>> constructed = [];
-
-                                Cell<int> sealsWhenSampled =
-                                    source.Map(
-                                        f: value =>
+                                // The thread catches each exception. An exception that leaves a thread
+                                // stops the test process.
+                                Thread factoryCall =
+                                    new(
+                                        start: () =>
                                         {
-                                            if (constructed.Count == 0)
+                                            try
                                             {
-                                                log.Add(item: "construct");
-
-#pragma warning disable MC1007 // The function of the cell calls Construct on purpose, so that the output closes while the factory makes a bindable.
-                                                constructed.Add(
-                                                    item: construct.Construct(
-                                                        constructor: static viewModelBase => viewModelBase));
-#pragma warning restore MC1007
+                                                output.BindableFactory.CreateOneWay(cell: source);
                                             }
+                                            catch (Exception exception)
+                                            {
+                                                caught.Add(item: exception);
+                                            }
+                                        })
+                                    {
+                                        IsBackground = true
+                                    };
 
-                                            return value;
-                                        });
+                                factoryCalls.Add(item: factoryCall);
+                                factoryCall.Start();
 
-                                log.Add(item: "factory call starts");
+                                // The thread has this state only while it waits. Before the factory makes
+                                // the value, the thread waits for nothing: this thread does not hold the
+                                // lock of the output.
+                                waitedInTheFactory =
+                                    SpinWait.SpinUntil(
+                                        condition: () =>
+                                            (factoryCall.ThreadState & ThreadState.WaitSleepJoin) != 0,
+                                        timeout: TimeSpan.FromSeconds(value: 30));
 
-                                caught.Add(
-                                    item: Catch(
-                                        action: () => output.BindableFactory.CreateOneWay(cell: sealsWhenSampled)));
-
-                                log.Add(item: "factory call ends");
-
-                                return constructed[0];
+                                return construct.Construct(constructor: static viewModelBase => viewModelBase);
                             }));
+
+            // No transaction is open now, thus the factory call ends.
+            bool factoryCallEnded = factoryCalls[0].Join(timeout: TimeSpan.FromSeconds(value: 30));
 
             postsBeforeTheChange = scheduler.Posts;
             source.Send(a: 2);
             postsAfterTheChange = scheduler.Posts;
+
+            await Assert.That(factoryCallEnded).IsTrue();
         }
         finally
         {
@@ -216,12 +225,8 @@ public sealed class ViewModelBaseConcurrencyTests
             }
         }
 
-        await Assert
-            .That(log)
-            .IsEquivalentTo(
-                expected: ["factory call starts", "construct", "factory call ends"],
-                ordering: CollectionOrdering.Matching);
-
+        await Assert.That(waitedInTheFactory).IsTrue();
+        await Assert.That(caught.Count).IsEqualTo(expected: 1);
         await Assert.That(caught[0]).IsTypeOf<InvalidOperationException>();
         await Assert.That(caught[0].Message).Contains(expected: "registrations are closed");
         await Assert.That(postsAfterTheChange).IsEqualTo(expected: postsBeforeTheChange);
@@ -239,20 +244,6 @@ public sealed class ViewModelBaseConcurrencyTests
         {
             Skip.Test(reason: "The no-GC region ended before the test read the scheduler. A leak could hide from the test.");
         }
-    }
-
-    private static Exception Catch(Action action)
-    {
-        try
-        {
-            action();
-        }
-        catch (Exception exception)
-        {
-            return exception;
-        }
-
-        throw new InvalidOperationException(message: "The action did not throw an exception.");
     }
 
     // Starts the threads that add registrations, and returns when they overlap with the caller. Each

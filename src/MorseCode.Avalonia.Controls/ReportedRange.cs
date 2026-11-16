@@ -9,7 +9,7 @@ namespace MorseCode.Avalonia.Controls;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         The parts of this value come in one write, thus they are always from the same instant.
+///         The parts of this value come in one report, thus they are always from the same instant.
 ///     </para>
 ///     <para>
 ///         The two ranges are inside the list as the control knew it at the report. The count of

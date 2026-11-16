@@ -5,7 +5,7 @@ using SodaFlow.Functional;
 namespace MorseCode.Avalonia.Controls.Tests;
 
 /// <summary>
-///     A source whose rows are the value that a test gives. It does not read the
+///     A source whose rows are the value that a test gives. It does not use the
 ///     range that the control reports. Thus, a test can give rows that no view model
 ///     gives for that range.
 /// </summary>
@@ -22,30 +22,23 @@ internal sealed class GivenRowsModel : IVirtualItemsSource
         BindableFactory factory = new(bindingScheduler: BindingScheduler.Immediate);
 
         this.Rows = factory.CreateOneWay(cell: this.rows);
-        this.ScrollRequest = factory.CreateOneWay(cell: Cell.Constant(value: Maybe<int>.None));
+        this.ScrollRequest = factory.CreateOneWay(cell: Cell.Constant(value: Maybe<ScrollRequest>.None));
 
-        this.Range =
-            factory.CreateOneWayToSource(
-                editsStreamSink: Stream.CreateSink<ReportedRange>(),
-                initialValue: ReportedRange.Empty);
-
-        this.ScrollHandled =
-            factory.CreateOneWayToSource(
-                editsStreamSink: Stream.CreateSink<Maybe<int>>(),
-                initialValue: Maybe<int>.None);
+        this.RangeReported = factory.CreateBindableAction(firingsStreamSink: Stream.CreateSink<ReportedRange>());
+        this.ScrollHandled = factory.CreateBindableAction(firingsStreamSink: Stream.CreateSink<ScrollRequest>());
     }
 
     /// <inheritdoc />
     public IOneWayBindableValue<VirtualRows> Rows { get; }
 
     /// <inheritdoc />
-    public IOneWayToSourceBindableValue<ReportedRange> Range { get; }
+    public IBindableAction<ReportedRange> RangeReported { get; }
 
     /// <inheritdoc />
-    public IOneWayBindableValue<Maybe<int>> ScrollRequest { get; }
+    public IOneWayBindableValue<Maybe<ScrollRequest>> ScrollRequest { get; }
 
     /// <inheritdoc />
-    public IOneWayToSourceBindableValue<Maybe<int>> ScrollHandled { get; }
+    public IBindableAction<ScrollRequest> ScrollHandled { get; }
 
     /// <summary>
     ///     Gives the rows to the control.

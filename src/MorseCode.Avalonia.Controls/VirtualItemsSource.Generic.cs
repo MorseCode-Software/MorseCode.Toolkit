@@ -24,13 +24,13 @@ internal sealed class VirtualItemsSource<TRow>(
     public IOneWayBindableValue<VirtualRows> Rows { get; } = values.Rows;
 
     /// <inheritdoc />
-    public IOneWayToSourceBindableValue<ReportedRange> Range { get; } = values.Range;
+    public IBindableAction<ReportedRange> RangeReported { get; } = values.RangeReported;
 
     /// <inheritdoc />
-    public IOneWayBindableValue<Maybe<int>> ScrollRequest { get; } = values.ScrollRequest;
+    public IOneWayBindableValue<Maybe<ScrollRequest>> ScrollRequest { get; } = values.ScrollRequest;
 
     /// <inheritdoc />
-    public IOneWayToSourceBindableValue<Maybe<int>> ScrollHandled { get; } = values.ScrollHandled;
+    public IBindableAction<ScrollRequest> ScrollHandled { get; } = values.ScrollHandled;
 
     /// <inheritdoc />
     public Cell<IReadOnlyList<TRow>> ConstructedRows { get; } = constructedRows;

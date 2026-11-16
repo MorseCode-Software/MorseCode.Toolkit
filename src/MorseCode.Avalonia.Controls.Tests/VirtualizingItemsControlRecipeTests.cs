@@ -1,6 +1,7 @@
 using System.Linq;
 using System.Threading.Tasks;
 using Avalonia;
+using SodaFlow;
 using SodaFlow.Functional;
 using TUnit.Assertions;
 using TUnit.Assertions.Enums;
@@ -63,7 +64,7 @@ public sealed class VirtualizingItemsControlRecipeTests
                 shown.Settle();
 
                 await Assert.That(shown.Shown().Any(predicate: static pair => pair.Text == "Row 700")).IsTrue();
-                await Assert.That(model.ScrollRequest.Value).IsEqualTo(expected: Maybe<int>.None);
+                await Assert.That(model.ScrollRequest.Value).IsEqualTo(expected: Maybe<ScrollRequest>.None);
             });
 
     // The same, when the view model asks before the view binds.
@@ -79,7 +80,26 @@ public sealed class VirtualizingItemsControlRecipeTests
                 using ShownVirtual shown = new(model: model, buffer: 0);
 
                 await Assert.That(shown.Shown().Any(predicate: static pair => pair.Text == "Row 700")).IsTrue();
-                await Assert.That(model.ScrollRequest.Value).IsEqualTo(expected: Maybe<int>.None);
+                await Assert.That(model.ScrollRequest.Value).IsEqualTo(expected: Maybe<ScrollRequest>.None);
+            });
+
+    // A view can outlive its view model. The control reports from the dispatcher, where a throw stops
+    // the app. A report is an action, and an action does nothing after the disposal of its view model.
+    [Test]
+    public Task AViewThatOutlivesItsViewModelReportsWithNoEffect() =>
+        TestApplication.Run(
+            test: static async () =>
+            {
+                RecipeModel model = new(total: 1000, retainedBeyondTheView: 512);
+                using ShownVirtual shown = new(model: model, buffer: 0);
+
+                model.Dispose();
+                shown.Scroller.Offset = new Vector(x: 0, y: 10000);
+                shown.Settle();
+
+                await Assert.That(shown.List.ReportedRange.Visible.First).IsEqualTo(expected: 500);
+                await Assert.That(model.VisibleRows.Sample()[0].Position).IsEqualTo(expected: 0);
+                await Assert.That(model.Built.Count).IsEqualTo(expected: 10);
             });
 
     [Test]
