@@ -111,6 +111,12 @@ public class VirtualizingItemsControl : ItemsControl
     private static readonly FuncTemplate<Panel?> DefaultPanel =
         new(func: static () => new VirtualizingStackPanel());
 
+    // The placeholder when the app gives no template: an empty line of text. A placeholder must have a
+    // height, else the panel makes a container for each position. A line of text has the height of the
+    // font of the theme. Without this template, Avalonia shows the name of the placeholder type.
+    private static readonly FuncDataTemplate<RowPlaceholder> DefaultPlaceholderTemplate =
+        new(build: static (_, _) => new TextBlock(), supportsRecycling: true);
+
     private readonly VirtualItemList items = new();
 
     // Gives the number of positions on each side, from the number of positions that show.
@@ -241,8 +247,14 @@ public class VirtualizingItemsControl : ItemsControl
     ///     not cover.
     /// </summary>
     /// <remarks>
-    ///     The data context of the template is the control's own placeholder, which has
-    ///     no data. Give the template the height of a row.
+    ///     <para>
+    ///         The data context of the template is the control's own placeholder, which
+    ///         has no data. Give the template the height of a row.
+    ///     </para>
+    ///     <para>
+    ///         With no template, a placeholder is an empty line of text. A change of
+    ///         this property gives the new template to each placeholder on the screen.
+    ///     </para>
     /// </remarks>
     public IDataTemplate? PlaceholderTemplate
     {
@@ -268,6 +280,8 @@ public class VirtualizingItemsControl : ItemsControl
 
     // The row views that the control keeps now. A test reads them.
     internal IReadOnlyCollection<Control> KeptRowViews => this.rowViews;
+
+    private IDataTemplate EffectivePlaceholderTemplate => this.PlaceholderTemplate ?? DefaultPlaceholderTemplate;
 
     // The template for a row in a presenter. It is the row template, or the template of the control
     // that gives the row template a kept view. Only a row template that uses its view again can use
@@ -330,7 +344,7 @@ public class VirtualizingItemsControl : ItemsControl
         {
             this.AttachSource(newSource: change.GetNewValue<IVirtualItemsSource?>());
         }
-        else if (change.Property == RecyclesRowViewsProperty)
+        else if (change.Property == RecyclesRowViewsProperty || change.Property == PlaceholderTemplateProperty)
         {
             // Each container gets its template again, as it does for a new row template.
             this.RefreshContainers();
@@ -397,11 +411,11 @@ public class VirtualizingItemsControl : ItemsControl
         switch (container)
         {
             case ContentPresenter presenter:
-                presenter.ContentTemplate = isPlaceholder ? this.PlaceholderTemplate : this.RowTemplate;
+                presenter.ContentTemplate = isPlaceholder ? this.EffectivePlaceholderTemplate : this.RowTemplate;
 
                 break;
             case ContentControl control:
-                control.ContentTemplate = isPlaceholder ? this.PlaceholderTemplate : this.ItemTemplate;
+                control.ContentTemplate = isPlaceholder ? this.EffectivePlaceholderTemplate : this.ItemTemplate;
 
                 break;
         }
@@ -504,7 +518,7 @@ public class VirtualizingItemsControl : ItemsControl
         // which the row template never gets a placeholder.
         if (itemChange.After is RowPlaceholder)
         {
-            container.SetValue(property: contentTemplate, value: this.PlaceholderTemplate);
+            container.SetValue(property: contentTemplate, value: this.EffectivePlaceholderTemplate);
             container.SetCurrentValue(property: content, value: itemChange.After);
         }
         else
