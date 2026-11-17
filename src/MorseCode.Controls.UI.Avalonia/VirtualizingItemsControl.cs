@@ -122,8 +122,8 @@ public class VirtualizingItemsControl : ItemsControl
     // control keeps no more views than the panel has containers with no row view. It needs no limit.
     private readonly Stack<Control> rowViews = new();
 
-    // The template that the control gives to a container in place of the row template, or null when
-    // the control does not keep row views.
+    // The template that makes the template of each presenter in place of the row template, or null
+    // when the control does not keep row views.
     private RowViewTemplate? rowViewTemplate;
 
     // True from a request to report until the dispatcher runs the report.
@@ -270,32 +270,29 @@ public class VirtualizingItemsControl : ItemsControl
     // The row views that the control keeps now. A test reads them.
     internal IReadOnlyCollection<Control> KeptRowViews => this.rowViews;
 
-    // The template for a row in a presenter. It is the row template, or the template of the control
-    // that gives the row template a kept view. Only a row template that uses its view again can use
-    // a kept view. A template that does not says that each row needs a view of its own.
-    private IDataTemplate? RowTemplate
+    // The template for a row in the presenter. It is the row template, or the template of the control
+    // for the presenter, which gives the row template a view to use again. Only a row template that
+    // uses its view again can use such a view. A template that does not says that each row needs a
+    // view of its own.
+    private IDataTemplate? RowTemplateFor(ContentPresenter presenter)
     {
-        get
+        if (!this.RecyclesRowViews || this.ItemTemplate is not IRecyclingDataTemplate rowTemplate)
         {
-            if (!this.RecyclesRowViews || this.ItemTemplate is not IRecyclingDataTemplate rowTemplate)
-            {
-                this.rowViews.Clear();
-                this.rowViewTemplate = null;
+            this.rowViews.Clear();
+            this.rowViewTemplate = null;
 
-                return this.ItemTemplate;
-            }
-
-            // A kept view came from the row template of that time. A different row template cannot
-            // use it.
-            if (this.rowViewTemplate is null
-                || !ReferenceEquals(objA: this.rowViewTemplate.RowTemplate, objB: rowTemplate))
-            {
-                this.rowViews.Clear();
-                this.rowViewTemplate = new RowViewTemplate(owner: this, rowTemplate: rowTemplate);
-            }
-
-            return this.rowViewTemplate;
+            return this.ItemTemplate;
         }
+
+        // A kept view came from the row template of that time. A different row template cannot use it.
+        if (this.rowViewTemplate is null
+            || !ReferenceEquals(objA: this.rowViewTemplate.RowTemplate, objB: rowTemplate))
+        {
+            this.rowViews.Clear();
+            this.rowViewTemplate = new RowViewTemplate(owner: this, rowTemplate: rowTemplate);
+        }
+
+        return this.rowViewTemplate.For(presenter: presenter);
     }
 
     /// <inheritdoc />
@@ -398,7 +395,8 @@ public class VirtualizingItemsControl : ItemsControl
         switch (container)
         {
             case ContentPresenter presenter:
-                presenter.ContentTemplate = isPlaceholder ? this.PlaceholderTemplate : this.RowTemplate;
+                presenter.ContentTemplate =
+                    isPlaceholder ? this.PlaceholderTemplate : this.RowTemplateFor(presenter: presenter);
 
                 break;
             case ContentControl control:
@@ -510,7 +508,8 @@ public class VirtualizingItemsControl : ItemsControl
         }
         else
         {
-            IDataTemplate? rowTemplate = container is ContentPresenter ? this.RowTemplate : this.ItemTemplate;
+            IDataTemplate? rowTemplate =
+                container is ContentPresenter presenter ? this.RowTemplateFor(presenter: presenter) : this.ItemTemplate;
 
             container.SetCurrentValue(property: content, value: itemChange.After);
             container.SetValue(property: contentTemplate, value: rowTemplate);
@@ -525,8 +524,8 @@ public class VirtualizingItemsControl : ItemsControl
     // True when the presenter shows its row through the template of the control, from which the
     // control can keep the row view.
     private bool HasRowViewTemplate(ContentPresenter presenter) =>
-        this.rowViewTemplate is not null
-        && ReferenceEquals(objA: presenter.ContentTemplate, objB: this.rowViewTemplate);
+        presenter.ContentTemplate is PresenterTemplate template
+        && ReferenceEquals(objA: template.RowViewTemplate, objB: this.rowViewTemplate);
 
     // Keeps a row view that left its presenter. A view that has a parent is in use: the row template
     // gave the same view to the next content of the presenter. A presenter of the control can also show
@@ -890,14 +889,16 @@ public class VirtualizingItemsControl : ItemsControl
         return this.ReportedRange;
     }
 
-    // The template that a presenter gets in place of the row template. A presenter that joins the tree
-    // again does not give the view that it had to its template. Avalonia also removed that view at
-    // the clear of the container. This template gives the row template a kept view in that case. The
-    // row template decides what it does with the view, as it does for a presenter.
+    // Gives the row template a kept view when the presenter gives it no view. The row template decides
+    // what it does with the view, as it does for a presenter. Each presenter gets a template of its own
+    // from this template.
     private sealed class RowViewTemplate(in VirtualizingItemsControl owner, in IRecyclingDataTemplate rowTemplate)
         : IRecyclingDataTemplate
     {
         private readonly VirtualizingItemsControl owner = owner;
+
+        // The table keeps no presenter alive, and the template of a presenter refers to its presenter.
+        private readonly ConditionalWeakTable<ContentPresenter, PresenterTemplate> presenterTemplates = new();
 
         // The views that the row template gave this template. The table keeps no view alive, and a view
         // of an earlier row template is not in it. The value of an entry stays alive while its view is
@@ -933,5 +934,39 @@ public class VirtualizingItemsControl : ItemsControl
         }
 
         public bool Built(Control view) => this.builtViews.TryGetValue(key: view, value: out _);
+
+        public PresenterTemplate For(ContentPresenter presenter)
+        {
+            if (!this.presenterTemplates.TryGetValue(key: presenter, value: out PresenterTemplate? template))
+            {
+                template = new PresenterTemplate(rowViewTemplate: this, presenter: presenter);
+                this.presenterTemplates.Add(key: presenter, value: template);
+            }
+
+            return template;
+        }
+    }
+
+    // The template of one presenter. A presenter of Avalonia 12 that joins the tree again gives its
+    // template no view, and the control keeps no view at that time. Thus, this template gives the view
+    // that the presenter shows, if the row template built it. The presenter keeps its view, and a
+    // return to the tree builds no view. After a placeholder, the presenter shows no row view, and
+    // the row template gets a kept view.
+    private sealed class PresenterTemplate(in RowViewTemplate rowViewTemplate, in ContentPresenter presenter)
+        : IRecyclingDataTemplate
+    {
+        private readonly ContentPresenter presenter = presenter;
+
+        public RowViewTemplate RowViewTemplate { get; } = rowViewTemplate;
+
+        public bool Match(object? data) => this.RowViewTemplate.Match(data: data);
+
+        public Control? Build(object? param) => this.RowViewTemplate.Build(param: param);
+
+        public Control? Build(object? data, Control? existing) =>
+            this.RowViewTemplate.Build(data: data, existing: existing ?? this.ShownRowView());
+
+        private Control? ShownRowView() =>
+            this.presenter.Child is { } view && this.RowViewTemplate.Built(view: view) ? view : null;
     }
 }

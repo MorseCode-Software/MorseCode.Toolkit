@@ -383,6 +383,31 @@ public sealed class VirtualizingItemsControlRowViewTests
                 await Assert.That(ShowsItsRows(shown: shown)).IsTrue();
             });
 
+    // A presenter that joins the tree again builds its content again, and the control keeps no view
+    // at that time. Thus, each presenter must get the view that it shows.
+    [Test]
+    public Task EachPresenterKeepsItsRowViewAcrossARemoveAndAReturn() =>
+        TestApplication.Run(
+            test: static async () =>
+            {
+                VirtualModel model = new(total: 1000);
+                using ShownVirtual shown = new(model: model, buffer: RowsOnTheScreen);
+                ScrollBy(shown: shown, rows: 3);
+                List<Control?> before = Views(shown: shown);
+                int built = shown.RowViewsBuilt;
+
+                shown.Remove();
+                shown.Return();
+
+                await Assert.That(shown.RowViewsBuilt - built).IsEqualTo(expected: 0);
+
+                await Assert.That(
+                        Views(shown: shown).SequenceEqual(second: before, comparer: ReferenceEqualityComparer.Instance))
+                    .IsTrue();
+
+                await Assert.That(ShowsItsRows(shown: shown)).IsTrue();
+            });
+
     private static void ScrollBy(ShownVirtual shown, int rows)
     {
         shown.Scroller.Offset += new Vector(x: 0, y: rows * RowHeight);
