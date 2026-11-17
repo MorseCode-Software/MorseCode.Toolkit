@@ -286,18 +286,19 @@ same as with positions: the request waits for the control, the control reports i
 withdraw it. The method has its own name rather than being an overload, because a collection keyed
 by `int` would make the two overloads indistinguishable.
 
-- A request for a position beyond `TotalCount` waits until the count grows, and it stays until then.
+- A request for a position beyond the `TotalCount` of `Rows` waits until the count grows, and it
+  stays until then.
   If the list is reloaded later and is long enough by then, the control scrolls to the old position
   at that point, which can surprise the user. Withdraw a request that has gone stale with the
   `clears` stream. A negative position can never apply, so the control reports it at once and does
   not scroll.
 - A new request replaces one that is waiting. The last request wins.
 - A request that the view model makes while a report is on its way is kept. The report names the
-  position it handled, and the view model clears the request only if it is still that position. The
-  one gap left is a new request for the same position inside that window, which the report clears.
-  The position was just shown, so nothing is lost.
-- The control scrolls once for each request. A change of `TotalCount` before the view model has
-  cleared the request does not scroll again.
+  request it handled, position and number, and the view model clears the request only if it is
+  still that one. A new request for the same position has a new number, so the report does not
+  clear it.
+- The control scrolls once for each request. A change of the `TotalCount` of `Rows` before the view
+  model has cleared the request does not scroll again.
 - The tests of the control use these methods with a real SodaFlow graph, including a request made
   before the view binds. The graph of the request has tests of its own.
 
