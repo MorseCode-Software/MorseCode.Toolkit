@@ -44,12 +44,19 @@ Every cast expression, whatever the conversion is:
   an explicit conversion when the code runs, and the code without it runs an implicit one, so a
   `long` inside a `dynamic` converts to `int` with the cast and throws without it. The message
   doesn't say the cast isn't needed there.
+- From version 0.1.3, a `foreach` or a query that converts each element explicitly, with no cast in
+  the source: `foreach (string text in objects)` over an `IEnumerable<object>`,
+  `foreach (int number in longs)` over an `IEnumerable<long>`, and `from string text in objects`,
+  which calls `Cast<string>()`. The message says to use a sequence of that type or filter it with
+  `OfType`, or, for a number, to keep the elements in a type of the right size. A loop with `var`,
+  or with a type that the elements convert to implicitly, isn't reported.
 
 The warning marks the type in parentheses, such as `(int)`, and not the value after it. A cast on
-a long expression doesn't underline the expression.
+a long expression doesn't underline the expression. For a `foreach` or a query, it marks the type
+of the variable.
 
-It doesn't report `as`, `is`, a pattern, a conversion the compiler makes without a cast, a
-parenthesized expression such as `(big) + 1`, or code in a generated file.
+It doesn't report `as`, `is`, a pattern, an implicit conversion the compiler makes without a cast,
+a parenthesized expression such as `(big) + 1`, or code in a generated file.
 
 ## How to avoid a cast
 
