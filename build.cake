@@ -87,8 +87,16 @@ Task("Restore")
     DotNetRestore(solution);
 });
 
+// Each build of this script makes each warning an error, as -warnaserror does on the command line.
+// Inspect-Code reports each warning of the compiler and of the analyzers, on each target. It does
+// not report a warning of an MSBuild task, such as MSB3277, a NETSDK warning, or a warning of the
+// XAML compiler of Avalonia. Only the build sees those. A build in an editor does not use this
+// script, thus a warning there does not stop an edit.
+DotNetMSBuildSettings WarningsAsErrors() =>
+    new DotNetMSBuildSettings { TreatAllWarningsAs = MSBuildTreatAllWarningsAs.Error };
+
 Task("Build")
-    .Description("Builds the solution.")
+    .Description("Builds the solution, with each warning as an error.")
     .IsDependentOn("Verify-Inspection-Settings")
     .IsDependentOn("Restore")
     .Does(() =>
@@ -99,6 +107,7 @@ Task("Build")
         {
             Configuration = configuration,
             NoRestore = true,
+            MSBuildSettings = WarningsAsErrors(),
         });
 });
 
@@ -159,12 +168,18 @@ Task("Pack")
     CleanDirectory(artifactsDirectory);
 
     // Test projects set IsPackable false, so one pack over the solution produces only the packages.
+    //
+    // A pack builds again, and it can give warnings of its own, thus it also makes them errors. It
+    // does not restore, as Build does not, because the Restore task restores. Thus, a NuGet warning
+    // of a restore, such as an audit advisory, stays a warning.
     DotNetPack(
         solution,
         new DotNetPackSettings
         {
             Configuration = configuration,
             OutputDirectory = artifactsDirectory,
+            NoRestore = true,
+            MSBuildSettings = WarningsAsErrors(),
         });
 
     foreach (var package in GetFiles($"{artifactsDirectory.Path}/*.nupkg").OrderBy(p => p.FullPath))
