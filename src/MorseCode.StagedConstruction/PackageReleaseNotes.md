@@ -2,8 +2,9 @@
 
 Breaking: Constructor<T>.Construct and Stage<,,>.Advance return a Constructed<TResult>, and a
 StageContinuation returns one, so the continuation of a subclass must return what Construct gives
-it. Only Construct makes a Constructed<TResult>. A continuation that returns without a call to
-Construct therefore no longer compiles; before, a base found the mistake at run time, or not at
+it. Only Construct makes a Constructed<TResult>. A continuation that never calls Construct
+therefore no longer compiles, unless it returns null! or the result of a different handle, which
+MC1003 and MC1004 of the analyzer report. Before, a base found the mistake at run time, or not at
 all. A CreateBase method reads Value on what the continuation returns and gives that to its
 caller. A continuation that ends with return construct.Construct(...), or with return
 next.Advance(...), compiles as it is; code that wrote the return type of such a lambda, or a
