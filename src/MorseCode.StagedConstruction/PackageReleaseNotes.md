@@ -24,7 +24,9 @@ MC1007 is information: it reports where the handle goes to code that the analyze
 such as a helper method, a field, or a lambda that can run after the continuation returns. A C#
 project that has this package anywhere in its packages runs the analyzer with no step of its own,
 and a rule is turned off by its severity in .editorconfig. The documentation page on the
-continuation rules describes each one.
+continuation rules describes each one. The analyzer needs Roslyn 4.4 or later: the .NET 7 SDK or
+later, or Visual Studio 2022 17.4 or later. An older compiler does not run it, and the library
+itself does not need that compiler.
 
 New: the package has a net8.0 build, next to net472, net6.0, and netstandard2.0. It is the same
 code, compiled for net8.0. A project that targets net8.0 or later now takes the net8.0 build and

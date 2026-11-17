@@ -42,7 +42,8 @@ was written for objects whose properties are SodaFlow graphs. See
 The package carries its own analyzer, which reports a continuation that doesn't return the result of
 its handle. It runs in every project that has the package anywhere in its dependencies, so a project
 that references `MorseCode.Mvvm` or `MorseCode.Controls.UI.Avalonia` gets it too, with nothing to
-install. See [Continuation rules](continuation-rules.md).
+install. The analyzer needs the .NET 7 SDK or later, or Visual Studio 2022 17.4 or later, and an
+older compiler doesn't run it. See [Continuation rules](continuation-rules.md).
 
 ## MorseCode.Controls.ViewModels
 

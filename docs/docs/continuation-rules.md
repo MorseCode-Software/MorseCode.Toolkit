@@ -13,6 +13,10 @@ The analyzer ships inside the `MorseCode.StagedConstruction` package, so there i
 install. A project that references that package gets the rules. So does a project that references
 `MorseCode.Mvvm` or `MorseCode.Controls.UI.Avalonia`, because both depend on it.
 
+The analyzer needs Roslyn 4.4 or later: the .NET 7 SDK or later, or Visual Studio 2022 17.4 or
+later. An older compiler doesn't run it, so the rules report nothing there. The library itself
+doesn't need that compiler.
+
 It examines each lambda that becomes a `StageContinuation` and whose second parameter is a
 `Constructor<T>` or a `Stage<,,>`. That parameter is the handle. A stage can hand its continuation
 something that isn't a handle, and no rule applies to that continuation.
