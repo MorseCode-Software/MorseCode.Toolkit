@@ -142,6 +142,11 @@ SodaFlow.Bindable.ObjectModel, next to Avalonia and SodaFlow.Functional. To move
 the source in the view model with CreateVirtualItemsSource, expose it as an IVirtualItemsSource,
 and replace the bindings in the view with Source="{Binding Source}".
 
+Fixed: with no PlaceholderTemplate, a placeholder showed the name of an internal type,
+MorseCode.Controls.UI.Avalonia.RowPlaceholder. It is now an empty line of text, as high as before.
+A PlaceholderTemplate that is set or changed while placeholders are on screen now reaches them.
+Before, they kept the old look until Avalonia used their containers for other positions.
+
 Changed: the dependencies on SodaFlow packages now have a ceiling at their next major version, as
 the dependencies between the packages of this repository already did: SodaFlow.Bindable.ObjectModel
 [4.0.0, 5.0.0) and SodaFlow.Functional [3.0.2, 4.0.0). Before, the one on SodaFlow.Functional was a
