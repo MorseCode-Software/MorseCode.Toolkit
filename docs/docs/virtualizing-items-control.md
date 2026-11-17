@@ -434,12 +434,14 @@ The control gives Avalonia its own list, one position per item. Setting `ItemsSo
 The control is in `MorseCode.Controls.UI.Avalonia`, which targets `net8.0` and `net10.0`, as
 Avalonia 12 does. Reference it from the project that holds your views.
 
-`CreateVirtualItemsSource`, `IVirtualItemsSource`, `VirtualRows`, `ReportedRange`, and `ItemRange`
-are in `MorseCode.Controls.ViewModels`. Reference it from the project that holds your view models.
-It has the same targets as `MorseCode.Mvvm`, and it depends on SodaFlow,
-`SodaFlow.Bindable.ObjectModel`, `SodaFlow.Collections`, and `MorseCode.Mvvm` 0.3.0 or later. The
-source is made of SodaFlow bindable values, and `CreateVirtualItemsSource` works with the `IOutput`
-of a `ViewModelBase`.
+`CreateVirtualItemsSource`, `CreateVirtualItemsSourceByKey`, `IVirtualItemsSource`,
+`IVirtualItemsSource<TRow>`, `VirtualRows`, `ReportedRange`, `ItemRange`, and `ScrollRequest` are
+in `MorseCode.Controls.ViewModels`. Reference it from the project that holds your view models. It
+has the same targets as `MorseCode.Mvvm`. It depends on SodaFlow, `SodaFlow.Bindable.ObjectModel`,
+`SodaFlow.Collections`, `SodaFlow.Functional`, and `MorseCode.Mvvm`, each up to its next breaking
+version: `MorseCode.Mvvm` from 0.3.0 and below 0.4.0. See
+[Version ranges](packages.md#version-ranges). The source is made of SodaFlow bindable values, and
+`CreateVirtualItemsSource` works with the `IOutput` of a `ViewModelBase`.
 
 The control package depends on the view model package. An app that keeps its views and its view
 models in one project needs only the first.
