@@ -478,15 +478,26 @@ public sealed class ContinuationAnalyzer : DiagnosticAnalyzer
         && Receiver(function: function) is (var method, _)
         && continuation.Symbols.IsStageFrom(method: method);
 
-    // The first lambda around the reference that can run after the continuation returns, as text for
-    // the message. Null if each lambda around the reference runs before its call returns.
-    private static string? Captor(Continuation continuation, IOperation reference)
+    // The first function around the reference that can run after the continuation returns, as text for
+    // the message. Null if each function around the reference runs before its call returns.
+    private static string? Captor(Continuation continuation, IOperation reference) =>
+        Captor(continuation: continuation, place: reference, examined: []);
+
+    private static string? Captor(Continuation continuation, IOperation place, HashSet<IMethodSymbol> examined)
     {
-        for (IOperation? function = OperationTree.Owner(operation: reference);
+        for (IOperation? function = OperationTree.Owner(operation: place);
              function is not null && !ReferenceEquals(objA: function, objB: continuation.Lambda);
              function = OperationTree.Owner(operation: function))
         {
-            // The code around a local function calls it by its name, thus it is not a value that leaves.
+            // A local function runs where the code uses it, and not where the code declares it. A call in
+            // the local function itself gives no new location, thus the search ends.
+            if (function is ILocalFunctionOperation local)
+            {
+                return examined.Add(item: local.Symbol)
+                    ? UsesOf(continuation: continuation, local: local.Symbol, examined: examined)
+                    : null;
+            }
+
             if (function is not IAnonymousFunctionOperation lambda)
             {
                 continue;
@@ -506,6 +517,59 @@ public sealed class ContinuationAnalyzer : DiagnosticAnalyzer
 
         return null;
     }
+
+    // The first use of a local function that can run it after the continuation returns, as text for the
+    // message. A call by its name runs it at the call. A delegate from it runs where the delegate goes, as
+    // a lambda does.
+    private static string? UsesOf(Continuation continuation, IMethodSymbol local, HashSet<IMethodSymbol> examined)
+    {
+        foreach (IOperation use in continuation.Operations)
+        {
+            string? reason =
+                use switch
+                {
+                    IInvocationOperation call when IsLocal(method: call.TargetMethod, local: local) =>
+                        Captor(continuation: continuation, place: call, examined: examined),
+                    IMethodReferenceOperation reference when IsLocal(method: reference.Method, local: local) =>
+                        DelegateFrom(
+                            continuation: continuation,
+                            reference: reference,
+                            name: local.Name,
+                            examined: examined),
+                    _ => null
+                };
+
+            if (reason is not null)
+            {
+                return reason;
+            }
+        }
+
+        return null;
+    }
+
+    // The reference is the method group of the local function with that name.
+    private static string? DelegateFrom(
+        Continuation continuation,
+        IOperation reference,
+        string name,
+        HashSet<IMethodSymbol> examined)
+    {
+        if (Receiver(function: reference) is not (var method, var parameter))
+        {
+            return $"is in the local function {name}, which is used as a value that is not an argument";
+        }
+
+        return RunsBeforeReturn(continuation: continuation, method: method, parameter: parameter)
+            ? Captor(continuation: continuation, place: reference, examined: examined)
+            : $"is in the local function {name}, which {method.Name} gets and can call after the continuation "
+              + "returns";
+    }
+
+    // A generic local function has a different symbol at each call. Its OriginalDefinition is the symbol that
+    // the code declares.
+    private static bool IsLocal(IMethodSymbol method, IMethodSymbol local) =>
+        SymbolEqualityComparer.Default.Equals(x: method.OriginalDefinition, y: local.OriginalDefinition);
 
     // The method and the parameter that get a lambda as an argument, or null if the lambda is not an
     // argument.

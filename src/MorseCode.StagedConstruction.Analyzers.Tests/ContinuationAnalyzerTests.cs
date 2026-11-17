@@ -1130,6 +1130,69 @@ internal sealed class ContinuationAnalyzerTests
         await Assert.That(variable[0].GetMessage()).Contains(expected: "is in a lambda that is not an argument");
     }
 
+    // MC1007. A local function runs where the code uses it. A call by its name runs it there, and a
+    // delegate made from it runs where the delegate goes, as a lambda does.
+    [Test]
+    public async Task AHandleInALocalFunctionIsFollowedToEachUseOfTheFunction()
+    {
+        const string make = $"Constructed<Thing> Make() => construct.Construct({Samples.Make});";
+
+        IReadOnlyList<Diagnostic> later =
+            await AnalyzeBody(statements: $"{make}\nreturn Helpers.Later(f: Make);")
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        IReadOnlyList<Diagnostic> variable =
+            await AnalyzeBody(statements: $"{make}\nFunc<Constructed<Thing>> kept = Make;\nreturn kept();")
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        IReadOnlyList<Diagnostic> inALambda =
+            await AnalyzeBody(statements: $"{make}\nreturn Helpers.Later(f: () => Make());")
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        IReadOnlyList<Diagnostic> byName =
+            await AnalyzeBody(statements: $"{make}\nreturn Make();")
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        IReadOnlyList<Diagnostic> now =
+            await AnalyzeBody(statements: $"{make}\nreturn Helpers.Now(f: Make);")
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        IReadOnlyList<Diagnostic> recursive =
+            await AnalyzeBody(
+                    statements: $"""
+                                 Constructed<Thing> Make(int count) =>
+                                     count > 0 ? Make(count: count - 1) : construct.Construct({Samples.Make});
+
+                                 return Make(count: 2);
+                                 """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        await Assert.That(Ids(found: later))
+            .IsEquivalentTo(expected: ["MC1007"], ordering: CollectionOrdering.Matching);
+
+        await Assert.That(Covered(found: later))
+            .IsEquivalentTo(expected: ["construct"], ordering: CollectionOrdering.Matching);
+
+        await Assert.That(later[0].GetMessage())
+            .IsEqualTo(
+                expected: "The handle construct is in the local function Make, which Later gets and can call after "
+                          + "the continuation returns, and the analyzer cannot follow it there");
+
+        await Assert.That(Ids(found: variable))
+            .IsEquivalentTo(expected: ["MC1007"], ordering: CollectionOrdering.Matching);
+
+        await Assert.That(variable[0].GetMessage())
+            .Contains(expected: "is in the local function Make, which is used as a value that is not an argument");
+
+        await Assert.That(Ids(found: inALambda))
+            .IsEquivalentTo(expected: ["MC1007"], ordering: CollectionOrdering.Matching);
+
+        await Assert.That(inALambda[0].GetMessage()).Contains(expected: "is in a lambda that is given to Later");
+        await Assert.That(byName).IsEmpty();
+        await Assert.That(now).IsEmpty();
+        await Assert.That(recursive).IsEmpty();
+    }
+
     // MC1007 and MC1004. A pattern at the top of a test that declares a variable stores the value that it
     // tests in the variable, as a declaration does. A pattern that declares no variable only tests the value.
     [Test]
