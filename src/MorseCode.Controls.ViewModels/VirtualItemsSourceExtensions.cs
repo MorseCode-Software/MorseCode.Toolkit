@@ -61,6 +61,9 @@ public static class VirtualItemsSourceExtensions
     ///     <paramref name="output" />, <paramref name="collection" />, <paramref name="project" />,
     ///     or <paramref name="scrollRequests" /> is null.
     /// </exception>
+    /// <exception cref="ArgumentOutOfRangeException">
+    ///     <paramref name="retainedBeyondTheView" /> is negative.
+    /// </exception>
     public static IVirtualItemsSource<TRow> CreateVirtualItemsSource<TKey, TIdentity, TState, TRow>(
         this ViewModelBase.IOutput output,
         ReactiveCollection<TKey, TIdentity, TState> collection,
@@ -171,6 +174,9 @@ public static class VirtualItemsSourceExtensions
     /// <exception cref="ArgumentNullException">
     ///     <paramref name="output" />, <paramref name="collection" />, <paramref name="project" />,
     ///     or <paramref name="scrollRequests" /> is null.
+    /// </exception>
+    /// <exception cref="ArgumentOutOfRangeException">
+    ///     <paramref name="retainedBeyondTheView" /> is negative.
     /// </exception>
     public static IVirtualItemsSource<TRow> CreateVirtualItemsSourceByKey<TKey, TIdentity, TState, TRow>(
         this ViewModelBase.IOutput output,

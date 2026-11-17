@@ -44,7 +44,7 @@ namespace MorseCode.Controls.UI.Avalonia;
 ///     </para>
 ///     <para>
 ///         To scroll, the view model makes a request in the source. The control scrolls there when
-///         it can, and then reports the position back. Thus, a request made before the control is
+///         it can, and then reports the request back. Thus, a request made before the control is
 ///         bound or laid out is not lost.
 ///     </para>
 ///     <para>
@@ -183,7 +183,7 @@ public class VirtualizingItemsControl : ItemsControl
     /// <remarks>
     ///     <para>
     ///         The control reads the rows, with their count, and the scroll request from the source, and
-    ///         reports the range that shows and the position that it scrolled to. Make the source with
+    ///         reports the range that shows and the request that it scrolled for. Make the source with
     ///         <c>CreateVirtualItemsSource</c>. A change of this property detaches the control from the
     ///         old source and attaches it to the new one.
     ///     </para>

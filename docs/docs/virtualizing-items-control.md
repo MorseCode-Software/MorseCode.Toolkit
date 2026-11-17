@@ -259,7 +259,7 @@ the same position.
 
 Every overload takes an optional `Stream<Unit>` of clears. Each firing of it sets the request to
 `None`, so the view model can withdraw a request that the control didn't use yet. When a request
-and a clear come in one transaction, the request wins.
+comes in one transaction with a clear or a report, the request wins.
 
 Code runs the action with `scrollToAction.Execute(position)`, and a view binds a `Command` to it as it
 does to any `ICommand`.
