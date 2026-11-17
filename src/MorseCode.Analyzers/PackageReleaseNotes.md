@@ -3,9 +3,10 @@
 Changed: MC0001 now also checks the arguments of an indexer, such as grid[column: 2, row: 1], and
 the constructor arguments of an attribute, such as [Range(maximum: 9, minimum: 1)]. Before, it
 checked calls of methods, local functions, delegates, and constructors only, so named arguments out
-of order in these two places gave no report. A name with an equals sign in an attribute sets a
-property and is not part of the order. The rule, its message, and its id are as before. Because it
-now reports more, a build with -warnaserror can fail where it passed with 0.1.2.
+of order in these two places gave no report. An indexer in an object initializer, such as
+new Grid { [column: 2, row: 1] = 3 }, is checked too. A name with an equals sign in an attribute
+sets a property and is not part of the order. The rule, its message, and its id are as before.
+Because it now reports more, a build with -warnaserror can fail where it passed with 0.1.2.
 
 New: code fixes for MC0001 and MC0003, in a second assembly, MorseCode.Analyzers.CodeFixes, beside
 the analyzer under analyzers/dotnet/cs. An editor loads it, and the compiler does not, because a

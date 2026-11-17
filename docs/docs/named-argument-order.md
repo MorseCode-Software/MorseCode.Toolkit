@@ -47,7 +47,8 @@ compiler doesn't run it.
 - Calls of methods, extension methods, local functions, and delegates.
 - Calls of constructors: `new Pair(...)`, `new(...)`, `base(...)`, `this(...)`, and the base type of
   a primary constructor, as in `class Named(int value) : Pair(...)`.
-- The arguments of an indexer, as in `grid[column: 2, row: 1]`, also through `grid?[...]`.
+- The arguments of an indexer, as in `grid[column: 2, row: 1]`, also through `grid?[...]` and in an
+  object initializer, as in `new Grid { [column: 2, row: 1] = 3 }`.
 - The constructor arguments of an attribute, as in `[Range(maximum: 9, minimum: 1)]`. A name with an
   equals sign, as in `Extra = 3`, sets a property and not a parameter, so it isn't part of the order.
 
