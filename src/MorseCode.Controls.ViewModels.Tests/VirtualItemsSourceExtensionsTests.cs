@@ -293,6 +293,75 @@ public sealed class VirtualItemsSourceExtensionsTests
         await Assert.That(source.VisibleRows.Sample()).IsEmpty();
     }
 
+    // A place can start before the list, stop at an end, or start after the list. The rows are the
+    // positions of the place that the list has. The test gets the expected positions with a filter, and
+    // the code gets them with Math.Min and Math.Max.
+    [Test]
+    [Arguments(12, 0, 5)]
+    [Arguments(12, 7, 5)]
+    [Arguments(12, 10, 5)]
+    [Arguments(12, 12, 5)]
+    [Arguments(12, 20, 5)]
+    [Arguments(12, -3, 5)]
+    [Arguments(12, -10, 5)]
+    [Arguments(12, 0, 0)]
+    [Arguments(12, 0, 20)]
+    [Arguments(0, 0, 5)]
+    public async Task TheRowsOfAWholeListAreThePositionsOfThePlaceThatTheListHas(int total, int first, int count)
+    {
+        (IVirtualItemsSource<VirtualRow> source, ViewModelBase viewModel) =
+            Make(make: output => output.CreateVirtualItemsSource(rows: Cell.Constant(value: Rows(count: total))));
+
+        using ViewModelBase owner = viewModel;
+
+        source.RangeReported.Execute(parameter: Reported(first: first, count: count));
+
+        int[] expected =
+        [
+            .. Enumerable.Range(start: 0, count: total)
+                .Where(predicate: position => position >= first && position < first + count)
+        ];
+
+        await Assert.That(source.ConstructedRows.Sample().Select(selector: static row => row.Position))
+            .IsEquivalentTo(expected: expected, ordering: CollectionOrdering.Matching);
+
+        await Assert.That(source.VisibleRows.Sample().Select(selector: static row => row.Position))
+            .IsEquivalentTo(expected: expected, ordering: CollectionOrdering.Matching);
+    }
+
+    // The rows of a place are a copy. The second calm compares new rows with the rows of its last value.
+    // Thus, an owner that changes its list and sends it again gets new rows, and a consumer cannot
+    // change the rows.
+    [Test]
+    public async Task TheRowsOfAWholeListKeepTheRowsOfTheirInstant()
+    {
+        List<VirtualRow> list = [.. Rows(count: 12)];
+        CellSink<IReadOnlyList<VirtualRow>> rows = Cell.CreateSink<IReadOnlyList<VirtualRow>>(initialValue: list);
+
+        (IVirtualItemsSource<VirtualRow> source, ViewModelBase viewModel) =
+            Make(make: output => output.CreateVirtualItemsSource(rows: rows));
+
+        using ViewModelBase owner = viewModel;
+
+        source.RangeReported.Execute(parameter: Reported(first: 2, count: 5));
+
+        IReadOnlyList<VirtualRow> before = source.VisibleRows.Sample();
+        VirtualRow first = before[index: 0];
+        list[index: 2] = new VirtualRow(Position: 2);
+
+        await Assert.That(source.VisibleRows.Sample()[index: 0]).IsSameReferenceAs(expected: first);
+
+        rows.Send(a: list);
+
+        await Assert.That(source.VisibleRows.Sample()[index: 0]).IsSameReferenceAs(expected: list[index: 2]);
+
+        // An array is also an IList<T>, and it accepts the write. Its IsReadOnly is true, thus this test
+        // writes and does not read IsReadOnly.
+        IList<VirtualRow>? writable = before as IList<VirtualRow>;
+
+        await Assert.That(() => writable?[index: 0] = list[index: 0]).Throws<NotSupportedException>();
+    }
+
     [Test]
     public async Task ACollectionGivesItsCountAndOnlyTheRowsOfTheRangeAtTheirOffset()
     {
