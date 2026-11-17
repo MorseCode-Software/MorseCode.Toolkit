@@ -422,8 +422,13 @@ public sealed class ContinuationAnalyzer : DiagnosticAnalyzer
                 ? null
                 : "is returned from a lambda",
 
+            // A pattern that declares a variable stores the handle in it, as a declaration does. A pattern that
+            // declares no variable only tests the handle.
+            (IIsPatternOperation or ISwitchExpressionOperation or ISwitchOperation) and var test =>
+                StoredByPattern(continuation: continuation, test: test),
+
             // A comparison, a type test, and a nameof do not move the handle.
-            IBinaryOperation or IIsPatternOperation or IIsTypeOperation or INameOfOperation => null,
+            IBinaryOperation or IIsTypeOperation or INameOfOperation => null,
             ISimpleAssignmentOperation { Target: IDiscardOperation } => null,
             ISimpleAssignmentOperation { IsRef: false, Target: ILocalReferenceOperation target } assignment
                 when continuation.KeepsTheHandle(local: target.Local, write: assignment.Syntax) => null,
@@ -431,6 +436,30 @@ public sealed class ContinuationAnalyzer : DiagnosticAnalyzer
 
             _ => "is used in an expression"
         };
+    }
+
+    // The first variable that a pattern of the test declares for the handle and that does not keep the
+    // handle, as text for the message. Each arm of a switch tests the same value.
+    private static string? StoredByPattern(Continuation continuation, IOperation test)
+    {
+        IEnumerable<IPatternOperation> patterns =
+            test switch
+            {
+                IIsPatternOperation isPattern => [isPattern.Pattern],
+                ISwitchExpressionOperation choice => choice.Arms.Select(selector: static arm => arm.Pattern),
+                ISwitchOperation choice =>
+                    choice.Cases.SelectMany(selector: static section => section.Clauses)
+                        .OfType<IPatternCaseClauseOperation>()
+                        .Select(selector: static clause => clause.Pattern),
+                _ => []
+            };
+
+        return patterns.SelectMany(selector: OperationTree.TestedValueVariables)
+            .Where(
+                predicate: variable =>
+                    !continuation.KeepsTheHandle(local: variable.Local, write: variable.Pattern.Syntax))
+            .Select(selector: static variable => $"is stored in {variable.Local.Name}")
+            .FirstOrDefault();
     }
 
     // The next step of a base gets the handle as the argument of a continuation, which is the purpose of

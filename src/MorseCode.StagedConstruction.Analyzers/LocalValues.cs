@@ -587,11 +587,31 @@ internal sealed class LocalValues
                     deconstruction.Target.DescendantsAndSelf()
                         .OfType<ILocalReferenceOperation>()
                         .Select(selector: static target => target.Local),
-                IDeclarationPatternOperation { DeclaredSymbol: ILocalSymbol local } => [local],
-                IRecursivePatternOperation { DeclaredSymbol: ILocalSymbol local } => [local],
-                IListPatternOperation { DeclaredSymbol: ILocalSymbol local } => [local],
+                IDeclarationPatternOperation { DeclaredSymbol: ILocalSymbol local } pattern
+                    when !HoldsTheTestedValue(pattern: pattern) => [local],
+                IRecursivePatternOperation { DeclaredSymbol: ILocalSymbol local } pattern
+                    when !HoldsTheTestedValue(pattern: pattern) => [local],
+                IListPatternOperation { DeclaredSymbol: ILocalSymbol local } pattern
+                    when !HoldsTheTestedValue(pattern: pattern) => [local],
                 _ => []
             };
+
+        // A variable of a pattern at the top of an is gets the value that the is tests. Each side of an and at
+        // the top is also at the top. The graph makes each arm of a switch an is of its own, thus this also
+        // holds for a switch.
+        private static bool HoldsTheTestedValue(IOperation pattern)
+        {
+            IOperation child = pattern;
+            IOperation? parent = pattern.Parent;
+
+            while (parent is IBinaryPatternOperation { OperatorKind: BinaryOperatorKind.And })
+            {
+                child = parent;
+                parent = parent.Parent;
+            }
+
+            return parent is IIsPatternOperation test && ReferenceEquals(objA: test.Pattern, objB: child);
+        }
 
         private void Record(IOperation operation, BasicBlock block, int position)
         {
@@ -610,6 +630,19 @@ internal sealed class LocalValues
                         position: position,
                         value: assignment.Value,
                         syntax: operation.Syntax);
+
+                    break;
+                case IIsPatternOperation test:
+                    foreach ((ILocalSymbol local, IPatternOperation pattern) in OperationTree.TestedValueVariables(
+                                 pattern: test.Pattern))
+                    {
+                        this.Define(
+                            local: local,
+                            block: block,
+                            position: position,
+                            value: test.Value,
+                            syntax: pattern.Syntax);
+                    }
 
                     break;
                 default:

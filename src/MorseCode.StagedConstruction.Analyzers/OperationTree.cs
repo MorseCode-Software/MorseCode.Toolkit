@@ -100,6 +100,29 @@ internal static class OperationTree
         };
 
     /// <summary>
+    ///     Gives each variable that <paramref name="pattern" /> declares for all of
+    ///     the value that it tests, with the pattern that declares the variable.
+    /// </summary>
+    /// <remarks>
+    ///     Each side of an <c>and</c> tests the same value. A variable of a nested
+    ///     pattern gets a part of the value, thus it is not in the result.
+    /// </remarks>
+    /// <param name="pattern">The pattern at the top of a test.</param>
+    /// <returns>The variables, with their patterns.</returns>
+    public static IEnumerable<(ILocalSymbol Local, IPatternOperation Pattern)> TestedValueVariables(
+        IPatternOperation pattern) =>
+        pattern switch
+        {
+            IBinaryPatternOperation { OperatorKind: BinaryOperatorKind.And } both =>
+                TestedValueVariables(pattern: both.LeftPattern)
+                    .Concat(second: TestedValueVariables(pattern: both.RightPattern)),
+            IDeclarationPatternOperation { DeclaredSymbol: ILocalSymbol local } => [(local, pattern)],
+            IRecursivePatternOperation { DeclaredSymbol: ILocalSymbol local } => [(local, pattern)],
+            IListPatternOperation { DeclaredSymbol: ILocalSymbol local } => [(local, pattern)],
+            _ => []
+        };
+
+    /// <summary>
     ///     Gives true if the function returns a value on at least one path. A
     ///     function that only throws returns none.
     /// </summary>

@@ -1130,6 +1130,86 @@ internal sealed class ContinuationAnalyzerTests
         await Assert.That(variable[0].GetMessage()).Contains(expected: "is in a lambda that is not an argument");
     }
 
+    // MC1007 and MC1004. A pattern at the top of a test that declares a variable stores the value that it
+    // tests in the variable, as a declaration does. A pattern that declares no variable only tests the value.
+    [Test]
+    public async Task APatternThatDeclaresAVariableStoresTheValueThatItTests()
+    {
+        const string fail = "throw new InvalidOperationException();";
+
+        IReadOnlyList<Diagnostic> isVar =
+            await AnalyzeBody(statements: $"if (construct is var h)\n{{\nreturn Helpers.Finish(handle: h);\n}}\n{fail}")
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        IReadOnlyList<Diagnostic> property =
+            await AnalyzeBody(
+                    statements: $"if (construct is {{ }} h)\n{{\nreturn Helpers.Finish(handle: h);\n}}\n{fail}")
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        IReadOnlyList<Diagnostic> both =
+            await AnalyzeBody(
+                    statements:
+                    $"if (construct is var h and not null)\n{{\nreturn Helpers.Finish(handle: h);\n}}\n{fail}")
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        IReadOnlyList<Diagnostic> switchExpression =
+            await AnalyzeBody(statements: "return construct switch { var h => Helpers.Finish(handle: h) };")
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        IReadOnlyList<Diagnostic> switchStatement =
+            await AnalyzeBody(
+                    statements: $"switch (construct)\n{{\ncase var h:\nreturn Helpers.Finish(handle: h);\n}}\n{fail}")
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        IReadOnlyList<Diagnostic> kept =
+            await AnalyzeBody(
+                    statements:
+                    $"if (construct is var h)\n{{\nreturn h.Construct({Samples.Make});\n}}\n{fail}")
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        IReadOnlyList<Diagnostic> keptBySwitch =
+            await AnalyzeBody(statements: $"return construct switch {{ var h => h.Construct({Samples.Make}) }};")
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        IReadOnlyList<Diagnostic> tested =
+            await AnalyzeBody(
+                    statements:
+                    $"if (construct is null)\n{{\n{fail}\n}}\nreturn construct.Construct({Samples.Make});")
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        IReadOnlyList<Diagnostic> foreign =
+            await AnalyzeBody(
+                    statements: $$"""
+                                  if (Constructor.From(values: new Thing(values: new Values())) is var other)
+                                  {
+                                      return other.Construct(constructor: static thing => thing);
+                                  }
+
+                                  return construct.Construct({{Samples.Make}});
+                                  """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        foreach (IReadOnlyList<Diagnostic> found in new[] { isVar, property, both, switchExpression, switchStatement })
+        {
+            await Assert.That(Ids(found: found))
+                .IsEquivalentTo(expected: ["MC1007"], ordering: CollectionOrdering.Matching);
+
+            await Assert.That(Covered(found: found))
+                .IsEquivalentTo(expected: ["h"], ordering: CollectionOrdering.Matching);
+
+            await Assert.That(found[0].GetMessage())
+                .IsEqualTo(
+                    expected: "The handle construct is given to Finish, and the analyzer cannot follow it there");
+        }
+
+        await Assert.That(kept).IsEmpty();
+        await Assert.That(keptBySwitch).IsEmpty();
+        await Assert.That(tested).IsEmpty();
+
+        await Assert.That(Ids(found: foreign))
+            .IsEquivalentTo(expected: ["MC1004"], ordering: CollectionOrdering.Matching);
+    }
+
     // The attribute is conditional, and a library that does not define its symbol does not have it in
     // its assembly. The analyzer then cannot read it, and it reports the lambda. This is why it knows
     // the members of SodaFlow by name.
