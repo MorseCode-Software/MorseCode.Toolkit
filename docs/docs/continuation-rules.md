@@ -158,7 +158,9 @@ code may be correct. The rule says only that the other rules can't check it past
 The analyzer follows the handle through these uses, and reports none of them:
 
 - A call to `Construct`, `Select`, or `Advance` on it.
-- A local variable that holds it, wherever the variable is read.
+- A local variable that holds it, wherever the variable is read. That includes a variable that a
+  pattern declares for the whole value it tests, as in `construct is var next` or a switch arm
+  `var next => ...`. A pattern that declares nothing only tests the handle.
 - Passing it to a continuation, which is how a base hands it to its subclass.
 - Passing it to the constructor of a type that derives from `Stage<,,>` or `Constructor<T>`, which
   is how you write a stage or a handle of your own.
@@ -211,6 +213,17 @@ static T Later<T>(Func<T> f) => f();
 
 Nothing says that `Later` runs the lambda before it returns, so it may keep it. Marking the
 parameter, as in `Later<T>([InstantHandle] Func<T> f)`, removes that report.
+
+A local function runs where it's used, not where it's declared, so the analyzer follows each use. A
+call by its name runs it at the call. Passing it as a delegate is checked exactly like passing a
+lambda, and storing it in a variable is reported.
+
+```csharp
+Constructed<Thing> Make() => construct.Construct(...);
+
+return Make();         // No report.
+return Later(Make);    // MC1007: Later gets Make and can call it after the continuation returns
+```
 
 `[InstantHandle]` works on a method in the same project as the continuation. It usually doesn't
 work on a method from a compiled library: the attribute is conditional, and a library that doesn't
