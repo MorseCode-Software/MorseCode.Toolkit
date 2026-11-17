@@ -33,7 +33,28 @@ public static partial class Disposable
     /// </param>
     /// <returns>The composite.</returns>
     /// <exception cref="ArgumentException">An entry is null.</exception>
-    public static IDisposable Composite([InstantHandle] params IEnumerable<IDisposable> disposables) =>
+    public static IDisposable Composite([InstantHandle] IEnumerable<IDisposable> disposables) =>
+        new CompositeDisposable(disposables);
+
+    /// <summary>
+    ///     Makes one disposable from the disposables that the call gives, as
+    ///     <see cref="Composite(IEnumerable{IDisposable})" /> does.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         Each entry can be an argument of its own, as in
+    ///         <c>Disposable.Composite(first, second)</c>. A compiler before C# 13 and
+    ///         F# accept that call only for a params array. Thus, this overload has
+    ///         one.
+    ///     </para>
+    /// </remarks>
+    /// <param name="disposables">
+    ///     The entries, in the order of their disposal. The composite keeps a copy,
+    ///     thus a subsequent change to the array has no effect.
+    /// </param>
+    /// <returns>The composite.</returns>
+    /// <exception cref="ArgumentException">An entry is null.</exception>
+    public static IDisposable Composite([InstantHandle] params IDisposable[] disposables) =>
         new CompositeDisposable(disposables);
 
     // ReSharper disable once InheritdocConsiderUsage - The summary of IDisposable does not say what this type disposes or in which order.
@@ -69,8 +90,8 @@ public static partial class Disposable
         /// <inheritdoc />
         /// <remarks>
         ///     The first call disposes each entry. Each subsequent call does nothing. The
-        ///     remarks of <see cref="Composite" /> give the order and the result of an
-        ///     exception.
+        ///     remarks of <see cref="Composite(IEnumerable{IDisposable})" /> give the
+        ///     order and the result of an exception.
         /// </remarks>
         /// <exception cref="AggregateException">Two or more entries threw an exception.</exception>
         public void Dispose()
