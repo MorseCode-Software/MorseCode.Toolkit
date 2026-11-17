@@ -11,10 +11,12 @@ namespace MorseCode.StagedConstruction;
 ///     <para>
 ///         A continuation returns the result of <c>Construct</c>. Or, it returns
 ///         the result of <c>Advance</c> on the handle for the subsequent step,
-///         which gives that result back without a change. A continuation that
-///         returns a different value does not compile. Thus, the compiler checks
-///         that each continuation calls <c>Construct</c>. The handle is the only
-///         source of the values of the base. This type is the only result.
+///         which gives that result back without a change. The compiler checks
+///         only the type of the value that a continuation returns. Thus, a
+///         continuation that does not call <c>Construct</c> compiles only if it
+///         returns null or the result of a different handle. The analyzer of this
+///         package reports these two values. The handle is the only source of the
+///         values of the base. This type is the only result.
 ///     </para>
 ///     <para>
 ///         The first stage of a base is its static <c>CreateBase</c> method. It
