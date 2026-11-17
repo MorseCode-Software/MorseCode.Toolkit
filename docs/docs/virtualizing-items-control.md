@@ -63,7 +63,9 @@ different instant.
 The control follows the source only while it is in a visual tree. When the view leaves the tree, as
 it does when a tab closes or a page navigates away, the control removes its handlers from the
 source. A view model that outlives its view therefore does not keep the view alive. When the view
-returns to a tree, the control reads the source again and catches up with whatever changed.
+returns to a tree, the control reads the source again and catches up with whatever changed. If the
+control is reusing row views, which it does by default for a XAML `DataTemplate`, each row on screen
+also keeps its view, so the return builds no new ones.
 
 ## The view model
 
