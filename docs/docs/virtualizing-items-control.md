@@ -12,12 +12,13 @@ It is not a replacement for an Avalonia control. Use it where you would use an `
 `ListBox` over a SodaFlow `ReactiveCollection`, and the rows are view models that cost something to
 make: they hold bindables, subscriptions, or a query of their own.
 
-The control is made for SodaFlow. It has one property to bind, `Source`, and one helper that makes
-the object to bind it to. The sections below show both.
+The control is made for SodaFlow. It has one property to bind, `Source`, and helper methods that
+make the object to bind it to: `CreateVirtualItemsSource`, and `CreateVirtualItemsSourceByKey` for
+scroll requests by key. The sections below show them.
 
-They come in two packages. The control is in `MorseCode.Controls.UI.Avalonia`. The helper, and every
-type your view model touches, is in `MorseCode.Controls.ViewModels`, which has no dependency on
-Avalonia. So the project that holds your view models does not need one either.
+They come in two packages. The control is in `MorseCode.Controls.UI.Avalonia`. The helpers, and
+every type your view model touches, are in `MorseCode.Controls.ViewModels`, which has no
+dependency on Avalonia. So the project that holds your view models does not need one either.
 
 ## How it works
 
@@ -234,6 +235,7 @@ Each overload takes an optional `Stream<Unit>` of clears. See
 | `Source` | The one object that the control reads from and reports to. |
 | `PlaceholderTemplate` | What a position shows until its row arrives. |
 | `ItemTemplate` | What a row shows, as on any items control. |
+| `RecyclesRowViews` | Whether the control keeps the view of a row that leaves the screen and gives it to the next row, for a row template that reuses its view. `True` by default. See [The row view decides what a scroll costs](#the-row-view-decides-what-a-scroll-costs). |
 
 ### Scroll from the view model
 
