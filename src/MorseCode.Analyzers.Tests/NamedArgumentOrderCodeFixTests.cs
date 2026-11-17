@@ -170,7 +170,8 @@ internal sealed class NamedArgumentOrderCodeFixTests
     }
 
     // The other kinds of call that the rule reads: an indexer, a new, and the base type of a primary
-    // constructor. An attribute keeps the assignments of its properties after its constructor arguments.
+    // constructor. An indexer in an object initializer is also one. An attribute keeps the assignments of its
+    // properties after its constructor arguments.
     [Test]
     public async Task EachKindOfArgumentListIsFixed()
     {
@@ -181,6 +182,13 @@ internal sealed class NamedArgumentOrderCodeFixTests
 
             [Mark(b: 2, a: 1, Extra = 3)]
             public sealed class Marked;
+
+            public sealed class Board
+            {
+                public int this[int row, int column] { get => row * column; set { } }
+
+                public static Board Make() => new() { [column: 2, row: 1] = 3 };
+            }
             """;
 
         const string source =
@@ -207,7 +215,10 @@ internal sealed class NamedArgumentOrderCodeFixTests
                     source.Replace(oldValue: "grid[column: 2, row: 1]", newValue: "grid[row: 1, column: 2]"),
                     source.Replace(oldValue: "new Base(b: 2, a: 1)", newValue: "new Base(a: 1, b: 2)"),
                     source.Replace(oldValue: "Base(b: 2, a: 1);", newValue: "Base(a: 1, b: 2);"),
-                    source.Replace(oldValue: "[Mark(b: 2, a: 1, Extra = 3)]", newValue: "[Mark(a: 1, b: 2, Extra = 3)]")
+                    source.Replace(
+                        oldValue: "[Mark(b: 2, a: 1, Extra = 3)]",
+                        newValue: "[Mark(a: 1, b: 2, Extra = 3)]"),
+                    source.Replace(oldValue: "[column: 2, row: 1] = 3", newValue: "[row: 1, column: 2] = 3")
                 ],
                 ordering: CollectionOrdering.Matching);
     }
