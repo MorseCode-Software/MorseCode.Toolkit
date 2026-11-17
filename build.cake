@@ -426,6 +426,35 @@ List<string> PrefixesOf(string tag, IEnumerable<string> prefixes) =>
 bool IsTagOf(string tag, string prefix) =>
     tag.StartsWith(prefix, StringComparison.Ordinal) && tag.Length > prefix.Length && char.IsDigit(tag[prefix.Length]);
 
+// The one package that a tag releases. Thrown rather than skipped, for a tag that names no package as
+// for one that names more than one: a tag build that quietly released nothing is the failure hardest to
+// notice, and publishing the wrong package cannot be undone. The likely way to name none is a tag with
+// the prefix that a package had before a rename, such as morsecode-avalonia-controls- for what is now
+// MorseCode.Controls.UI.Avalonia. The message lists the prefixes that the projects declare now.
+(string Id, FilePath Project) PackageOfTag(string tag, Dictionary<string, (string Id, FilePath Project)> packages)
+{
+    var prefixes = PrefixesOf(tag, packages.Keys);
+
+    if (prefixes.Count == 0)
+    {
+        throw new Exception(
+            $"Tag '{tag}' does not name a package in this repository, so this build would release " +
+            "nothing. A release tag is the MinVerTagPrefix of a project under src followed by its version. " +
+            "The prefixes are: " +
+            string.Join(", ", packages.Keys.OrderBy(p => p, StringComparer.Ordinal)) + ". " +
+            "Delete the tag, and push one with the prefix of the package.");
+    }
+
+    if (prefixes.Count > 1)
+    {
+        throw new Exception(
+            $"Tag '{tag}' matches more than one package prefix: {string.Join(", ", prefixes)}. " +
+            "Rename one of them so that neither extends the other.");
+    }
+
+    return packages[prefixes[0]];
+}
+
 // The projects that a project file names in a ProjectReference. The references that
 // src/Directory.Build.props adds are analyzers, which a package does not depend on, and they are not
 // in the project file.
@@ -544,7 +573,9 @@ List<string> UnreleasedReferences(FilePath project, Dictionary<string, (string I
 // through a different project, with the last tag of that project. It does not see a change that is
 // not in those folders, for example in src/Directory.Build.props.
 Task("Verify-Release-Order")
-    .Description("Fails when the tagged package compiles against a package here that changed after its last tag.")
+    .Description(
+        "Fails when the tag names no package, or when the tagged package compiles against a package here that " +
+        "changed after its last tag.")
     .Does(() =>
 {
     // With --tag, the check runs for a tag before the push.
@@ -561,17 +592,10 @@ Task("Verify-Release-Order")
         return;
     }
 
+    // Fails here, before the build and the tests, for a tag that names no package or more than one. This
+    // failure skips the publish job, which would otherwise release nothing or the wrong package.
     var packages = PackagesByPrefix();
-    var prefixes = PrefixesOf(tag, packages.Keys);
-
-    // Publish refuses a tag that names more than one package, and skips one that names none.
-    if (prefixes.Count != 1)
-    {
-        Information("Tag '{0}' does not name exactly one package - nothing to check.", tag);
-        return;
-    }
-
-    var (packageId, project) = packages[prefixes[0]];
+    var (packageId, project) = PackageOfTag(tag, packages);
     var unreleased = UnreleasedReferences(project, packages);
 
     if (unreleased.Count > 0)
@@ -622,29 +646,10 @@ Task("Publish")
             + "by the MorseCodeSoftware organization.");
     }
 
-    var packagesByPrefix = PackagesByPrefix();
-
-    // More than one match is refused rather than tie-broken, because publishing the wrong package
-    // cannot be undone.
-    var prefixes = PrefixesOf(tag, packagesByPrefix.Keys);
-
-    if (prefixes.Count == 0)
-    {
-        Information("Tag '{0}' does not name a package in this repository - skipping NuGet push.", tag);
-        Information(
-            "Known prefixes: {0}",
-            string.Join(", ", packagesByPrefix.Keys.OrderBy(p => p, StringComparer.Ordinal)));
-        return;
-    }
-
-    if (prefixes.Count > 1)
-    {
-        throw new Exception(
-            $"Tag '{tag}' matches more than one package prefix: {string.Join(", ", prefixes)}. " +
-            "Rename one of them so that neither extends the other.");
-    }
-
-    var packageId = packagesByPrefix[prefixes[0]].Id;
+    // Verify-Release-Order already failed for a tag that names no package or more than one, and its
+    // failure skips this job. Checked again, so that this target alone never pushes the wrong package or
+    // quietly pushes none.
+    var (packageId, _) = PackageOfTag(tag, PackagesByPrefix());
     Information("Tag '{0}' releases {1}.", tag, packageId);
 
     // Matched by name rather than by glob, which would also match every package whose id extends
