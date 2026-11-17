@@ -24,8 +24,13 @@ public static class VirtualItemsSourceExtensions
     /// <remarks>
     ///     <para>
     ///         The count of the control is the number of keys in the collection. The count, the rows,
-    ///         and their offset come from one cell, so that they always agree. The request is the one
-    ///         that <c>CreateScrollRequest</c> makes.
+    ///         and their offset come from one cell, so that they always agree.
+    ///     </para>
+    ///     <para>
+    ///         <see cref="IVirtualItemsSource.ScrollRequest" /> is none at first. Each position on
+    ///         <paramref name="scrollRequests" /> makes it a request for that position, with the next
+    ///         number. A report of the control clears the request only if it is the request that is
+    ///         there now. Each value on <paramref name="clears" /> sets the request to none.
     ///     </para>
     ///     <para>
     ///         The <c>Map</c> keeps a row for a key that left the slice until more than
