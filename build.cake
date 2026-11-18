@@ -610,20 +610,14 @@ Task("Verify-Release-Order")
     Information("Tag '{0}' releases {1}, and each package that it compiles against is released.", tag, packageId);
 });
 
-Task("Publish")
-    .Description("Pushes the one package this build's tag names to nuget.org.")
-    .Does(() =>
-{
-    // Gated on a tag, and a tag build publishes exactly the one package its tag names, so the order
-    // packages reach nuget.org is the order their tags are pushed. Push dependencies first, and wait
-    // for each run to publish before pushing the next.
-    if (!BuildSystem.IsRunningOnGitHubActions ||
-        GitHubActions.Environment.Workflow.RefType != GitHubActionsRefType.Tag)
-    {
-        Information("Not a tag build - skipping NuGet push.");
-        return;
-    }
+// True for the build of a tag in GitHub Actions, which is the one build that publishes.
+bool IsTagBuild() =>
+    BuildSystem.IsRunningOnGitHubActions &&
+    GitHubActions.Environment.Workflow.RefType == GitHubActionsRefType.Tag;
 
+// The tag of this build. Call it only on a tag build.
+string BuildTag()
+{
     var tag = GitHubActions.Environment.Workflow.RefName;
     if (string.IsNullOrEmpty(tag))
     {
@@ -631,6 +625,50 @@ Task("Publish")
             "This is a tag build but the tag name is empty, so there is no way to tell which " +
             "package it releases.");
     }
+
+    return tag;
+}
+
+// The one package file of a package in artifacts.
+FilePath PackageFileOf(string packageId)
+{
+    // Matched by name rather than by glob, which would also match every package whose id extends
+    // this one. The legacy *.symbols.nupkg that IncludeSymbols emits is excluded, because nuget.org
+    // rejects it.
+    var packages = GetFiles($"{artifactsDirectory.Path}/*.nupkg")
+        .Where(p => !p.GetFilename().FullPath.EndsWith(".symbols.nupkg", StringComparison.OrdinalIgnoreCase))
+        .Where(p =>
+        {
+            var name = p.GetFilename().FullPath;
+            return name.StartsWith(packageId + ".", StringComparison.OrdinalIgnoreCase) &&
+                   name.Length > packageId.Length + 1 &&
+                   char.IsDigit(name[packageId.Length + 1]);
+        })
+        .ToList();
+
+    if (packages.Count != 1)
+    {
+        throw new Exception(
+            $"Expected exactly one {packageId} package in artifacts, found {packages.Count}.");
+    }
+
+    return packages[0];
+}
+
+Task("Publish")
+    .Description("Pushes the one package this build's tag names to nuget.org.")
+    .Does(() =>
+{
+    // Gated on a tag, and a tag build publishes exactly the one package its tag names, so the order
+    // packages reach nuget.org is the order their tags are pushed. Push dependencies first, and wait
+    // for each run to publish before pushing the next.
+    if (!IsTagBuild())
+    {
+        Information("Not a tag build - skipping NuGet push.");
+        return;
+    }
+
+    var tag = BuildTag();
 
     // Minted by the NuGet login step in build.yml through trusted publishing; nothing here stores a
     // key. Thrown rather than skipped: a tag build that quietly released nothing is the failure
@@ -652,31 +690,12 @@ Task("Publish")
     var (packageId, _) = PackageOfTag(tag, PackagesByPrefix());
     Information("Tag '{0}' releases {1}.", tag, packageId);
 
-    // Matched by name rather than by glob, which would also match every package whose id extends
-    // this one. The legacy *.symbols.nupkg that IncludeSymbols emits is excluded, because nuget.org
-    // rejects it.
-    var packages = GetFiles($"{artifactsDirectory.Path}/*.nupkg")
-        .Where(p => !p.GetFilename().FullPath.EndsWith(".symbols.nupkg", StringComparison.OrdinalIgnoreCase))
-        .Where(p =>
-        {
-            var name = p.GetFilename().FullPath;
-            return name.StartsWith(packageId + ".", StringComparison.OrdinalIgnoreCase) &&
-                   name.Length > packageId.Length + 1 &&
-                   char.IsDigit(name[packageId.Length + 1]);
-        })
-        .ToList();
-
-    if (packages.Count != 1)
-    {
-        throw new Exception(
-            $"Expected exactly one {packageId} package in artifacts, found {packages.Count}.");
-    }
-
-    Information("Pushing {0} to {1}", packages[0].GetFilename(), nugetSource);
+    var package = PackageFileOf(packageId);
+    Information("Pushing {0} to {1}", package.GetFilename(), nugetSource);
 
     // --skip-duplicate makes re-running a tag build a no-op for a package it already pushed.
     DotNetNuGetPush(
-        packages[0].FullPath,
+        package.FullPath,
         new DotNetNuGetPushSettings
         {
             ApiKey = apiKey,
