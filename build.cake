@@ -54,8 +54,9 @@ var mirroredInspectionSettings = new[]
 {
     File("./samples/Workbench/MorseCode.Toolkit.Samples.Workbench.sln.DotSettings"),
 };
-// Overridable so a release can be rehearsed against a local folder feed. nuget.org does not allow a
-// version to be deleted or reused.
+// Overridable so a release can be rehearsed against a local folder feed: --tag names the package, and
+// this names the folder. RELEASING.md gives the command. nuget.org does not allow a version to be
+// deleted or reused.
 var nugetSource = Argument("nuget-source", "https://api.nuget.org/v3/index.json");
 
 //////////////////////////////////////////////////////////////////////
@@ -583,13 +584,7 @@ Task("Verify-Release-Order")
     .Does(() =>
 {
     // With --tag, the check runs for a tag before the push.
-    var tag = Argument(
-        "tag",
-        BuildSystem.IsRunningOnGitHubActions &&
-        GitHubActions.Environment.Workflow.RefType == GitHubActionsRefType.Tag
-            ? GitHubActions.Environment.Workflow.RefName
-            : string.Empty);
-
+    var tag = ReleaseTag();
     if (string.IsNullOrEmpty(tag))
     {
         Information("Not a tag build, and no --tag was given - nothing to check.");
@@ -620,11 +615,12 @@ bool IsTagBuild() =>
     BuildSystem.IsRunningOnGitHubActions &&
     GitHubActions.Environment.Workflow.RefType == GitHubActionsRefType.Tag;
 
-// The tag of this build. Call it only on a tag build.
-string BuildTag()
+// The tag that this run releases: --tag, or else the tag of a tag build. Empty for each other run. Thus,
+// --tag runs the release tasks on a machine, for a rehearsal, with the tag that a push gives.
+string ReleaseTag()
 {
-    var tag = GitHubActions.Environment.Workflow.RefName;
-    if (string.IsNullOrEmpty(tag))
+    var tag = Argument("tag", IsTagBuild() ? GitHubActions.Environment.Workflow.RefName : string.Empty);
+    if (IsTagBuild() && string.IsNullOrEmpty(tag))
     {
         throw new Exception(
             "This is a tag build but the tag name is empty, so there is no way to tell which " +
@@ -633,6 +629,13 @@ string BuildTag()
 
     return tag;
 }
+
+// The feed as a URL, or null when it is a folder.
+Uri FeedUrl() =>
+    Uri.TryCreate(nugetSource, UriKind.Absolute, out var source) &&
+    (source.Scheme == Uri.UriSchemeHttp || source.Scheme == Uri.UriSchemeHttps)
+        ? source
+        : null;
 
 // The one package file of a package in artifacts.
 FilePath PackageFileOf(string packageId)
@@ -711,8 +714,8 @@ async Task<bool> IsOnFeed(HttpClient client, string id, string version)
     var lowerId = id.ToLowerInvariant();
     var lowerVersion = version.Split('+')[0].ToLowerInvariant();
 
-    if (!Uri.TryCreate(nugetSource, UriKind.Absolute, out var source) ||
-        (source.Scheme != Uri.UriSchemeHttp && source.Scheme != Uri.UriSchemeHttps))
+    var source = FeedUrl();
+    if (source == null)
     {
         return FolderFeedHas(lowerId, lowerVersion);
     }
@@ -767,13 +770,13 @@ Task("Verify-Published-Dependencies")
     .Description("Fails when the package to publish depends on a package here that is not on the feed yet.")
     .Does(async () =>
 {
-    if (!IsTagBuild())
+    var tag = ReleaseTag();
+    if (string.IsNullOrEmpty(tag))
     {
-        Information("Not a tag build - nothing to check.");
+        Information("Not a tag build, and no --tag was given - nothing to check.");
         return;
     }
 
-    var tag = BuildTag();
     var (packageId, _) = PackageOfTag(tag, PackagesByPrefix());
     Information("Tag '{0}' releases {1}.", tag, packageId);
 
@@ -826,19 +829,27 @@ Task("Publish")
     // Gated on a tag, and a tag build publishes exactly the one package its tag names, so the order
     // packages reach nuget.org is the order their tags are pushed. Verify-Published-Dependencies
     // refuses a package that is early. RELEASING.md gives the order.
-    if (!IsTagBuild())
+    var tag = ReleaseTag();
+    if (string.IsNullOrEmpty(tag))
     {
-        Information("Not a tag build - skipping NuGet push.");
+        Information("Not a tag build, and no --tag was given - skipping NuGet push.");
         return;
     }
 
-    var tag = BuildTag();
+    // A rehearsal pushes to a folder only. From a machine, a push to a URL is a real release, and
+    // nobody can replace a version on nuget.org.
+    if (!IsTagBuild() && FeedUrl() != null)
+    {
+        throw new Exception(
+            $"--tag rehearses a release, and a rehearsal pushes only to a folder, not to {nugetSource}. " +
+            "Give --nuget-source=<folder>. A release pushes its tag, and GitHub Actions publishes it.");
+    }
 
     // Minted by the NuGet login step in build.yml through trusted publishing; nothing here stores a
     // key. Thrown rather than skipped: a tag build that quietly released nothing is the failure
-    // hardest to notice.
+    // hardest to notice. A push to a folder needs no key.
     var apiKey = EnvironmentVariable("NUGET_API_KEY");
-    if (string.IsNullOrEmpty(apiKey))
+    if (IsTagBuild() && string.IsNullOrEmpty(apiKey))
     {
         throw new Exception(
             "NUGET_API_KEY is not set. It is minted by the NuGet login step in "
@@ -862,7 +873,7 @@ Task("Publish")
         package.FullPath,
         new DotNetNuGetPushSettings
         {
-            ApiKey = apiKey,
+            ApiKey = string.IsNullOrEmpty(apiKey) ? null : apiKey,
             Source = nugetSource,
             SkipDuplicate = true,
         });

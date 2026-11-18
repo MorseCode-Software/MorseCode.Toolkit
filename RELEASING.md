@@ -54,6 +54,25 @@ runs the Publish job again, and the job pushes the package that the run already 
 attempt can't download that package, **Re-run all jobs** builds it again from the same tag, at the
 same version.
 
+## Rehearse a release
+
+You can run the release on your own machine, against a folder instead of nuget.org. Do it in a
+scratch clone, so the tags you add there can't be pushed by accident. Tag the commit in the clone,
+pack, and then publish with `--tag` and a folder:
+
+```bash
+dotnet cake --target=Pack
+```
+
+```bash
+dotnet cake --target=Publish --tag=morsecode-mvvm-0.3.0 --nuget-source=C:/feed
+```
+
+`--tag` stands in for the tag that GitHub Actions would build. Publish runs the dependency check
+against the folder first, so a package whose dependency isn't in the folder yet is refused there,
+just as it would be on nuget.org. With `--tag`, Publish pushes only to a folder: it refuses a URL,
+so a rehearsal can't publish by mistake.
+
 ## After a release
 
 The samples reference published packages at a pinned version. Moving them to the new version is a
