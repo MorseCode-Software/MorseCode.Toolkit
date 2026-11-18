@@ -64,6 +64,10 @@ the dependencies between the packages of this repository already did: SodaFlow.B
 ceiling now gets NuGet warning NU1608 at restore, where before it got nothing and could fail at run
 time. A SodaFlow major therefore needs a release of this package, even when nothing here changes.
 
+New: each assembly in the package carries its PDB, with Source Link to the commit on GitHub. A
+debugger can step into the source with no symbol server, and a stack trace on .NET shows line
+numbers. The package has a readme, and its metadata gives the URL of the repository.
+
 0.2.4
 
 New: BindableFactoryExtensions.CreateScrollRequest, an extension method of

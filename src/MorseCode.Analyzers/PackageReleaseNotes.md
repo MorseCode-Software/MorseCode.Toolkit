@@ -22,6 +22,9 @@ is not offered for a parameter that a member captures, that a lambda uses, or th
 does not change a ref, out, or ref readonly parameter. Each fix has a fix of all reports for a
 document, a project, and a solution.
 
+New: each assembly in the package carries its PDB, with Source Link to the commit on GitHub. The
+package has a readme, and its metadata gives the URL of the repository.
+
 0.1.2
 
 New rule: MC0003 reports a primary constructor parameter of a class or a struct that is not
