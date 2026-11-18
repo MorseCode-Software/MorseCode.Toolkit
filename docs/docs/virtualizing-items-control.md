@@ -108,9 +108,11 @@ It holds two ranges:
 | `Visible` | The positions on screen. A row that is only partly on screen counts. |
 | `Constructed` | The positions that the control wants rows for: the visible ones, and more on each side, so that a scroll finds its rows ready. |
 
-Both ranges stay inside the list. `CreateVirtualItemsSource` builds the rows of `Constructed` for
-you. The source that it returns carries the type of your rows, and your view model can read the
-report and the rows from it:
+Both ranges stay inside the list. When `Constructed` is cut short by the end of the list, the
+report also carries `Ahead`: the number of positions past the end that the control would want rows
+for if the list had them. It is 0 anywhere else. `CreateVirtualItemsSource` builds the rows of
+`Constructed`, and of `Ahead` once the list grows into it, for you. The source that it returns
+carries the type of your rows, and your view model can read the report and the rows from it:
 
 ```csharp
 IVirtualItemsSource<RowViewModel> source = output.CreateVirtualItemsSource(
@@ -177,6 +179,19 @@ again at every step of a scroll:
 ```csharp
 Cell<ItemRange> constructed = reported.Map(static range => range.Constructed).Calm();
 ```
+
+To get a row that is added at the end of the list onto the screen together with the new count, also
+build rows for the `Ahead` positions that your count covers. Widen the range before you calm it:
+
+```csharp
+Cell<ItemRange> wanted =
+    reported
+        .Map(static range => range.Constructed with { Count = range.Constructed.Count + range.Ahead })
+        .Calm();
+```
+
+Without that, the row arrives a step later. See
+[The control decides how far ahead to ask](#the-control-decides-how-far-ahead-to-ask).
 
 ### When every row already exists
 
@@ -393,10 +408,16 @@ size. There is no setting for it.
 
 A row that is added at an end of the list that is on screen does not show as a placeholder first.
 A source made from a collection delivers the row together with the new count, because its slice
-reaches past the end of the list. A list that is read at its end while rows arrive, such as a log,
-is the usual case. A view model that builds its own rows gets there in two steps: the control
-reports again as soon as it sees the new count, and the view model answers with the row. With the
-default panel that happens before the next layout.
+reaches past the end of the list by `Ahead` positions. A list that is read at its end while rows
+arrive, such as a log, is the usual case. A view model that builds its own rows does the same if it
+builds rows for `Ahead` too, as shown in
+[When the rows do not come from a collection](#when-the-rows-do-not-come-from-a-collection).
+
+If it builds rows only for `Constructed`, it gets there in two steps: the control reports again as
+soon as it sees the new count, and the view model answers with the row. With the default panel that
+happens before the next layout, so no placeholder shows. With a panel other than the default
+`VirtualizingStackPanel`, the second report can wait for a layout, and that layout shows a
+placeholder at the new position.
 
 ### The control uses the style of `ListBox`
 
@@ -427,6 +448,57 @@ The control gives Avalonia its own list, one position per item. Setting `ItemsSo
   by one. Avalonia does not keep the scroll position on the row that was on screen.
 - **A change of the count by more than 512 positions resets the list.** Avalonia clears its
   containers and makes them again, which is cheaper than an event for every position.
+
+## Write a control for the source
+
+`IVirtualItemsSource` and everything in it are public, and nothing in them depends on Avalonia, so
+another control can drive the same view models: a control for a different UI framework, or a
+different layout of the rows. `VirtualizingItemsControl` uses only the public surface. A control of
+your own has to keep the same rules for the view models to work with it.
+
+Reading the rows:
+
+- Read `Rows` when you attach, and again on each `PropertyChanged`. Take the count, the offset, and
+  the rows from one value, and apply them in one update.
+- Show the row at index `p - Offset` of `Items` at position `p`, and a placeholder at any position
+  the items do not cover. The rows can answer an earlier report, so do not expect them to cover the
+  range you reported last.
+- Read a row from `Items` when you need it. The view model never changes a list after it hands it
+  over.
+
+Reporting:
+
+- Run `RangeReported` whenever the report changes, and not with a report equal to the last one. The
+  action does not drop duplicates, so compare before you run it. Compare a new source with
+  `ReportedRange.Empty`, which is where every source starts.
+- Keep `Visible` and `Constructed` inside the list as you know it, with `Constructed` covering
+  `Visible`, and put the positions you want past the end in `Ahead`.
+- Report again when the count in `Rows` changes, even if no container changed. The ranges stop at
+  the count, so a new count can change them. Without this, the row of a new position comes only
+  with the next scroll.
+- Do not report a smaller range just because you have no containers for a moment, as after the
+  items change and before the next layout. The view model would drop rows that are on screen, the
+  rows would change again, and the cycle would not stop. Keep the last report until the containers
+  are back. Only a list that is empty, or that has just stopped being empty, needs a new report
+  then.
+- Expect the view model to build rows inside the action. It builds them in the transaction of the
+  report, on the thread that runs the action, so a row that is heavy to build holds up that thread.
+  `VirtualizingItemsControl` runs it on the UI thread.
+
+Scrolling:
+
+- Scroll once for each `ScrollRequest` value, then run `ScrollHandled` with that value. Each request
+  has a number of its own, so two requests for the same position are different values.
+- Mark the request as handled before you run `ScrollHandled`. The view model can clear or replace
+  it while the action runs, and that new value must not be marked as handled.
+- Let a position past the end of the list wait until the count reaches it. A negative position can
+  never apply, so report it without scrolling.
+
+Lifetime:
+
+- Remove your handlers from `Rows` and `ScrollRequest` when the control leaves the visual tree, and
+  read both values again when it returns. A view model that outlives its view then does not keep the
+  view alive.
 
 ## Targets and dependencies
 
