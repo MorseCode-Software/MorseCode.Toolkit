@@ -17,6 +17,7 @@
         <Title>MorseCode.Mvvm</Title>
         <Description>Building blocks for view models written in a functional reactive style on SodaFlow.</Description>
         <PackageIcon>MorseCode.png</PackageIcon>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
         <AssemblyName>MorseCode.Mvvm</AssemblyName>
         <RootNamespace>MorseCode.Mvvm</RootNamespace>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
@@ -42,6 +43,7 @@
       <None Include="..\..\logo\MorseCode.png" Pack="true" PackagePath="\">
         <Link>MorseCode.png</Link>
       </None>
+      <None Include="README.md" Pack="true" PackagePath="\"/>
     </ItemGroup>
 
 </Project>

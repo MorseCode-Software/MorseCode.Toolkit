@@ -20,6 +20,7 @@
         <Title>MorseCode.Analyzers</Title>
         <Description>Roslyn analyzers for the conventions that MorseCode Software writes C# with, such as named arguments in the order of the parameters.</Description>
         <PackageIcon>MorseCode.png</PackageIcon>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
         <AssemblyName>MorseCode.Analyzers</AssemblyName>
         <RootNamespace>MorseCode.Analyzers</RootNamespace>
     </PropertyGroup>
@@ -80,6 +81,7 @@
         <None Include="..\..\logo\MorseCode.png" Pack="true" PackagePath="\">
             <Link>MorseCode.png</Link>
         </None>
+        <None Include="README.md" Pack="true" PackagePath="\"/>
     </ItemGroup>
 
 </Project>

@@ -22,6 +22,7 @@
         <Title>MorseCode.Controls.ViewModels</Title>
         <Description>What a view model on SodaFlow gives to a control of the MorseCode toolkit, and the methods that build it. It has no dependency on a UI framework.</Description>
         <PackageIcon>MorseCode.png</PackageIcon>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
         <AssemblyName>MorseCode.Controls.ViewModels</AssemblyName>
         <RootNamespace>MorseCode.Controls.ViewModels</RootNamespace>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
@@ -73,6 +74,7 @@
         <None Include="..\..\logo\MorseCode.png" Pack="true" PackagePath="\">
             <Link>MorseCode.png</Link>
         </None>
+        <None Include="README.md" Pack="true" PackagePath="\"/>
     </ItemGroup>
 
 </Project>
