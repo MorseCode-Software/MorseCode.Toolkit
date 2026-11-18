@@ -29,14 +29,12 @@
         compiler and an editor find them. It
         gives a project no assembly to reference, and no dependency: the compiler supplies Roslyn.
         DevelopmentDependency makes NuGet add the package with PrivateAssets="all", thus it does not
-        flow to the packages of a project that uses it. A symbol package has nothing to hold.
+        flow to the packages of a project that uses it.
     -->
     <PropertyGroup>
         <IncludeBuildOutput>false</IncludeBuildOutput>
         <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
         <DevelopmentDependency>true</DevelopmentDependency>
-        <IncludeSymbols>false</IncludeSymbols>
-        <IncludeSource>false</IncludeSource>
     </PropertyGroup>
 
     <!--
