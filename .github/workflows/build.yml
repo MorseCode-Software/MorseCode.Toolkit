@@ -16,6 +16,11 @@
 #
 # Coverage goes to Coveralls with the run's own GITHUB_TOKEN, so no Coveralls secret exists either.
 # The repository has to be enabled on coveralls.io for the submission to be accepted.
+#
+# EACH ACTION IS PINNED to a commit, with its version in a comment after it. The owner of an action can
+# move a tag such as v7 to other code at any time, and the publish job holds the token that becomes a
+# key for nuget.org. A commit cannot move. Dependabot opens one pull request each week that moves the
+# pins of all the actions; see .github/dependabot.yml.
 name: Build
 
 # Tags are built, and a tag build is what releases a package. Every MinVerTagPrefix here begins
@@ -48,8 +53,8 @@ defaults:
     shell: pwsh
 
 jobs:
-  # The job name is the status check name. If it becomes a required check on main, renaming it
-  # needs a matching ruleset change.
+  # The job name is the status check name, and Build is a required check on main. Renaming it needs a
+  # matching ruleset change.
   build:
     name: Build
     # Windows, for parity with SodaFlow and because the WPF adapters this repository is planned to
@@ -58,13 +63,13 @@ jobs:
     timeout-minutes: 60
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # MinVer reads the full commit graph and every tag. A shallow clone versions every package
           # wrongly.
           fetch-depth: 0
 
-      - uses: actions/setup-dotnet@v6
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
           # 10.0 builds everything. 6.0 and 8.0 run the net6.0 and net8.0 builds of the test
           # projects, which are the one check that the net6.0 and net8.0 builds of the libraries get.
@@ -102,7 +107,7 @@ jobs:
       # check run, because a pull request from a fork cannot create one from here.
       - name: Collect test results
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: test-results
           path: coverage/**/*.trx
@@ -127,7 +132,7 @@ jobs:
       # be seen, while the job still passes. Reporting must not decide whether the code is good.
       - name: Upload coverage
         continue-on-error: true
-        uses: coverallsapp/github-action@v2
+        uses: coverallsapp/github-action@8d6379e14d29928660c4ba802d8e85393440b329 # v2.3.8
         with:
           files: ${{ steps.coverage-files.outputs.files }}
           format: cobertura
@@ -139,14 +144,14 @@ jobs:
 
       - name: Collect packages
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: packages
           path: artifacts/*.nupkg
 
       - name: Collect coverage
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage
           path: coverage
@@ -162,11 +167,11 @@ jobs:
       security-events: write
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-dotnet@v6
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
           dotnet-version: 10.0.x
           cache: true
@@ -178,7 +183,7 @@ jobs:
       # revalidates the sources that changed; build.cake keys a subdirectory by the settings, which
       # it does not revalidate against. The key here hashes the same settings files as that one.
       - name: Cache inspection analysis
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .inspectcode-cache
           key: inspectcode-${{ runner.os }}-${{ hashFiles('src/**/*.cs', 'src/**/*.csproj', 'src/MorseCode.Toolkit.slnx', 'src/MorseCode.Toolkit.sln.DotSettings', '.editorconfig', 'src/**/.editorconfig', 'samples/**/.editorconfig') }}
@@ -201,14 +206,14 @@ jobs:
       - name: Upload inspection results
         if: always()
         continue-on-error: true
-        uses: github/codeql-action/upload-sarif@v4
+        uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         with:
           sarif_file: inspection/inspectcode.sarif
           category: src
 
       - name: Collect inspection
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: inspection
           path: inspection
@@ -228,9 +233,9 @@ jobs:
 
     steps:
       # No fetch-depth: the packages were versioned when they were built.
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-dotnet@v6
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
           dotnet-version: 10.0.x
           cache: true
@@ -242,7 +247,7 @@ jobs:
         run: dotnet tool restore
 
       - name: Download packages
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: packages
           path: artifacts
@@ -253,7 +258,7 @@ jobs:
       # which is jam40jeff. It is a name, not a secret.
       - name: NuGet login
         id: nuget-login
-        uses: NuGet/login@v1
+        uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1.2.0
         with:
           user: jam40jeff
 
