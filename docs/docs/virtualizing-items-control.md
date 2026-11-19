@@ -394,6 +394,11 @@ view model would build rows nobody can see. Make the placeholder about as high a
 If rows differ in height, use a typical height. Avalonia corrects its estimate as real rows
 arrive.
 
+With no `PlaceholderTemplate`, a placeholder is an empty line of text: it shows nothing, and it is
+as high as a line of text in your theme. That keeps Avalonia from the problem above, but a template
+as high as a row keeps the scroll bar steadier. Changing `PlaceholderTemplate` while the list is on
+screen, for example for a new theme, gives the new template to the placeholders already showing.
+
 ### The control decides how far ahead to ask
 
 The control asks for rows beyond the screen, so that a scroll finds them ready. It asks for one
