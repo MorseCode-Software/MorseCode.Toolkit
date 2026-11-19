@@ -510,6 +510,10 @@ Scrolling:
   it while the action runs, and that new value must not be marked as handled.
 - Let a position past the end of the list wait until the count reaches it. A negative position can
   never apply, so report it without scrolling.
+- Let a request wait while your control or one of its parents is hidden, and scroll when the control
+  shows. Do not run `ScrollHandled` before that scroll. A view model can ask while the list is in a
+  collapsed `Expander` or under a panel bound to `IsVisible`, and it expects the request to apply
+  once the list is on screen, as it does with `VirtualizingItemsControl`.
 
 Lifetime:
 
