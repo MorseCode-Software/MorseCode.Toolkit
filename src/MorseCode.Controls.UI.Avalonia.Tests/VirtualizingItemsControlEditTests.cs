@@ -410,6 +410,59 @@ public sealed class VirtualizingItemsControlEditTests
                     .IsEquivalentTo(expected: Rows(first: 0, count: 6), ordering: CollectionOrdering.Matching);
             });
 
+    // A view model with its own rows that reads Ahead builds the row of the new position with the new
+    // count. Thus, no layout shows a placeholder, also with a panel whose range the control cannot read.
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public Task ANewPositionAtAnEndThatShowsComesWithItsRowFromAViewModelWithItsOwnRowsThatReadsAhead(
+        bool recyclingPanel) =>
+        TestApplication.Run(
+            test: async () =>
+            {
+                VirtualModel model = new(total: 5) { ReadsAhead = true };
+                using ShownVirtual shown = Shown(model: model, recyclingPanel: recyclingPanel);
+
+                shown.WatchLayouts();
+
+                model.Resize(total: 6);
+
+                await Assert.That(model.Built).Contains(expected: 5);
+
+                shown.Settle();
+
+                await Assert.That(shown.TextsAtLayouts).IsNotEmpty();
+                await Assert.That(shown.TextsAtLayouts).DoesNotContain(expected: PlaceholderText);
+
+                await Assert.That(Texts(shown: shown))
+                    .IsEquivalentTo(expected: Rows(first: 0, count: 6), ordering: CollectionOrdering.Matching);
+            });
+
+    // A view model with its own rows that does not read Ahead builds the row only at the next report. With
+    // a panel whose range the control cannot read, that report waits for a layout, and the layout shows a
+    // placeholder. This is why the docs tell a view model with its own rows to read Ahead.
+    [Test]
+    public Task ANewPositionAtAnEndThatShowsWaitsForALayoutFromAViewModelWithItsOwnRowsWithARecyclingPanel() =>
+        TestApplication.Run(
+            test: static async () =>
+            {
+                VirtualModel model = new(total: 5);
+                using ShownVirtual shown = Shown(model: model, recyclingPanel: true);
+
+                shown.WatchLayouts();
+
+                model.Resize(total: 6);
+
+                await Assert.That(model.Built).DoesNotContain(expected: 5);
+
+                shown.Settle();
+
+                await Assert.That(shown.TextsAtLayouts).Contains(expected: PlaceholderText);
+
+                await Assert.That(Texts(shown: shown))
+                    .IsEquivalentTo(expected: Rows(first: 0, count: 6), ordering: CollectionOrdering.Matching);
+            });
+
     // A list that was empty has no container until its next layout. The control wants rows for the
     // first positions when the count comes.
     [Test]
@@ -439,4 +492,10 @@ public sealed class VirtualizingItemsControlEditTests
 
     private static List<string> Texts(ShownVirtual shown) =>
         [.. shown.Shown().Select(selector: static pair => pair.Text)];
+
+    // The control with a buffer of 10, with its default panel or with a panel whose range it cannot read.
+    private static ShownVirtual Shown(IVirtualItemsSource model, bool recyclingPanel) =>
+        recyclingPanel
+            ? new ShownVirtual(model: model, buffer: 10, panel: static () => new RecyclingPanel())
+            : new ShownVirtual(model: model, buffer: 10);
 }
