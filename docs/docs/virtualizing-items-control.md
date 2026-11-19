@@ -12,12 +12,13 @@ It is not a replacement for an Avalonia control. Use it where you would use an `
 `ListBox` over a SodaFlow `ReactiveCollection`, and the rows are view models that cost something to
 make: they hold bindables, subscriptions, or a query of their own.
 
-The control is made for SodaFlow. It has one property to bind, `Source`, and one helper that makes
-the object to bind it to. The sections below show both.
+The control is made for SodaFlow. It has one property to bind, `Source`, and helper methods that
+make the object to bind it to: `CreateVirtualItemsSource`, and `CreateVirtualItemsSourceByKey` for
+scroll requests by key. The sections below show them.
 
-They come in two packages. The control is in `MorseCode.Controls.UI.Avalonia`. The helper, and every
-type your view model touches, is in `MorseCode.Controls.ViewModels`, which has no dependency on
-Avalonia. So the project that holds your view models does not need one either.
+They come in two packages. The control is in `MorseCode.Controls.UI.Avalonia`. The helpers, and
+every type your view model touches, are in `MorseCode.Controls.ViewModels`, which has no
+dependency on Avalonia. So the project that holds your view models does not need one either.
 
 ## How it works
 
@@ -249,6 +250,7 @@ Each overload takes an optional `Stream<Unit>` of clears. See
 | `Source` | The one object that the control reads from and reports to. |
 | `PlaceholderTemplate` | What a position shows until its row arrives. |
 | `ItemTemplate` | What a row shows, as on any items control. |
+| `RecyclesRowViews` | Whether the control keeps the view of a row that leaves the screen and gives it to the next row, for a row template that reuses its view. `True` by default. See [The row view decides what a scroll costs](#the-row-view-decides-what-a-scroll-costs). |
 
 ### Scroll from the view model
 
@@ -273,7 +275,7 @@ the same position.
 
 Every overload takes an optional `Stream<Unit>` of clears. Each firing of it sets the request to
 `None`, so the view model can withdraw a request that the control didn't use yet. When a request
-and a clear come in one transaction, the request wins.
+comes in one transaction with a clear or a report, the request wins.
 
 Code runs the action with `scrollToAction.Execute(position)`, and a view binds a `Command` to it as it
 does to any `ICommand`.
@@ -303,7 +305,8 @@ else is the same as with positions: the request waits for the control, the contr
 `clears` withdraw it. The method has its own name rather than being an overload, because a
 collection keyed by `int` would make the two overloads indistinguishable.
 
-- A request for a position beyond `TotalCount` waits until the count grows, and it stays until then.
+- A request for a position beyond the `TotalCount` of `Rows` waits until the count grows, and it
+  stays until then.
   If the list is reloaded later and is long enough by then, the control scrolls to the old position
   at that point, which can surprise the user. Withdraw a request that has gone stale with the
   `clears` stream. A negative position can never apply, so the control reports it at once and does
@@ -313,11 +316,11 @@ collection keyed by `int` would make the two overloads indistinguishable.
   request beyond the count, withdraw it with `clears` if it should not apply by then.
 - A new request replaces one that is waiting. The last request wins.
 - A request that the view model makes while a report is on its way is kept. The report names the
-  position it handled, and the view model clears the request only if it is still that position. The
-  one gap left is a new request for the same position inside that window, which the report clears.
-  The position was just shown, so nothing is lost.
-- The control scrolls once for each request. A change of `TotalCount` before the view model has
-  cleared the request does not scroll again.
+  request it handled, position and number, and the view model clears the request only if it is
+  still that one. A new request for the same position has a new number, so the report does not
+  clear it.
+- The control scrolls once for each request. A change of the `TotalCount` of `Rows` before the view
+  model has cleared the request does not scroll again.
 - The tests of the control use these methods with a real SodaFlow graph, including a request made
   before the view binds. The graph of the request has tests of its own.
 
@@ -507,6 +510,10 @@ Scrolling:
   it while the action runs, and that new value must not be marked as handled.
 - Let a position past the end of the list wait until the count reaches it. A negative position can
   never apply, so report it without scrolling.
+- Let a request wait while your control or one of its parents is hidden, and scroll when the control
+  shows. Do not run `ScrollHandled` before that scroll. A view model can ask while the list is in a
+  collapsed `Expander` or under a panel bound to `IsVisible`, and it expects the request to apply
+  once the list is on screen, as it does with `VirtualizingItemsControl`.
 
 Lifetime:
 
@@ -519,12 +526,14 @@ Lifetime:
 The control is in `MorseCode.Controls.UI.Avalonia`, which targets `net8.0` and `net10.0`, as
 Avalonia 12 does. Reference it from the project that holds your views.
 
-`CreateVirtualItemsSource`, `IVirtualItemsSource`, `VirtualRows`, `ReportedRange`, and `ItemRange`
-are in `MorseCode.Controls.ViewModels`. Reference it from the project that holds your view models.
-It has the same targets as `MorseCode.Mvvm`, and it depends on SodaFlow,
-`SodaFlow.Bindable.ObjectModel`, `SodaFlow.Collections`, and `MorseCode.Mvvm` 0.3.0 or later. The
-source is made of SodaFlow bindable values, and `CreateVirtualItemsSource` works with the `IOutput`
-of a `ViewModelBase`.
+`CreateVirtualItemsSource`, `CreateVirtualItemsSourceByKey`, `IVirtualItemsSource`,
+`IVirtualItemsSource<TRow>`, `VirtualRows`, `ReportedRange`, `ItemRange`, and `ScrollRequest` are
+in `MorseCode.Controls.ViewModels`. Reference it from the project that holds your view models. It
+has the same targets as `MorseCode.Mvvm`. It depends on SodaFlow, `SodaFlow.Bindable.ObjectModel`,
+`SodaFlow.Collections`, `SodaFlow.Functional`, and `MorseCode.Mvvm`, each up to its next breaking
+version: `MorseCode.Mvvm` from 0.3.0 and below 0.4.0. See
+[Version ranges](packages.md#version-ranges). The source is made of SodaFlow bindable values, and
+`CreateVirtualItemsSource` works with the `IOutput` of a `ViewModelBase`.
 
 The control package depends on the view model package. An app that keeps its views and its view
 models in one project needs only the first.

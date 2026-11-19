@@ -79,8 +79,14 @@ first. [Staged construction](staged-construction.md) and
 
 ## VirtualizingItemsControl
 
-The view model follows the recipe on the [VirtualizingItemsControl](virtualizing-items-control.md)
-page:
+The sample pins `MorseCode.Avalonia.Controls` 0.2.1 and `MorseCode.Mvvm` 0.2.4, the published
+versions. Its view model follows the recipe of
+[the control page as it was for 0.2.1](https://github.com/MorseCode-Software/MorseCode.Toolkit/blob/morsecode-avalonia-controls-0.2.1/docs/docs/virtualizing-items-control.md).
+The [VirtualizingItemsControl](virtualizing-items-control.md) page on this site describes 0.3.0,
+where the control binds one `Source` that `MorseCode.Controls.ViewModels` makes, and the
+properties below are gone. The sample moves to it when it pins 0.3.0.
+
+In 0.2.1 the recipe is:
 
 - The window binds the `VisibleRange` of the control, one way to the source, to a bindable value.
   That value writes a `CellSink<ItemRange>`.
@@ -108,9 +114,11 @@ The button **Scroll far down the list** has no code in the window. It binds its 
 - The list scrolls to the position, and writes `Maybe.None` back. That write clears the request.
 
 The request is a value and not an event, so a jump that the view model asks for before the window
-has laid out is not lost. The list keeps it until it can scroll. The control page explains the
-rules, including the one case that can lose a request. See
-[VirtualizingItemsControl](virtualizing-items-control.md).
+has laid out is not lost. The list keeps it until it can scroll.
+[The 0.2.1 control page](https://github.com/MorseCode-Software/MorseCode.Toolkit/blob/morsecode-avalonia-controls-0.2.1/docs/docs/virtualizing-items-control.md#scroll-from-the-view-model)
+explains the rules, including the one case that can lose a request. In 0.3.0 each request has a
+number, which closes that case: see
+[Scroll from the view model](virtualizing-items-control.md#scroll-from-the-view-model).
 
 ## The tests
 
