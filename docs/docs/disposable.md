@@ -28,10 +28,13 @@ A null `onDispose` fails at the call to `FromAction`, and not later in `Dispose`
 ## Disposable.Composite
 
 ```csharp
-IDisposable Disposable.Composite(params IEnumerable<IDisposable> disposables)
+IDisposable Disposable.Composite(params IDisposable[] disposables)
+IDisposable Disposable.Composite(IEnumerable<IDisposable> disposables)
 ```
 
-Makes one disposable from a fixed list. The first `Dispose` disposes each entry one time, in the
+Makes one disposable from a fixed list. Pass the entries as separate arguments, or pass a collection
+you already have. The separate-arguments form is a `params` array, so it works from any C# version
+and from F#. The first `Dispose` disposes each entry one time, in the
 order of the list. Each later call does nothing.
 
 An exception from one entry does not stop the entries after it. When all entries finish:
