@@ -53,7 +53,7 @@ internal sealed class VirtualModel : IVirtualItemsSource
             range.Lift(
                 c2: this.totalCount,
                 c3: released,
-                f: (reported, count, _) => this.Answer(wanted: reported.Constructed, count: count));
+                f: (reported, count, _) => this.Answer(reported: reported, count: count));
 
         // Each request gets the next number, as in the source of a view model. A report of the request
         // that the model holds clears it, unless the model keeps it.
@@ -125,6 +125,13 @@ internal sealed class VirtualModel : IVirtualItemsSource
     public bool MakesNewRows { get; init; }
 
     /// <summary>
+    ///     Gets or sets whether the model also builds rows for the positions of
+    ///     <see cref="ReportedRange.Ahead" /> that its count has. The docs tell a view
+    ///     model with its own rows that it can do this.
+    /// </summary>
+    public bool ReadsAhead { get; init; }
+
+    /// <summary>
     ///     Gets the position of each request that the view reported as handled, in sequence.
     /// </summary>
     public List<int> ScrollReports { get; } = [];
@@ -183,7 +190,7 @@ internal sealed class VirtualModel : IVirtualItemsSource
         }
     }
 
-    private VirtualRows Answer(ItemRange wanted, int count)
+    private VirtualRows Answer(ReportedRange reported, int count)
     {
         // The count is always current. Only the rows are late.
         if (this.isHeld)
@@ -191,8 +198,9 @@ internal sealed class VirtualModel : IVirtualItemsSource
             return this.lastRows with { TotalCount = count };
         }
 
-        int first = wanted.First;
-        int end = Math.Min(val1: first + wanted.Count, val2: count);
+        int first = reported.Constructed.First;
+        int ahead = this.ReadsAhead ? reported.Ahead : 0;
+        int end = Math.Min(val1: first + reported.Constructed.Count + ahead, val2: count);
         List<object?> items = [];
 
         for (int position = first; position < end; position++)

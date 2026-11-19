@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Presenters;
+using Avalonia.Controls.Templates;
 using MorseCode.Controls.ViewModels;
 using TUnit.Assertions;
 using TUnit.Assertions.Enums;
@@ -162,6 +163,55 @@ public sealed class VirtualizingItemsControlInPlaceTests
 
                 await Assert.That(Texts(shown: shown))
                     .IsEquivalentTo(expected: Rows(first: 0, count: 10), ordering: CollectionOrdering.Matching);
+            });
+
+    // A row that is a ContentControl is its own container. Before, the control set the row template as
+    // the template of that control. The presenter of the control then showed a row view and not its own
+    // content.
+    [Test]
+    public Task ARowThatIsAContentControlKeepsItsOwnContent() =>
+        TestApplication.Run(
+            test: static async () =>
+            {
+                GivenRowsModel model = new();
+                using ShownVirtual shown = new(model: model, buffer: 0);
+
+                Button button = new() { Content = "OK", Height = 20 };
+                TextBlock inside = new() { Text = "inside" };
+                UserControl view = new() { Content = inside, Height = 20 };
+                int built = shown.RowViewsBuilt;
+
+                model.Give(value: new VirtualRows(TotalCount: 2, Offset: 0, Items: [button, view]));
+                shown.Settle();
+
+                await Assert.That(shown.List.ContainerFromIndex(index: 0)).IsSameReferenceAs(expected: button);
+                await Assert.That(shown.List.ContainerFromIndex(index: 1)).IsSameReferenceAs(expected: view);
+                await Assert.That(button.ContentTemplate).IsNull();
+                await Assert.That(view.ContentTemplate).IsNull();
+                await Assert.That((button.Presenter?.Child as TextBlock)?.Text).IsEqualTo(expected: "OK");
+                await Assert.That(view.Presenter?.Child).IsSameReferenceAs(expected: inside);
+                await Assert.That(shown.RowViewsBuilt - built).IsEqualTo(expected: 0);
+            });
+
+    // The template of a row that is a ContentControl belongs to that row, as its content does.
+    [Test]
+    public Task ARowThatIsAContentControlKeepsItsOwnTemplate() =>
+        TestApplication.Run(
+            test: static async () =>
+            {
+                GivenRowsModel model = new();
+                using ShownVirtual shown = new(model: model, buffer: 0);
+
+                FuncDataTemplate<string> template =
+                    new(build: static (text, _) => new TextBlock { Text = "own " + text }, supportsRecycling: false);
+
+                Button button = new() { Content = "OK", ContentTemplate = template, Height = 20 };
+
+                model.Give(value: new VirtualRows(TotalCount: 1, Offset: 0, Items: [button]));
+                shown.Settle();
+
+                await Assert.That(button.ContentTemplate).IsSameReferenceAs(expected: template);
+                await Assert.That((button.Presenter?.Child as TextBlock)?.Text).IsEqualTo(expected: "own OK");
             });
 
     // The rows are higher than the placeholders, and the list came to its position by a jump. Before

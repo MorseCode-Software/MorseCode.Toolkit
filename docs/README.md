@@ -12,17 +12,28 @@ DocFX is pinned as a local .NET tool, so restore it once:
 dotnet tool restore
 ```
 
-Then, from the repository root:
+DocFX reads the projects without building them, but every library in `src/` loads two analyzers,
+`MorseCode.Analyzers` and the analyzer of `MorseCode.StagedConstruction`, and DocFX needs them
+built first. Without them it reports a `FailedToResolveAnalyzer` warning for each. So, from the
+repository root, build both in Release once, which is the configuration `docfx.json` reads:
+
+```bash
+dotnet build src/MorseCode.Analyzers/MorseCode.Analyzers.csproj --configuration Release
+```
+
+```bash
+dotnet build src/MorseCode.StagedConstruction.Analyzers/MorseCode.StagedConstruction.Analyzers.csproj --configuration Release
+```
+
+Then build and serve the site:
 
 ```bash
 dotnet docfx docs/docfx.json --serve
 ```
 
 That extracts API metadata, builds the site into `docs/_site`, and serves it at
-<http://localhost:8080>. Drop `--serve` to build without serving.
-
-Metadata extraction compiles the projects, so the first run takes a while and needs a working
-`dotnet restore`.
+<http://localhost:8080>. Drop `--serve` to build without serving, and add `--warningsAsErrors` to
+build it the way CI does. DocFX restores the projects itself.
 
 ## Layout
 
@@ -63,5 +74,10 @@ and not its built path. Writing the built path instead is a warning, and CI buil
 
 ## Adding a project to the API reference
 
-Add its `.csproj` to the `metadata.src.files` list in `docfx.json`, and make sure the project sets
-`GenerateDocumentationFile`.
+- Add its `.csproj` to the `metadata.src.files` list in `docfx.json`.
+- Add a `dotnet restore` of it to the "Restore projects" step of
+  [`.github/workflows/docs.yml`](../.github/workflows/docs.yml), which names the same projects.
+- Make sure the project sets `GenerateDocumentationFile`.
+- Make sure it has a `net8.0` target. `docfx.json` pins `TargetFramework` to `net8.0` for every
+  project it reads, because the projects target several frameworks and DocFX must see one.
+- Describe the package in `api/index.md`.

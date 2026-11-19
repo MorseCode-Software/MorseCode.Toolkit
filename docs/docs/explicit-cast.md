@@ -87,7 +87,7 @@ add it once in `Directory.Build.props`:
 
 ```xml
 <ItemGroup>
-    <PackageReference Include="MorseCode.Analyzers" Version="0.1.1" PrivateAssets="all"/>
+    <PackageReference Include="MorseCode.Analyzers" Version="0.1.2" PrivateAssets="all"/>
 </ItemGroup>
 ```
 

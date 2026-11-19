@@ -44,7 +44,8 @@ internal sealed class ShownVirtual : IDisposable
             buffer: Maybe<int>.Some(value: buffer),
             panel: Maybe<Func<Panel>>.None,
             rowHeight: DefaultHeight,
-            placeholderHeight: DefaultHeight)
+            placeholderHeight: DefaultHeight,
+            isVisible: true)
     {
     }
 
@@ -62,7 +63,8 @@ internal sealed class ShownVirtual : IDisposable
             buffer: Maybe<int>.Some(value: buffer),
             panel: Maybe<Func<Panel>>.Some(value: panel),
             rowHeight: DefaultHeight,
-            placeholderHeight: DefaultHeight)
+            placeholderHeight: DefaultHeight,
+            isVisible: true)
     {
     }
 
@@ -82,7 +84,8 @@ internal sealed class ShownVirtual : IDisposable
             buffer: Maybe<int>.Some(value: buffer),
             panel: Maybe<Func<Panel>>.None,
             rowHeight: rowHeight,
-            placeholderHeight: placeholderHeight)
+            placeholderHeight: placeholderHeight,
+            isVisible: true)
     {
     }
 
@@ -91,7 +94,8 @@ internal sealed class ShownVirtual : IDisposable
         Maybe<int> buffer,
         Maybe<Func<Panel>> panel,
         int rowHeight,
-        int placeholderHeight)
+        int placeholderHeight,
+        bool isVisible)
     {
         // An app cannot set the number of positions on each side. A test can, with the constructor that
         // an app cannot call.
@@ -113,6 +117,8 @@ internal sealed class ShownVirtual : IDisposable
         this.List.Source = model;
 
         panel.MatchSome(onSome: make => this.List.ItemsPanel = new FuncTemplate<Panel?>(func: make));
+
+        this.List.IsVisible = isVisible;
 
         this.window = new Window { Content = this.List, Width = 300, Height = 200 };
         this.window.Show();
@@ -137,7 +143,26 @@ internal sealed class ShownVirtual : IDisposable
             buffer: Maybe<int>.None,
             panel: Maybe<Func<Panel>>.None,
             rowHeight: rowHeight,
-            placeholderHeight: rowHeight);
+            placeholderHeight: rowHeight,
+            isVisible: true);
+
+    /// <summary>
+    ///     Shows the window with the control not visible, and runs the first layout. A layout does not
+    ///     measure the control. Thus, the control has no template and no panel until it is visible.
+    /// </summary>
+    /// <param name="model">The model.</param>
+    /// <param name="buffer">
+    ///     The number of positions that the control adds on each side of the positions that show.
+    /// </param>
+    /// <returns>The shown window with the control that is not visible.</returns>
+    public static ShownVirtual HiddenAtTheStart(IVirtualItemsSource model, int buffer) =>
+        new(
+            model: model,
+            buffer: Maybe<int>.Some(value: buffer),
+            panel: Maybe<Func<Panel>>.None,
+            rowHeight: DefaultHeight,
+            placeholderHeight: DefaultHeight,
+            isVisible: false);
 
     /// <summary>
     ///     Gets the number of row views that the row template built.
@@ -197,6 +222,22 @@ internal sealed class ShownVirtual : IDisposable
     /// <summary>
     ///     Puts the control back into the window, and runs the layout.
     /// </summary>
+    /// <summary>
+    ///     Puts the control in a border, and runs the layout. A test hides the border to hide the control
+    ///     and keep the visible value of the control.
+    /// </summary>
+    /// <returns>The border that holds the control.</returns>
+    public Border PutInAParent()
+    {
+        this.window.Content = null;
+
+        Border parent = new() { Child = this.List };
+        this.window.Content = parent;
+        this.Settle();
+
+        return parent;
+    }
+
     public void Return()
     {
         this.window.Content = this.List;
