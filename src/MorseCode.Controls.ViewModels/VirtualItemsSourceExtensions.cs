@@ -137,8 +137,10 @@ public static class VirtualItemsSourceExtensions
     /// <remarks>
     ///     <para>
     ///         The source finds the position of a key in the collection in the transaction of the
-    ///         request. Thus, the view model does not keep positions, which move when the collection
-    ///         changes. A key that the collection does not have at that instant makes no request.
+    ///         request, after the edits of that transaction. Thus, the view model does not keep
+    ///         positions, which move when the collection changes. A request can name a key that the
+    ///         same transaction adds. A key that the collection does not have after the transaction
+    ///         makes no request.
     ///     </para>
     ///     <para>
     ///         This method has its own name. A collection with keys of type <c>int</c> would make an
@@ -187,10 +189,16 @@ public static class VirtualItemsSourceExtensions
         return Transaction.Run(
             f: () =>
             {
-                // The position of the key at the instant of the request. A key that is not in the
-                // collection gives none, and the filter drops it.
+                // The position of the key in the keys after the edits of the transaction of the request.
+                // The source makes the rows from the same keys, thus the position and the rows agree.
+                // Snapshot gives the keys from before the edits. With those keys, a key that the
+                // transaction adds makes no request. Also, a removal before the key moves the request
+                // one position too far. The requests do not change the keys, thus SnapshotLatest closes
+                // no loop. A key that is not in the collection gives none, and the filter drops it.
                 Stream<int> positions =
-                    scrollRequests.Snapshot(c: collection.KeysCell, f: static (key, keys) => keys.IndexOf(key: key))
+                    scrollRequests.SnapshotLatest(
+                            c: collection.KeysCell,
+                            f: static (key, keys) => keys.IndexOf(key: key))
                         .FilterSome();
 
                 return output.CreateVirtualItemsSource(
