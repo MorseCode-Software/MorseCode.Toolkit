@@ -44,7 +44,7 @@ pre-1.0, and their APIs will change as the applications built on them teach us w
 <a class="sf-card" href="docs/packages.md">
 <i class="bi bi-box-seam"></i>
 <span class="sf-card-title">Which package do I install?</span>
-<span class="sf-card-text">The two packages, what each one holds, and how they depend on each other.</span>
+<span class="sf-card-text">The packages, what each one holds, and how they depend on each other.</span>
 </a>
 <a class="sf-card" href="docs/staged-construction.md">
 <i class="bi bi-layers"></i>

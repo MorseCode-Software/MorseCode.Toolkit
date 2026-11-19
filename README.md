@@ -66,6 +66,11 @@ The documentation site is at <https://morsecode-software.github.io/MorseCode.Too
   [![Latest Stable Version](https://img.shields.io/nuget/v/MorseCode.Analyzers.svg)](https://www.nuget.org/packages/MorseCode.Analyzers/)
   [![Total Downloads](https://img.shields.io/nuget/dt/MorseCode.Analyzers.svg)](https://www.nuget.org/packages/MorseCode.Analyzers/)
 
+## Releasing
+
+Each package releases on its own, from a tag. [`RELEASING.md`](RELEASING.md) gives the steps and the
+order.
+
 ## License
 
 BSD 3-Clause. See [LICENSE](LICENSE).

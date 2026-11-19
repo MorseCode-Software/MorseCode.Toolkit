@@ -141,13 +141,13 @@ placeholder when its step is no longer than the positions on one side, so a fixe
 for one window size only. With 20 rows on screen and Buffer at 10, every step of one screen showed
 placeholders. Remove Buffer from your XAML.
 
-Breaking: the control reports a ReportedRange where it reported an ItemRange, and the member of the
-source is the action RangeReported, where it was the value VisibleRange. A ReportedRange holds two
-ranges from the same instant. Visible is the positions on screen, where a row that is only partly
-on screen counts, so a view model can now tell what the user sees. Constructed is the positions
-that the control wants rows for. Both stay inside the list. On the overload for a view model with
-its own rows, the parameter visibleRange is now reportedRanges, a StreamSink of ReportedRange. The
-view model holds that stream, and builds rows for Constructed.
+Breaking: the control reports a ReportedRange through the action RangeReported of its Source,
+where 0.2.1 wrote an ItemRange to its own property VisibleRange. A ReportedRange holds two ranges
+from the same instant. Visible is the positions on screen, where a row that is only partly on
+screen counts, so a view model can now tell what the user sees. Constructed is the positions that
+the control wants rows for. Both stay inside the list. A view model with its own rows builds them
+for Constructed. It gets the reports from a StreamSink of ReportedRange that it passes to
+CreateVirtualItemsSource, which the notes of MorseCode.Controls.ViewModels describe.
 
 A row that is added at an end of the list that is on screen no longer shows as a placeholder first.
 A source made from a collection slices past the end of the list by the positions that the control
