@@ -239,8 +239,9 @@ Each overload takes an optional `Stream<Unit>` of clears. See
 
 A view model asks for a scroll through the `ScrollRequest` of its source, and the view doesn't call
 `ScrollIntoView` itself. The request is a value and not an event, so it isn't lost when the view
-model asks before the view is bound, or before the list has laid out. The control keeps the request
-until it can use it, scrolls, and then runs `ScrollHandled` with the request it handled. The view
+model asks before the view is bound, before the list has laid out, or while the list is hidden. The
+control keeps the request until it can use it, scrolls, and then runs `ScrollHandled` with the
+request it handled. The view
 model clears the request when it receives the report, and only if the request is still that one.
 
 `CreateVirtualItemsSource` takes a `Stream<int>` of positions. The request starts as `None`, and
@@ -292,6 +293,9 @@ collection keyed by `int` would make the two overloads indistinguishable.
   at that point, which can surprise the user. Withdraw a request that has gone stale with the
   `clears` stream. A negative position can never apply, so the control reports it at once and does
   not scroll.
+- A request made while the list or one of its parents is hidden, such as in a collapsed `Expander`
+  or under a panel bound to `IsVisible`, waits until the list shows, then scrolls. As with a
+  request beyond the count, withdraw it with `clears` if it should not apply by then.
 - A new request replaces one that is waiting. The last request wins.
 - A request that the view model makes while a report is on its way is kept. The report names the
   position it handled, and the view model clears the request only if it is still that position. The

@@ -173,7 +173,11 @@ public class VirtualizingItemsControl : ItemsControl
 
         // The amount of a row that shows changes with each scroll and with each change of a size, and no
         // container changes then. A layout is the one event that each of those has.
-        this.LayoutUpdated += (_, _) => this.RequestReport();
+        this.LayoutUpdated += (_, _) =>
+        {
+            this.RequestReport();
+            this.RequestWaitingScroll();
+        };
     }
 
     /// <summary>
@@ -570,12 +574,32 @@ public class VirtualizingItemsControl : ItemsControl
                 {
                     this.Handle(request: request);
                 }
-                else if (this.IsLoaded && this.ItemsPanelRoot is not null && request.Position < this.items.Count)
+                else if (this.CanScrollTo(request: request))
                 {
                     this.ScrollIntoView(index: request.Position);
                     this.Handle(request: request);
                 }
             });
+    }
+
+    // The panel does not scroll while it is not visible, and ScrollIntoView then does nothing and says
+    // nothing. Thus, the control keeps the request until the list and each parent are visible.
+    private bool CanScrollTo(ScrollRequest request) =>
+        this.IsLoaded
+        && this.IsEffectivelyVisible
+        && this.ItemsPanelRoot is not null
+        && request.Position < this.items.Count;
+
+    // Avalonia has no public event for a change of IsEffectivelyVisible. Also, a list that the view hides
+    // from the start gets its panel only in its first visible layout. A layout follows each of those changes.
+    // Thus, a layout asks again for a request that waits and can apply now.
+    private void RequestWaitingScroll()
+    {
+        if (!this.isRequestHandled
+            && this.ScrollRequest.Match(onSome: this.CanScrollTo, onNone: static () => false))
+        {
+            this.RequestScroll();
+        }
     }
 
     private void Handle(ScrollRequest request)
