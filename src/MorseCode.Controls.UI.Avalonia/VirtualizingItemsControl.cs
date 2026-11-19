@@ -898,6 +898,7 @@ public class VirtualizingItemsControl : ItemsControl
         private readonly VirtualizingItemsControl owner = owner;
 
         // The table keeps no presenter alive, and the template of a presenter refers to its presenter.
+        // No code removes an entry. The entry goes when the garbage collector frees its presenter.
         private readonly ConditionalWeakTable<ContentPresenter, PresenterTemplate> presenterTemplates = new();
 
         // The views that the row template gave this template. The table keeps no view alive, and a view
