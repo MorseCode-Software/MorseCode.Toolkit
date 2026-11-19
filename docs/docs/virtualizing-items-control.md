@@ -240,8 +240,9 @@ Each overload takes an optional `Stream<Unit>` of clears. See
 
 A view model asks for a scroll through the `ScrollRequest` of its source, and the view doesn't call
 `ScrollIntoView` itself. The request is a value and not an event, so it isn't lost when the view
-model asks before the view is bound, or before the list has laid out. The control keeps the request
-until it can use it, scrolls, and then runs `ScrollHandled` with the request it handled. The view
+model asks before the view is bound, before the list has laid out, or while the list is hidden. The
+control keeps the request until it can use it, scrolls, and then runs `ScrollHandled` with the
+request it handled. The view
 model clears the request when it receives the report, and only if the request is still that one.
 
 `CreateVirtualItemsSource` takes a `Stream<int>` of positions. The request starts as `None`, and
@@ -270,7 +271,8 @@ that are on screen. The scroll brings the position into view, as `ScrollIntoView
 
 A view model usually knows the key of the item it wants to show, not its position, and positions
 move when the collection changes. `CreateVirtualItemsSourceByKey` takes a `Stream<TKey>` instead of
-a `Stream<int>`, and looks the position up in the collection inside the transaction of the request:
+a `Stream<int>`, and looks the position up in the collection inside the transaction of the request,
+after that transaction's edits. A view model can therefore add an item and scroll to it in one step:
 
 ```csharp
 StreamSink<OrderId> scrollTo = Stream.CreateSink<OrderId>();
@@ -282,16 +284,19 @@ IVirtualItemsSource source = output.CreateVirtualItemsSourceByKey(
     onEvicted: static row => row.Dispose());
 ```
 
-A key that the collection doesn't have at that instant makes no request. Everything else is the
-same as with positions: the request waits for the control, the control reports it, and `clears`
-withdraw it. The method has its own name rather than being an overload, because a collection keyed
-by `int` would make the two overloads indistinguishable.
+A key that the collection doesn't have once those edits are applied makes no request. Everything
+else is the same as with positions: the request waits for the control, the control reports it, and
+`clears` withdraw it. The method has its own name rather than being an overload, because a
+collection keyed by `int` would make the two overloads indistinguishable.
 
 - A request for a position beyond `TotalCount` waits until the count grows, and it stays until then.
   If the list is reloaded later and is long enough by then, the control scrolls to the old position
   at that point, which can surprise the user. Withdraw a request that has gone stale with the
   `clears` stream. A negative position can never apply, so the control reports it at once and does
   not scroll.
+- A request made while the list or one of its parents is hidden, such as in a collapsed `Expander`
+  or under a panel bound to `IsVisible`, waits until the list shows, then scrolls. As with a
+  request beyond the count, withdraw it with `clears` if it should not apply by then.
 - A new request replaces one that is waiting. The last request wins.
 - A request that the view model makes while a report is on its way is kept. The report names the
   position it handled, and the view model clears the request only if it is still that position. The
@@ -330,7 +335,9 @@ It has these consequences:
   the row at a position changes.
 
 An item that is itself a `Control` is its own container, so the control cannot hand it a different
-item. Avalonia replaces the container of such a position, as it does in any `ItemsControl`.
+item. Avalonia replaces the container of such a position, as it does in any `ItemsControl`. The
+control leaves such an item as it is: a `Button` or a `UserControl` shows its own content with its
+own template, and `ItemTemplate` does not apply to it.
 
 ### The row view decides what a scroll costs
 
@@ -343,7 +350,9 @@ container. Left to itself, every row that scrolls in would get a new view from t
 and the view that scrolled out would be garbage. The control keeps that view instead and hands it
 to the next row that scrolls in, so a scroll builds no views. It does this for a row template that
 reuses its view: every XAML `DataTemplate`, and a `FuncDataTemplate` created with
-`supportsRecycling: true`.
+`supportsRecycling: true`. It keeps only views that the row template built. If the row template
+doesn't match an item, for example a typed template and an item of another type, Avalonia shows
+that item with a template it finds itself, and the control doesn't hand that view to another row.
 
 The view that is handed over still has to be attached, styled, and measured before the frame can
 draw. So the cost still grows with what is in a row, and with how many rows arrive in a frame.

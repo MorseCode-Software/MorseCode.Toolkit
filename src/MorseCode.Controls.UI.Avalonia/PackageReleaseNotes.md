@@ -57,6 +57,17 @@ for no content. The base clears the content of a container before its template, 
 ContentPresenter of Avalonia 12 builds an explicit template also when the content is null. The
 control now clears the template first.
 
+Fixed: a scroll request made while the list was hidden was reported as handled, and the list
+never scrolled. The control checked only that it was loaded and had a panel. The panel of Avalonia
+does nothing in ScrollIntoView while it is not effectively visible, so the control reported a
+scroll that never happened and the view model cleared the request. A list in a collapsed Expander,
+or under a panel bound to IsVisible, lost its request this way. A list hidden from the start had a
+second gap: it had no panel at its Loaded event, and nothing asked for the scroll again once it
+showed, so its request waited for good and the list stayed at the top. The control now scrolls only
+while the list and every parent are visible. After each layout, it asks again for a request that
+waits and can now apply, which is how it finds that the list has shown or that its panel exists.
+Avalonia 12.1.3 has no public event for a change of IsEffectivelyVisible.
+
 Fixed: a change of a row on screen could make the control and the view model exchange ranges and
 rows without end. The panel of Avalonia recycles the container of a replaced item at once and makes
 it again at the next layout. The control measured between the two, found fewer containers, and
@@ -116,6 +127,14 @@ the row of a position changes. An item that is a Control, and a container that i
 ContentPresenter or a ContentControl, are replaced through the panel as before. A change of more
 than 512 rows is no longer a reset. Only a change of the count by more than 512 positions is.
 
+Fixed: a row that is itself a ContentControl, such as a Button or a UserControl, lost its own
+content. Such an item is its own container, and the control set the row template as the
+ContentTemplate of that container, as it does for a container it makes. The presenter of the row
+then built a row view in place of what the row held: a Button with the content OK showed a row
+view, and a UserControl showed a row view in place of its XAML. A ContentTemplate that the row set
+for itself was replaced the same way. The control now leaves an item that is its own container as
+it is, as the base ItemsControl does.
+
 Breaking: the Buffer property is gone. The control now decides how far ahead of the screen it asks
 for rows: one screen of positions on each side, and never fewer than 10. A scroll shows no
 placeholder when its step is no longer than the positions on one side, so a fixed number was right
@@ -174,7 +193,10 @@ New: the control keeps the view of a row that leaves the screen, and gives it to
 comes on the screen. Thus, a scroll builds no row view. Avalonia uses the container of such a row
 again, but it removes the view, and the presenter asks the row template for a new one when it
 joins the tree again. The control keeps a view only for a row template that uses its view again:
-each XAML DataTemplate, and a FuncDataTemplate with supportsRecycling true. A kept view gets its
+each XAML DataTemplate, and a FuncDataTemplate with supportsRecycling true. It keeps only a view that
+the row template built. An item that the row template does not match, such as an item of another
+type with a typed template, is shown by a template that Avalonia finds, and that view goes to no
+other row. A kept view gets its
 next row as its data context, and it keeps each state that is not bound, as a view does when its
 row changes in place. The new property RecyclesRowViews, true by default, stops this for a row view
 with such state. Measured with no screen on .NET 10, with XAML row templates: one row that comes on
