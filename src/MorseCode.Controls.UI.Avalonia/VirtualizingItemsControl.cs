@@ -900,9 +900,10 @@ public class VirtualizingItemsControl : ItemsControl
         private readonly VirtualizingItemsControl owner = owner;
 
         // The views that the row template gave this template. The table keeps no view alive, and a view
-        // of an earlier row template is not in it. The value of an entry stays alive while its view is
-        // alive. Thus, the value is the view itself. A value that refers to this template keeps the
-        // table, and through it the control, alive while an app keeps one of the views.
+        // of an earlier row template is not in it. No code removes an entry. The entry goes when the
+        // garbage collector frees its view. The value of an entry stays alive while its view is alive.
+        // Thus, the value is the view itself. A value that refers to this template keeps the table, and
+        // through it the control, alive while an app keeps one of the views.
         private readonly ConditionalWeakTable<Control, Control> builtViews = new();
 
         public IRecyclingDataTemplate RowTemplate { get; } = rowTemplate;
