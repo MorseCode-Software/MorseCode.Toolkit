@@ -349,7 +349,9 @@ container. Left to itself, every row that scrolls in would get a new view from t
 and the view that scrolled out would be garbage. The control keeps that view instead and hands it
 to the next row that scrolls in, so a scroll builds no views. It does this for a row template that
 reuses its view: every XAML `DataTemplate`, and a `FuncDataTemplate` created with
-`supportsRecycling: true`.
+`supportsRecycling: true`. It keeps only views that the row template built. If the row template
+doesn't match an item, for example a typed template and an item of another type, Avalonia shows
+that item with a template it finds itself, and the control doesn't hand that view to another row.
 
 The view that is handed over still has to be attached, styled, and measured before the frame can
 draw. So the cost still grows with what is in a row, and with how many rows arrive in a frame.

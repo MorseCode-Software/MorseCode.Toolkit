@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Runtime.CompilerServices;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Presenters;
@@ -539,10 +540,15 @@ public class VirtualizingItemsControl : ItemsControl
         && ReferenceEquals(objA: presenter.ContentTemplate, objB: this.rowViewTemplate);
 
     // Keeps a row view that left its presenter. A view that has a parent is in use: the row template
-    // gave the same view to the next content of the presenter.
+    // gave the same view to the next content of the presenter. A presenter of the control can also show
+    // a view of a different template, for an item that the row template does not match. Only a view
+    // that the row template built can go to a row.
     private void Keep(Control? rowView)
     {
-        if (rowView is null || rowView.Parent is not null || rowView.GetVisualParent() is not null)
+        if (rowView is null
+            || rowView.Parent is not null
+            || rowView.GetVisualParent() is not null
+            || this.rowViewTemplate?.Built(view: rowView) != true)
         {
             return;
         }
@@ -924,6 +930,13 @@ public class VirtualizingItemsControl : ItemsControl
     {
         private readonly VirtualizingItemsControl owner = owner;
 
+        // The views that the row template gave this template. The table keeps no view alive, and a view
+        // of an earlier row template is not in it. No code removes an entry. The entry goes when the
+        // garbage collector frees its view. The value of an entry stays alive while its view is alive.
+        // Thus, the value is the view itself. A value that refers to this template keeps the table, and
+        // through it the control, alive while an app keeps one of the views.
+        private readonly ConditionalWeakTable<Control, Control> builtViews = new();
+
         public IRecyclingDataTemplate RowTemplate { get; } = rowTemplate;
 
         // No content matches, so that the presenter asks this template and finds no other template
@@ -934,9 +947,23 @@ public class VirtualizingItemsControl : ItemsControl
 
         // For no content this builds nothing. The row template of an app can fail on null, and a view
         // for null is garbage immediately.
-        public Control? Build(object? data, Control? existing) =>
-            data is null
-                ? null
-                : this.RowTemplate.Build(data: data, existing: existing ?? this.owner.TakeKeptRowView());
+        public Control? Build(object? data, Control? existing)
+        {
+            if (data is null)
+            {
+                return null;
+            }
+
+            Control? view = this.RowTemplate.Build(data: data, existing: existing ?? this.owner.TakeKeptRowView());
+
+            if (view is not null)
+            {
+                this.builtViews.AddOrUpdate(key: view, value: view);
+            }
+
+            return view;
+        }
+
+        public bool Built(Control view) => this.builtViews.TryGetValue(key: view, value: out _);
     }
 }
