@@ -394,6 +394,13 @@ public class VirtualizingItemsControl : ItemsControl
     {
         base.PrepareContainerForItemOverride(container: container, item: item, index: index);
 
+        // A control is its own container, and its template and content belong to it. The base does not
+        // change them either.
+        if (ReferenceEquals(objA: container, objB: item))
+        {
+            return;
+        }
+
         // Avalonia can reuse a container for a position that gets a different kind of item. Thus, the
         // template is set in both directions.
         bool isPlaceholder = item is RowPlaceholder;
