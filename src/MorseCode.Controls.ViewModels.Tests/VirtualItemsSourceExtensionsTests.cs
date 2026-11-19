@@ -402,6 +402,64 @@ public sealed class VirtualItemsSourceExtensionsTests
         await Assert.That(source.ScrollRequest.Value).IsEqualTo(expected: Maybe<ScrollRequest>.None);
     }
 
+    // One stream adds a key and asks for it. The source finds the key in the collection after the edit,
+    // thus the request is for the new last position.
+    [Test]
+    public async Task ARequestByKeyCanNameAKeyThatTheSameTransactionAdds()
+    {
+        StreamSink<int> added = Stream.CreateSink<int>();
+
+        ReactiveCollection<int, int, int> collection =
+            Collection(
+                keys: [10, 20, 30],
+                edits: added.Map(
+                    f: static key => CollectionEdit<int, int, int>.Add(new Item<int, int>(identity: key, state: 0))));
+
+        (IVirtualItemsSource source, ViewModelBase viewModel) =
+            Make(
+                make: output =>
+                    output.CreateVirtualItemsSourceByKey(
+                        collection: collection,
+                        project: static key => new VirtualRow(Position: key),
+                        scrollRequests: added));
+
+        using ViewModelBase owner = viewModel;
+
+        added.Send(a: 40);
+
+        await Assert.That(source.Rows.Value.TotalCount).IsEqualTo(expected: 4);
+        await Assert.That(source.ScrollRequest.Value).IsEqualTo(expected: Asked(position: 3, number: 0));
+    }
+
+    // A removal and a request in one transaction. The position of key 30 is 1 after the removal of key 10.
+    // The position from before the removal is 2, which is past the end of the list.
+    [Test]
+    public async Task ARequestByKeyReadsTheKeysAfterAnEditInTheSameTransaction()
+    {
+        StreamSink<CollectionEdit<int, int, int>> edits = Stream.CreateSink<CollectionEdit<int, int, int>>();
+        StreamSink<int> requests = Stream.CreateSink<int>();
+
+        (IVirtualItemsSource source, ViewModelBase viewModel) =
+            Make(
+                make: output =>
+                    output.CreateVirtualItemsSourceByKey(
+                        collection: Collection(keys: [10, 20, 30], edits: edits),
+                        project: static key => new VirtualRow(Position: key),
+                        scrollRequests: requests));
+
+        using ViewModelBase owner = viewModel;
+
+        Transaction.RunVoid(
+            action: () =>
+            {
+                edits.Send(a: CollectionEdit<int, int, int>.Remove(10));
+                requests.Send(a: 30);
+            });
+
+        await Assert.That(source.Rows.Value.TotalCount).IsEqualTo(expected: 2);
+        await Assert.That(source.ScrollRequest.Value).IsEqualTo(expected: Asked(position: 1, number: 0));
+    }
+
     [Test]
     public async Task ANullArgumentOfTheMethodByKeyIsRefusedAndNamed()
     {
@@ -792,10 +850,15 @@ public sealed class VirtualItemsSourceExtensionsTests
         Collection(keys: Enumerable.Range(start: 0, count: total));
 
     private static ReactiveCollection<int, int, int> Collection(IEnumerable<int> keys) =>
+        Collection(keys: keys, edits: Stream.CreateSink<CollectionEdit<int, int, int>>());
+
+    private static ReactiveCollection<int, int, int> Collection(
+        IEnumerable<int> keys,
+        Stream<CollectionEdit<int, int, int>> edits) =>
         ReactiveCollection<int, int, int>.Create(
             keySelector: static identity => identity,
             initialItems: [.. keys.Select(selector: static key => new Item<int, int>(identity: key, state: 0))],
-            Stream.CreateSink<CollectionEdit<int, int, int>>());
+            edits);
 
     private static Exception Catch(Action action)
     {
