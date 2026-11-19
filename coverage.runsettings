@@ -6,9 +6,12 @@
     A pair of hyphens cannot appear inside an XML comment, and the collector rejects the whole file
     if one does, reporting only that the settings do not exist or are invalid.
 
-    Cobertura, because that is a format Coveralls accepts. Only the shipping assemblies are listed.
-    A package missing from this list does not read as uncovered; it is absent from the report, which
-    reads as though there were nothing there to cover. Add each new package here.
+    Cobertura, because that is a format Coveralls accepts. Only the shipping assemblies are listed,
+    and these include the analyzers that a package holds under analyzers/dotnet/cs. A package
+    missing from this list does not read as uncovered; it is absent from the report, which reads as
+    though there were nothing there to cover. Verify-Coverage-Settings in build.cake reads from the
+    projects what the packages ship, and fails the build until this list names each assembly with the
+    pattern below, and no other.
 -->
 <RunSettings>
   <DataCollectionRunSettings>
@@ -21,9 +24,11 @@
               <Include>
                 <ModulePath>.*\MorseCode\.Mvvm\.dll$</ModulePath>
                 <ModulePath>.*\MorseCode\.StagedConstruction\.dll$</ModulePath>
+                <ModulePath>.*\MorseCode\.StagedConstruction\.Analyzers\.dll$</ModulePath>
                 <ModulePath>.*\MorseCode\.Controls\.ViewModels\.dll$</ModulePath>
                 <ModulePath>.*\MorseCode\.Controls\.UI\.Avalonia\.dll$</ModulePath>
                 <ModulePath>.*\MorseCode\.Analyzers\.dll$</ModulePath>
+                <ModulePath>.*\MorseCode\.Analyzers\.CodeFixes\.dll$</ModulePath>
               </Include>
             </ModulePaths>
           </CodeCoverage>
