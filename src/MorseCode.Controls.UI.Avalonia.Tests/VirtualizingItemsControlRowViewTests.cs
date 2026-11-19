@@ -472,6 +472,29 @@ public sealed class VirtualizingItemsControlRowViewTests
                 await Assert.That(isCorrect).IsTrue();
             });
 
+    // With no ItemTemplate and no DisplayMemberBinding, the control gives a row no template. Thus, the
+    // presenter uses the template of Avalonia for an object, which shows the ToString of the row.
+    [Test]
+    public Task WithNoTemplateAndNoBindingEachRowShowsTheTextOfItsObject() =>
+        TestApplication.Run(
+            test: static async () =>
+            {
+                VirtualModel model = new(total: 1000);
+                using ShownVirtual shown = new(model: model, buffer: RowsOnTheScreen);
+
+                shown.List.ItemTemplate = null;
+                shown.Settle();
+
+                await Assert.That(shown.Shown().Count).IsGreaterThanOrEqualTo(minimum: RowsOnTheScreen);
+
+                bool isCorrect = ShowsTheTextOfItsObjects(shown: shown);
+
+                ScrollBy(shown: shown, rows: 40);
+                isCorrect &= ShowsTheTextOfItsObjects(shown: shown);
+
+                await Assert.That(isCorrect).IsTrue();
+            });
+
     private static void ShowTheMember(ShownVirtual shown, string path)
     {
         // The base does not accept DisplayMemberBinding while there is an ItemTemplate.
@@ -479,6 +502,10 @@ public sealed class VirtualizingItemsControlRowViewTests
         shown.List.DisplayMemberBinding = new Binding(path: path);
         shown.Settle();
     }
+
+    // True when each container shows the ToString of the row of its position.
+    private static bool ShowsTheTextOfItsObjects(ShownVirtual shown) =>
+        shown.Shown().All(predicate: static pair => pair.Text == new VirtualRow(Position: pair.Position).ToString());
 
     // True when each container shows the number of its position.
     private static bool ShowsItsPositions(ShownVirtual shown) =>
