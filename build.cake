@@ -35,6 +35,7 @@ var sampleName = Argument("sample", string.Empty);
 var solution = File("./src/MorseCode.Toolkit.slnx");
 var artifactsDirectory = Directory("./artifacts");
 var coverageDirectory = Directory("./coverage");
+var coverageSettings = File("./coverage.runsettings");
 var inspectionDirectory = Directory("./inspection");
 // Kept between runs, and keyed by the settings in force; see InspectionCacheFor. Not
 // inspectionDirectory, which is cleaned at the start of every inspection.
@@ -87,9 +88,18 @@ Task("Restore")
     DotNetRestore(solution);
 });
 
+// Each build of this script makes each warning an error, as -warnaserror does on the command line.
+// Inspect-Code reports each warning of the compiler and of the analyzers, on each target. It does
+// not report a warning of an MSBuild task, such as MSB3277, a NETSDK warning, or a warning of the
+// XAML compiler of Avalonia. Only the build sees those. A build in an editor does not use this
+// script, thus a warning there does not stop an edit.
+DotNetMSBuildSettings WarningsAsErrors() =>
+    new DotNetMSBuildSettings { TreatAllWarningsAs = MSBuildTreatAllWarningsAs.Error };
+
 Task("Build")
-    .Description("Builds the solution.")
+    .Description("Builds the solution, with each warning as an error.")
     .IsDependentOn("Verify-Inspection-Settings")
+    .IsDependentOn("Verify-Coverage-Settings")
     .IsDependentOn("Restore")
     .Does(() =>
 {
@@ -99,6 +109,7 @@ Task("Build")
         {
             Configuration = configuration,
             NoRestore = true,
+            MSBuildSettings = WarningsAsErrors(),
         });
 });
 
@@ -113,7 +124,7 @@ Task("Test")
     // after the -- belongs to them rather than to the SDK. Coverage is the Microsoft Code Coverage
     // collector, which arrives with TUnit and writes Cobertura; coverage.runsettings scopes it.
     var resultsDirectory = MakeAbsolute(coverageDirectory).FullPath;
-    var coverageSettings = MakeAbsolute(File("./coverage.runsettings")).FullPath;
+    var coverageSettingsPath = MakeAbsolute(coverageSettings).FullPath;
 
     DotNetTest(
         solution,
@@ -126,7 +137,7 @@ Task("Test")
                 .Append("--results-directory").AppendQuoted(resultsDirectory)
                 .Append("--coverage")
                 .Append("--coverage-output-format").Append("cobertura")
-                .Append("--coverage-settings").AppendQuoted(coverageSettings)
+                .Append("--coverage-settings").AppendQuoted(coverageSettingsPath)
                 .Append("--report-trx"),
         });
 
@@ -159,12 +170,18 @@ Task("Pack")
     CleanDirectory(artifactsDirectory);
 
     // Test projects set IsPackable false, so one pack over the solution produces only the packages.
+    //
+    // A pack builds again, and it can give warnings of its own, thus it also makes them errors. It
+    // does not restore, as Build does not, because the Restore task restores. Thus, a NuGet warning
+    // of a restore, such as an audit advisory, stays a warning.
     DotNetPack(
         solution,
         new DotNetPackSettings
         {
             Configuration = configuration,
             OutputDirectory = artifactsDirectory,
+            NoRestore = true,
+            MSBuildSettings = WarningsAsErrors(),
         });
 
     foreach (var package in GetFiles($"{artifactsDirectory.Path}/*.nupkg").OrderBy(p => p.FullPath))
@@ -251,6 +268,93 @@ Task("Verify-Inspection-Settings")
         mirroredInspectionSettings.Length,
         inspectionSettings.Path);
 });
+
+// A dependency of Build, as Verify-Inspection-Settings is. The collector does not put an assembly in
+// the report if coverage.runsettings does not name it. Coveralls then shows no code to cover, and not
+// code with no tests. A person keeps the list by hand. This check reads from the projects what the
+// packages ship, as PackagesByPrefix reads the prefixes, and compares the two.
+Task("Verify-Coverage-Settings")
+    .Description("Checks that coverage.runsettings names each assembly that a package ships, and no other.")
+    .Does(() =>
+{
+    var expected = ShippedAssemblies().Select(CoverageModulePath).ToList();
+    var listed = XDocument.Load(MakeAbsolute(coverageSettings).FullPath)
+        .Descendants("Include")
+        .Descendants("ModulePath")
+        .Select(modulePath => modulePath.Value)
+        .ToList();
+
+    var problems = expected
+        .Except(listed, StringComparer.Ordinal)
+        .Select(modulePath => $"Missing: <ModulePath>{modulePath}</ModulePath>")
+        .Concat(listed
+            .Except(expected, StringComparer.Ordinal)
+            .Select(modulePath => $"Names no assembly that a package ships: <ModulePath>{modulePath}</ModulePath>"))
+        .ToList();
+
+    foreach (var problem in problems)
+    {
+        Error("  {0}", problem);
+    }
+
+    if (problems.Count > 0)
+    {
+        throw new Exception(
+            $"{problems.Count} line(s) of {coverageSettings.Path} out of step with the packages under src, listed "
+            + "above. Add each missing line to its Include list, and remove each line that names no shipped assembly.");
+    }
+
+    Information("{0} names all {1} assemblies that the packages ship.", coverageSettings.Path, expected.Count);
+});
+
+// The assemblies that the packages in src ship. Each package ships its build output, unless it sets
+// IncludeBuildOutput to false, and each dll that it packs in analyzers/dotnet/cs. Read from the
+// projects, where each package says what it holds.
+List<string> ShippedAssemblies()
+{
+    var assemblies = new SortedSet<string>(StringComparer.Ordinal);
+    foreach (var project in GetFiles("./src/**/*.csproj"))
+    {
+        var document = XDocument.Load(project.FullPath);
+        if (!document.Descendants("PackageId").Any())
+        {
+            continue;
+        }
+
+        var assemblyName = document.Descendants("AssemblyName").SingleOrDefault()?.Value
+            ?? throw new Exception($"{project} declares a PackageId and no AssemblyName.");
+
+        if (document.Descendants("IncludeBuildOutput").SingleOrDefault()?.Value != "false")
+        {
+            assemblies.Add(assemblyName);
+        }
+
+        var analyzers = document.Descendants().Where(item =>
+            item.Attribute("Pack")?.Value == "true" && item.Attribute("PackagePath")?.Value == "analyzers/dotnet/cs");
+        foreach (var analyzer in analyzers)
+        {
+            var include = analyzer.Attribute("Include")?.Value ?? string.Empty;
+            var fileName = include
+                .Replace("$(OutputPath)", string.Empty)
+                .Replace("$(AssemblyName)", assemblyName)
+                .Replace('\\', '/')
+                .Split('/')
+                .Last();
+            if (!fileName.EndsWith(".dll", StringComparison.Ordinal) || fileName.Contains("$("))
+            {
+                throw new Exception($"{project} packs '{include}' as an analyzer; its assembly name cannot be read.");
+            }
+
+            assemblies.Add(fileName.Substring(0, fileName.Length - ".dll".Length));
+        }
+    }
+
+    return assemblies.ToList();
+}
+
+// The ModulePath that coverage.runsettings gives an assembly. Each line has the same pattern with a
+// different name. Thus, the check compares the text and does not run the pattern.
+string CoverageModulePath(string assemblyName) => @".*\" + assemblyName.Replace(".", @"\.") + @"\.dll$";
 
 // A subdirectory of inspectionCacheDirectory named by a hash of every file that decides what an
 // inspection reports. inspectcode revalidates a cache against source edits but not against the
