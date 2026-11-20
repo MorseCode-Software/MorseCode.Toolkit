@@ -35,7 +35,7 @@ add it once in `Directory.Build.props`:
 
 ```xml
 <ItemGroup>
-    <PackageReference Include="MorseCode.Analyzers" Version="0.1.0" PrivateAssets="all"/>
+    <PackageReference Include="MorseCode.Analyzers" Version="0.1.2" PrivateAssets="all"/>
 </ItemGroup>
 ```
 
@@ -47,30 +47,41 @@ compiler doesn't run it.
 - Calls of methods, extension methods, local functions, and delegates.
 - Calls of constructors: `new Pair(...)`, `new(...)`, `base(...)`, `this(...)`, and the base type of
   a primary constructor, as in `class Named(int value) : Pair(...)`.
-- The arguments of an indexer, as in `grid[column: 2, row: 1]`, also through `grid?[...]`.
-- The constructor arguments of an attribute, as in `[Range(maximum: 9, minimum: 1)]`. A name with an
-  equals sign, as in `Extra = 3`, sets a property and not a parameter, so it isn't part of the order.
+- From version 0.1.3, the arguments of an indexer, as in `grid[column: 2, row: 1]`, also through
+  `grid?[...]` and in an object initializer, as in `new Grid { [column: 2, row: 1] = 3 }`.
+- From version 0.1.3, the constructor arguments of an attribute, as in
+  `[Range(maximum: 9, minimum: 1)]`. A name with an equals sign, as in `Extra = 3`, sets a property
+  and not a parameter, so it isn't part of the order.
 
 It reads the argument list as the source has it, and asks the compiler which parameter each
 argument goes to. So an optional parameter that a call leaves out, and an empty `params` array,
 never cause a report, and neither does a call that the compiler makes for an interpolated string. A
 value that goes into a `params` array counts as the `params` parameter, which is always the last.
+MC0001 matches an argument to its own parameter when the argument is in parentheses, in
+`checked(...)` or `unchecked(...)`, or has the null-forgiving operator. So
+`Three(a: (x), b: checked(y + 1), c: z!)` is in order and gets no report.
 
-The warning marks the argument list, such as `(second: 2, first: 1)`, or the brackets of an indexer,
-and not the whole call. A call on a long receiver doesn't underline the receiver.
+The warning marks the argument list, such as `(second: 2, first: 1)`, or from version 0.1.3 the
+brackets of an indexer, and not the whole call. A call on a long receiver doesn't underline the
+receiver.
 
 ## Fixing it
 
 From version 0.1.3, an editor that offers the code fixes of Roslyn analyzers, such as Visual Studio,
 offers a fix that puts the arguments in the order of the parameters. Each position of the list keeps
-its line, so a call with one argument on each line stays that way.
+its line, so a call with one argument on each line stays that way. Each argument takes its comments
+with it: a comment on the line above it, a comment after it, and a comment after its comma.
 
 C# runs the arguments of a call in the order they're written, also when they have names, so a new
 order can change what runs first. The title of the fix says which case you're in:
 
 - **Put the arguments in the order of the parameters** when the new order can't change anything: no
   argument has an effect, or one has and every other one is a constant. Reading a variable, a
-  parameter, or a field has no effect.
+  parameter, or a field has no effect. A cast that can throw, such as unboxing with `(int)value`,
+  counts as an effect. So does a delegate made from a method of an instance that can be null, such
+  as `holder.Get` or `new Func<int>(holder.Get)`: it throws `ArgumentException` when `holder` is
+  null, where reading `holder.Value` would throw `NullReferenceException`. A delegate from a static
+  method, from `this`, or from a value doesn't.
 - **Put the arguments in the order of the parameters, which changes the order in which they run** in
   every other case, such as `Pair(b: Next(), a: x)`, where `Next()` might change `x`.
 
@@ -79,7 +90,10 @@ chose. The first takes only the reports where nothing can change, and the second
 An argument list inside another one is fixed in the same step.
 
 The fix isn't offered when one argument declares a variable, as `out int value` does, and another
-argument uses it, because a new order could put the use first.
+argument uses it, because a new order could put the use first. It isn't offered either when a
+directive such as `#if` sits between the arguments, because the directive would end up guarding a
+different argument, or when the move would put a `//` comment before a closing parenthesis on the
+same line.
 
 ## Changing its severity
 

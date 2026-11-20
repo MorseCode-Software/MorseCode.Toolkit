@@ -64,6 +64,18 @@ the dependencies between the packages of this repository already did: SodaFlow.B
 ceiling now gets NuGet warning NU1608 at restore, where before it got nothing and could fail at run
 time. A SodaFlow major therefore needs a release of this package, even when nothing here changes.
 
+Fixed: Disposable.Composite(first, second) did not compile below C# 13 or in F#. The method took a
+params IEnumerable<IDisposable>, which is a params collection of C# 13, and an older compiler and F#
+see a plain parameter there. The entries now go to a new overload with params IDisposable[], which
+each compiler accepts, and the overload for an IEnumerable<IDisposable> is no longer params. Code
+compiled against 0.2.x still binds to that overload, which has the same signature. In C# 13 and
+later, a call with separate entries, an array, or a collection expression now goes to the array
+overload; each overload copies its entries, so nothing changes at run time.
+
+New: each assembly in the package carries its PDB, with Source Link to the commit on GitHub. A
+debugger can step into the source with no symbol server, and a stack trace on .NET shows line
+numbers. The package has a readme, and its metadata gives the URL of the repository.
+
 0.2.4
 
 New: BindableFactoryExtensions.CreateScrollRequest, an extension method of
