@@ -1195,8 +1195,9 @@ internal sealed class ContinuationAnalyzerTests
 
     // MC1003 and MC1004 read the returns of a local function that the continuation calls by its name. They
     // do this when the value of the call is the result. A variable can hold the value of the call. A call
-    // whose value is not the result gives no report. A local function that calls itself ends the search.
-    // None of the samples uses the handle, which is MC1006.
+    // whose value is not the result gives no report. A local function that calls itself ends the search. The
+    // last three samples put the local function in a local function, in a lambda that a call runs, and make
+    // it generic. The analyzer finds the graph of each. None of the samples uses the handle, which is MC1006.
     [Test]
     public async Task TheReturnsOfALocalFunctionThatGivesTheResultAreRead()
     {
@@ -1264,6 +1265,57 @@ internal sealed class ContinuationAnalyzerTests
                                  """)
                 .ConfigureAwait(continueOnCapturedContext: false);
 
+        IReadOnlyList<Diagnostic> inALocalFunction =
+            await AnalyzeBody(
+                    statements: $$"""
+                                  return Outer();
+
+                                  Constructed<Thing> Outer()
+                                  {
+                                      return Inner();
+
+                                      Constructed<Thing> Inner()
+                                      {
+                                          Constructed<Thing> made = {{Samples.Foreign}};
+
+                                          return made;
+                                      }
+                                  }
+                                  """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        IReadOnlyList<Diagnostic> inALambda =
+            await AnalyzeBody(
+                    statements: $$"""
+                                  return Transaction.Run(
+                                      f: () =>
+                                      {
+                                          return Inner();
+
+                                          Constructed<Thing> Inner()
+                                          {
+                                              Constructed<Thing> made = {{Samples.Foreign}};
+
+                                              return made;
+                                          }
+                                      });
+                                  """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        IReadOnlyList<Diagnostic> generic =
+            await AnalyzeBody(
+                    statements: $$"""
+                                  return Inner<int>();
+
+                                  Constructed<Thing> Inner<T>()
+                                  {
+                                      Constructed<Thing> made = {{Samples.Foreign}};
+
+                                      return made;
+                                  }
+                                  """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
         await Assert.That(Ids(found: foreign))
             .IsEquivalentTo(expected: ["MC1006", "MC1004"], ordering: CollectionOrdering.Matching);
 
@@ -1286,6 +1338,17 @@ internal sealed class ContinuationAnalyzerTests
 
         await Assert.That(Ids(found: callsItself))
             .IsEquivalentTo(expected: ["MC1006", "MC1004"], ordering: CollectionOrdering.Matching);
+
+        IReadOnlyList<Diagnostic>[] inOtherFunctions = [inALocalFunction, inALambda, generic];
+
+        foreach (IReadOnlyList<Diagnostic> found in inOtherFunctions)
+        {
+            await Assert.That(Ids(found: found))
+                .IsEquivalentTo(expected: ["MC1006", "MC1004"], ordering: CollectionOrdering.Matching);
+
+            await Assert.That(Covered(found: found))
+                .IsEquivalentTo(expected: ["construct", "made"], ordering: CollectionOrdering.Matching);
+        }
     }
 
     // MC1007 and MC1004. A pattern at the top of a test that declares a variable stores the value that it
