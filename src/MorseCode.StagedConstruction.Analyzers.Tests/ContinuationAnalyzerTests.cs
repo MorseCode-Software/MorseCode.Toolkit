@@ -1193,6 +1193,101 @@ internal sealed class ContinuationAnalyzerTests
         await Assert.That(recursive).IsEmpty();
     }
 
+    // MC1003 and MC1004 read the returns of a local function that the continuation calls by its name. They
+    // do this when the value of the call is the result. A variable can hold the value of the call. A call
+    // whose value is not the result gives no report. A local function that calls itself ends the search.
+    // None of the samples uses the handle, which is MC1006.
+    [Test]
+    public async Task TheReturnsOfALocalFunctionThatGivesTheResultAreRead()
+    {
+        IReadOnlyList<Diagnostic> foreign =
+            await AnalyzeBody(
+                    statements: $"""
+                                 return Inner();
+
+                                 Constructed<Thing> Inner() => {Samples.Foreign};
+                                 """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        IReadOnlyList<Diagnostic> nullReturn =
+            await AnalyzeBody(
+                    statements: """
+                                return Inner();
+
+                                Constructed<Thing> Inner() => null!;
+                                """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        IReadOnlyList<Diagnostic> variableInTheFunction =
+            await AnalyzeBody(
+                    statements: $$"""
+                                  return Inner();
+
+                                  Constructed<Thing> Inner()
+                                  {
+                                      Constructed<Thing> made = {{Samples.Foreign}};
+
+                                      return made;
+                                  }
+                                  """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        IReadOnlyList<Diagnostic> variableThatHoldsTheCall =
+            await AnalyzeBody(
+                    statements: $"""
+                                 Constructed<Thing> made = Inner();
+
+                                 return made;
+
+                                 Constructed<Thing> Inner() => {Samples.Foreign};
+                                 """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        IReadOnlyList<Diagnostic> notTheResult =
+            await AnalyzeBody(
+                    statements: $"""
+                                 _ = Inner();
+
+                                 return construct.Construct({Samples.Make});
+
+                                 Constructed<Thing> Inner() => {Samples.Foreign};
+                                 """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        IReadOnlyList<Diagnostic> callsItself =
+            await AnalyzeBody(
+                    statements: $"""
+                                 return Inner(count: 3);
+
+                                 Constructed<Thing> Inner(int count) =>
+                                     count > 0 ? Inner(count: count - 1) : {Samples.Foreign};
+                                 """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        await Assert.That(Ids(found: foreign))
+            .IsEquivalentTo(expected: ["MC1006", "MC1004"], ordering: CollectionOrdering.Matching);
+
+        await Assert.That(Ids(found: nullReturn))
+            .IsEquivalentTo(expected: ["MC1006", "MC1003"], ordering: CollectionOrdering.Matching);
+
+        await Assert.That(Covered(found: nullReturn))
+            .IsEquivalentTo(expected: ["construct", "null"], ordering: CollectionOrdering.Matching);
+
+        await Assert.That(Ids(found: variableInTheFunction))
+            .IsEquivalentTo(expected: ["MC1006", "MC1004"], ordering: CollectionOrdering.Matching);
+
+        await Assert.That(Covered(found: variableInTheFunction))
+            .IsEquivalentTo(expected: ["construct", "made"], ordering: CollectionOrdering.Matching);
+
+        await Assert.That(Ids(found: variableThatHoldsTheCall))
+            .IsEquivalentTo(expected: ["MC1006", "MC1004"], ordering: CollectionOrdering.Matching);
+
+        await Assert.That(notTheResult).IsEmpty();
+
+        await Assert.That(Ids(found: callsItself))
+            .IsEquivalentTo(expected: ["MC1006", "MC1004"], ordering: CollectionOrdering.Matching);
+    }
+
     // MC1007 and MC1004. A pattern at the top of a test that declares a variable stores the value that it
     // tests in the variable, as a declaration does. A pattern that declares no variable only tests the value.
     [Test]
