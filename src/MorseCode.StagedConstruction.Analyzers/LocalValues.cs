@@ -96,23 +96,61 @@ internal sealed class LocalValues
     /// <param name="read">A read of a local variable in the continuation.</param>
     /// <param name="cancellationToken">Stops the search when the compiler cancels the analysis.</param>
     /// <returns>
-    ///     The values, without conversions, in the tree of the continuation. None
-    ///     is a local variable or a conditional. Empty if the analyzer cannot
-    ///     know the value.
+    ///     The values, without conversions, in the tree of the continuation, and
+    ///     if they are all of the values.
     /// </returns>
-    public ImmutableArray<IOperation> Of(ILocalReferenceOperation read, CancellationToken cancellationToken)
+    public LocalRead Of(ILocalReferenceOperation read, CancellationToken cancellationToken)
     {
-        if (OwnerOf(operation: read) is not { } owner
-            || this.Graph(function: owner, cancellationToken: cancellationToken) is not { } graph
-            || graph.Read(syntax: read.Syntax, local: read.Local) is not { } start)
+        if (this.Start(read: read, cancellationToken: cancellationToken) is not ({ } graph, { } start))
         {
-            return ImmutableArray<IOperation>.Empty;
+            return new LocalRead(values: ImmutableArray<IOperation>.Empty, isComplete: false);
         }
 
         Search search = new(cancellationToken: cancellationToken);
         this.Follow(graph: graph, value: start, search: search);
 
-        return search.Found.ToImmutableArray();
+        return new LocalRead(values: search.Found.ToImmutableArray(), isComplete: search.IsComplete);
+    }
+
+    /// <summary>
+    ///     Gives the syntax of each write that can get to <paramref name="read" />.
+    ///     That is the syntax of the declarator or of the assignment for a write
+    ///     with a value.
+    /// </summary>
+    /// <param name="read">A read of a local variable in the continuation.</param>
+    /// <param name="cancellationToken">Stops the search when the compiler cancels the analysis.</param>
+    /// <returns>The syntax of each write, or null if the analyzer does not follow the variable.</returns>
+    public ImmutableArray<SyntaxNode>? WritesTo(ILocalReferenceOperation read, CancellationToken cancellationToken) =>
+        this.Start(read: read, cancellationToken: cancellationToken) is ({ } graph, { } start)
+        && this.Reaching(graph: graph, read: start, cancellationToken: cancellationToken) is { } reaching
+            ? reaching.Definitions.Select(selector: static definition => definition.Syntax).ToImmutableArray()
+            : null;
+
+    /// <summary>
+    ///     Gives true if <paramref name="reference" /> reads the variable. The target
+    ///     of an assignment or of a deconstruction, and an out argument, only
+    ///     write it.
+    /// </summary>
+    /// <param name="reference">A reference to a local variable.</param>
+    /// <returns>True for a read.</returns>
+    public static bool IsRead(ILocalReferenceOperation reference)
+    {
+        IOperation child = reference;
+        IOperation? parent = reference.Parent;
+
+        while (parent is IParenthesizedOperation or IDeclarationExpressionOperation or ITupleOperation)
+        {
+            child = parent;
+            parent = parent.Parent;
+        }
+
+        return parent switch
+        {
+            ISimpleAssignmentOperation assignment => !ReferenceEquals(objA: assignment.Target, objB: child),
+            IDeconstructionAssignmentOperation assignment => !ReferenceEquals(objA: assignment.Target, objB: child),
+            IArgumentOperation { Parameter.RefKind: RefKind.Out } => false,
+            _ => true
+        };
     }
 
     // A write in a different function can occur at any time. A reference to the variable can write it at
@@ -224,6 +262,16 @@ internal sealed class LocalValues
     private static IMethodSymbol? OwnerOf(IOperation operation) =>
         OperationTree.Owner(operation: operation) is { } owner ? Symbol(function: owner) : null;
 
+    // The graph of the function that holds the read, and the read in that graph.
+    private (FunctionGraph Graph, ILocalReferenceOperation Read)? Start(
+        ILocalReferenceOperation read,
+        CancellationToken cancellationToken) =>
+        OwnerOf(operation: read) is { } owner
+        && this.Graph(function: owner, cancellationToken: cancellationToken) is { } graph
+        && graph.Read(syntax: read.Syntax, local: read.Local) is { } start
+            ? (graph, start)
+            : null;
+
     private FunctionGraph? Graph(IMethodSymbol function, CancellationToken cancellationToken)
     {
         if (this.graphs.TryGetValue(key: function, value: out FunctionGraph? known))
@@ -268,14 +316,29 @@ internal sealed class LocalValues
 
                 return;
             case ILocalReferenceOperation read:
-                if (search.Reads.Add(item: read))
+                if (!search.Reads.Add(item: read))
                 {
-                    foreach ((FunctionGraph where, IOperation written) in this.Writes(
-                                 graph: graph,
-                                 read: read,
-                                 search: search))
+                    return;
+                }
+
+                // No write at all, or a write with a value that the analyzer cannot know, leaves a value out.
+                if (this.Reaching(graph: graph, read: read, cancellationToken: search.CancellationToken) is not
+                    { Definitions.Count: > 0 } reaching)
+                {
+                    search.IsComplete = false;
+
+                    return;
+                }
+
+                foreach (Definition definition in reaching.Definitions)
+                {
+                    if (definition.Value is null)
                     {
-                        this.Follow(graph: where, value: written, search: search);
+                        search.IsComplete = false;
+                    }
+                    else
+                    {
+                        this.Follow(graph: reaching.Graph, value: definition.Value, search: search);
                     }
                 }
 
@@ -284,8 +347,11 @@ internal sealed class LocalValues
                 OperationKind kind =
                     leaf.Kind == OperationKind.FlowAnonymousFunction ? OperationKind.AnonymousFunction : leaf.Kind;
 
-                if (this.tree.TryGetValue(key: (leaf.Syntax, kind), value: out IOperation? operation)
-                    && search.Seen.Add(item: operation))
+                if (!this.tree.TryGetValue(key: (leaf.Syntax, kind), value: out IOperation? operation))
+                {
+                    search.IsComplete = false;
+                }
+                else if (search.Seen.Add(item: operation))
                 {
                     search.Found.Add(item: operation);
                 }
@@ -294,37 +360,32 @@ internal sealed class LocalValues
         }
     }
 
-    // The values of the writes that can get to a read. A variable that a different function declares can
-    // get its value at any time. Thus, it has values only when it has one write.
-    private IEnumerable<(FunctionGraph Graph, IOperation Value)> Writes(
+    // The writes that can get to a read, and the graph that holds them. Null if the analyzer does not follow
+    // the variable. A variable that a different function declares can get its value at any time. Thus, the
+    // analyzer follows it only when it has one write.
+    private (FunctionGraph Graph, IReadOnlyList<Definition> Definitions)? Reaching(
         FunctionGraph graph,
         ILocalReferenceOperation read,
-        Search search)
+        CancellationToken cancellationToken)
     {
         ILocalSymbol local = read.Local;
 
         if (this.excluded.Contains(item: local)
             || local.ContainingSymbol is not IMethodSymbol declaring
-            || this.Graph(function: declaring, cancellationToken: search.CancellationToken) is not { } where
+            || this.Graph(function: declaring, cancellationToken: cancellationToken) is not { } where
             || where.IsWrittenInFinally(local: local))
         {
-            return [];
+            return null;
         }
 
         if (ReferenceEquals(objA: where, objB: graph))
         {
-            return
-                from definition in graph.Reaching(
-                    local: local,
-                    read: read,
-                    cancellationToken: search.CancellationToken)
-                where definition.Value is not null
-                select (graph, definition.Value);
+            return (graph, [.. graph.Reaching(local: local, read: read, cancellationToken: cancellationToken)]);
         }
 
         IReadOnlyList<Definition> definitions = where.Definitions(local: local);
 
-        return definitions.Count == 1 && definitions[0].Value is { } value ? [(where, value)] : [];
+        return definitions.Count == 1 ? (where, definitions) : null;
     }
 
     // The state of one search. The sets stop the search at a value that it found before, thus a loop
@@ -340,11 +401,16 @@ internal sealed class LocalValues
         public HashSet<IOperation> Seen { get; } = [];
 
         public List<IOperation> Found { get; } = [];
+
+        // False when a write with a value that the analyzer cannot know gets to a read.
+        public bool IsComplete { get; set; } = true;
     }
 
     // One write of a local variable. A null value is a write whose value the analyzer cannot know.
-    private sealed class Definition(in int block, in int position, in IOperation? value)
+    private sealed class Definition(in int block, in int position, in IOperation? value, in SyntaxNode syntax)
     {
+        public SyntaxNode Syntax { get; } = syntax;
+
         public int Block { get; } = block;
 
         public int Position { get; } = position;
@@ -538,12 +604,23 @@ internal sealed class LocalValues
                     Add(key: read.Syntax, item: read, to: this.reads);
                     break;
                 case ISimpleAssignmentOperation { IsRef: false, Target: ILocalReferenceOperation target } assignment:
-                    this.Define(local: target.Local, block: block, position: position, value: assignment.Value);
+                    this.Define(
+                        local: target.Local,
+                        block: block,
+                        position: position,
+                        value: assignment.Value,
+                        syntax: operation.Syntax);
+
                     break;
                 default:
                     foreach (ILocalSymbol local in UnknownWrites(operation: operation))
                     {
-                        this.Define(local: local, block: block, position: position, value: null);
+                        this.Define(
+                            local: local,
+                            block: block,
+                            position: position,
+                            value: null,
+                            syntax: operation.Syntax);
                     }
 
                     break;
@@ -562,7 +639,12 @@ internal sealed class LocalValues
             list.Add(item: item);
         }
 
-        private void Define(ILocalSymbol local, BasicBlock block, int position, IOperation? value)
+        private void Define(
+            ILocalSymbol local,
+            BasicBlock block,
+            int position,
+            IOperation? value,
+            SyntaxNode syntax)
         {
             if (IsInFinally(block: block))
             {
@@ -575,7 +657,7 @@ internal sealed class LocalValues
                 this.definitions.Add(key: local, value: list);
             }
 
-            list.Add(item: new Definition(block: block.Ordinal, position: position, value: value));
+            list.Add(item: new Definition(block: block.Ordinal, position: position, value: value, syntax: syntax));
         }
 
         // The writes that can get to the start of each block. The analysis repeats until no set changes. A

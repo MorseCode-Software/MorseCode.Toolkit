@@ -47,6 +47,7 @@
         <Compile Include="ContinuationAnalyzer.cs"/>
         <Compile Include="ContinuationRules.cs"/>
         <Compile Include="KnownSymbols.cs"/>
+        <Compile Include="LocalRead.cs"/>
         <Compile Include="LocalValues.cs"/>
         <Compile Include="OperationTree.cs"/>
     </ItemGroup>

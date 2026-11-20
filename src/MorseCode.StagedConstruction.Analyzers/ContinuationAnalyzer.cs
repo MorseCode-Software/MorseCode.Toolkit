@@ -70,8 +70,11 @@ public sealed class ContinuationAnalyzer : DiagnosticAnalyzer
     private static void Check(OperationAnalysisContext context, KnownSymbols symbols)
     {
         if (context.Operation is not IAnonymousFunctionOperation lambda
-            || Continuation.From(lambda: lambda, symbols: symbols, graph: context.GetControlFlowGraph) is not
-                { } continuation)
+            || Continuation.From(
+                    lambda: lambda,
+                    symbols: symbols,
+                    graph: context.GetControlFlowGraph,
+                    cancellationToken: context.CancellationToken) is not { } continuation)
         {
             return;
         }
@@ -182,7 +185,7 @@ public sealed class ContinuationAnalyzer : DiagnosticAnalyzer
         {
             ILocalReferenceOperation local =>
             [
-                .. continuation.ValuesOf(read: local, cancellationToken: cancellationToken)
+                .. continuation.ValuesOf(read: local)
                     .SelectMany(
                         selector: held => LambdasOfTheValue(
                             continuation: continuation,
@@ -192,10 +195,7 @@ public sealed class ContinuationAnalyzer : DiagnosticAnalyzer
             IInvocationOperation call =>
             [
                 .. from argument in call.Arguments
-                from lambda in Lambdas(
-                    continuation: continuation,
-                    argument: argument.Value,
-                    cancellationToken: cancellationToken)
+                from lambda in Lambdas(continuation: continuation, argument: argument.Value)
                 where continuation.Symbols.IsConstructed(type: lambda.Symbol.ReturnType)
                       && !continuation.IsContinuation(function: lambda)
                 select lambda
@@ -205,21 +205,15 @@ public sealed class ContinuationAnalyzer : DiagnosticAnalyzer
     }
 
     // The lambdas that an argument gives: the lambda itself, or each lambda that a local variable can hold.
-    private static IEnumerable<IAnonymousFunctionOperation> Lambdas(
-        Continuation continuation,
-        IOperation? argument,
-        CancellationToken cancellationToken) =>
+    private static IEnumerable<IAnonymousFunctionOperation> Lambdas(Continuation continuation, IOperation? argument) =>
         OperationTree.Unwrap(operation: argument) switch
         {
             IDelegateCreationOperation { Target: IAnonymousFunctionOperation lambda } => [lambda],
             IAnonymousFunctionOperation lambda => [lambda],
             ILocalReferenceOperation local =>
-                continuation.ValuesOf(read: local, cancellationToken: cancellationToken)
+                continuation.ValuesOf(read: local)
                     .SelectMany(
-                        selector: held => Lambdas(
-                            continuation: continuation,
-                            argument: held,
-                            cancellationToken: cancellationToken)),
+                        selector: held => Lambdas(continuation: continuation, argument: held)),
             _ => []
         };
 
@@ -242,7 +236,7 @@ public sealed class ContinuationAnalyzer : DiagnosticAnalyzer
         // A variable that holds the result stands for each call that can give it its value.
         IEnumerable<IOperation> values =
             leaf is ILocalReferenceOperation local
-                ? continuation.ValuesOf(read: local, cancellationToken: cancellationToken)
+                ? continuation.ValuesOf(read: local)
                 : ImmutableArray.Create(item: leaf);
 
         bool isForeign =
@@ -298,9 +292,7 @@ public sealed class ContinuationAnalyzer : DiagnosticAnalyzer
                     toRead.Push(item: select.Instance);
                     break;
                 case ILocalReferenceOperation local:
-                    foreach (IOperation value in continuation.ValuesOf(
-                                 read: local,
-                                 cancellationToken: cancellationToken))
+                    foreach (IOperation value in continuation.ValuesOf(read: local))
                     {
                         toRead.Push(item: value);
                     }
@@ -419,8 +411,12 @@ public sealed class ContinuationAnalyzer : DiagnosticAnalyzer
                     ? null
                     : $"is given to the constructor of {creation.Type?.Name}",
 
-            // The declaration of a local variable. Continuation follows that variable as the handle.
-            IVariableInitializerOperation => null,
+            // A local variable. The rules follow the handle in it while each read that the write can get to is
+            // the handle.
+            IVariableInitializerOperation { Parent: IVariableDeclaratorOperation declarator } =>
+                continuation.KeepsTheHandle(local: declarator.Symbol, write: declarator.Syntax)
+                    ? null
+                    : $"is stored in {declarator.Symbol.Name}",
 
             ITupleOperation or IReturnOperation => IsInStageBody(continuation: continuation, operation: handle)
                 ? null
@@ -429,6 +425,8 @@ public sealed class ContinuationAnalyzer : DiagnosticAnalyzer
             // A comparison, a type test, and a nameof do not move the handle.
             IBinaryOperation or IIsPatternOperation or IIsTypeOperation or INameOfOperation => null,
             ISimpleAssignmentOperation { Target: IDiscardOperation } => null,
+            ISimpleAssignmentOperation { IsRef: false, Target: ILocalReferenceOperation target } assignment
+                when continuation.KeepsTheHandle(local: target.Local, write: assignment.Syntax) => null,
             ISimpleAssignmentOperation assignment => $"is stored in {assignment.Target.Syntax}",
 
             _ => "is used in an expression"

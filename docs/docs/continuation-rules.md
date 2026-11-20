@@ -162,7 +162,7 @@ code may be correct. The rule says only that the other rules can't check it past
 The analyzer follows the handle through these uses, and reports none of them:
 
 - A call to `Construct`, `Select`, or `Advance` on it.
-- A local variable that holds it.
+- A local variable that holds it, wherever the variable is read.
 - Passing it to a continuation, which is how a base hands it to its subclass.
 - Passing it to the constructor of a type that derives from `Stage<,,>` or `Constructor<T>`, which
   is how you write a stage or a handle of your own.
@@ -170,6 +170,25 @@ The analyzer follows the handle through these uses, and reports none of them:
 
 It reports the handle anywhere else: passed to another method, passed to the constructor of
 another type, or stored in a field or a property.
+
+A local variable counts as the handle at a read only when every value that can reach that read is
+the handle, followed the same way MC1004 follows a returned variable. The other rules check a call
+on the variable only there. Assigning a different handle to the variable ends that, so `Construct`
+on a handle from `Constructor.From` isn't reported as if it were the continuation's own. An
+assignment that isn't a declaration can start it. Storing the handle in a variable is reported
+only when some read of the variable that the store reaches isn't the handle, for example when the
+variable gets a different handle on another path. Writing to the variable, or passing it as an
+`out` argument, isn't a use of the handle.
+
+```csharp
+Constructor<Values> next = construct;
+if (flag)
+{
+    next = Constructor.From(new Values());
+}
+
+_ = next.Construct(...).Value;   // MC1007 on construct above: next isn't the handle here
+```
 
 ```csharp
 (output, construct) => Finish(construct)   // MC1007: is given to Finish

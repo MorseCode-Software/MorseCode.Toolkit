@@ -15,27 +15,29 @@ namespace MorseCode.StagedConstruction.Analyzers;
 /// </summary>
 internal sealed class Continuation
 {
-    private readonly ImmutableHashSet<ILocalSymbol> aliases;
     private readonly Func<ControlFlowGraph> graph;
+    private readonly CancellationToken cancellationToken;
 
     // Most continuations return the result of Construct directly and read no local variable. Thus, the
     // graph and its analysis occur only at the first read.
     private readonly Lazy<LocalValues> values;
+
+    private readonly Dictionary<IOperation, bool> handleReads = [];
 
     private Continuation(
         IAnonymousFunctionOperation lambda,
         IParameterSymbol handle,
         KnownSymbols symbols,
         ImmutableArray<IOperation> operations,
-        ImmutableHashSet<ILocalSymbol> aliases,
-        Func<ControlFlowGraph> graph)
+        Func<ControlFlowGraph> graph,
+        CancellationToken cancellationToken)
     {
         this.Lambda = lambda;
         this.Handle = handle;
         this.Symbols = symbols;
         this.Operations = operations;
-        this.aliases = aliases;
         this.graph = graph;
+        this.cancellationToken = cancellationToken;
 
         this.values = new Lazy<LocalValues>(
             valueFactory: () => new LocalValues(lambda: lambda, operations: operations, rootGraph: graph));
@@ -70,6 +72,7 @@ internal sealed class Continuation
     ///     Gives the control flow graph of the method body or the initializer that
     ///     holds the lambda.
     /// </param>
+    /// <param name="cancellationToken">Stops the analysis when the compiler cancels it.</param>
     /// <returns>
     ///     The continuation. Null if the lambda does not become a
     ///     <c>StageContinuation</c>, or if its second parameter is not a handle. A
@@ -79,7 +82,8 @@ internal sealed class Continuation
     public static Continuation? From(
         IAnonymousFunctionOperation lambda,
         KnownSymbols symbols,
-        Func<ControlFlowGraph> graph)
+        Func<ControlFlowGraph> graph,
+        CancellationToken cancellationToken)
     {
         if (lambda.Parent is not IDelegateCreationOperation creation
             || !symbols.IsContinuation(type: creation.Type)
@@ -89,49 +93,68 @@ internal sealed class Continuation
             return null;
         }
 
-        IParameterSymbol handle = lambda.Symbol.Parameters[1];
-        ImmutableArray<IOperation> operations = lambda.Body.Descendants().ToImmutableArray();
-
         return new Continuation(
             lambda: lambda,
-            handle: handle,
+            handle: lambda.Symbol.Parameters[1],
             symbols: symbols,
-            operations: operations,
-            aliases: FindAliases(handle: handle, symbols: symbols, operations: operations),
-            graph: graph);
+            operations: lambda.Body.Descendants().ToImmutableArray(),
+            graph: graph,
+            cancellationToken: cancellationToken);
     }
 
     /// <summary>
     ///     Gives true if <paramref name="operation" /> is the handle of this
-    ///     continuation: the parameter, a local variable that holds it, or a
-    ///     <c>Select</c> of one of these.
+    ///     continuation: the parameter, a read of a local variable whose values
+    ///     are all the handle, or a <c>Select</c> of one of these.
     /// </summary>
     /// <param name="operation">The operation.</param>
     /// <returns>True for the handle.</returns>
-    public bool IsHandle(IOperation? operation) =>
-        IsHandle(operation: operation, handle: this.Handle, symbols: this.Symbols, aliases: this.aliases);
+    public bool IsHandle(IOperation? operation) => this.IsHandle(operation: operation, assumed: []);
 
     /// <summary>
     ///     Gives true if <paramref name="operation" /> reads the parameter of the
-    ///     handle or a local variable that holds it.
+    ///     handle or a local variable that holds it. A write to the variable does
+    ///     not read it.
     /// </summary>
     /// <param name="operation">The operation.</param>
     /// <returns>True for a read of the handle by its name.</returns>
     public bool IsHandleName(IOperation operation) =>
-        operation is IParameterReferenceOperation or ILocalReferenceOperation && this.IsHandle(operation: operation);
+        operation switch
+        {
+            IParameterReferenceOperation => this.IsHandle(operation: operation),
+            ILocalReferenceOperation local => LocalValues.IsRead(reference: local) && this.IsHandle(operation: local),
+            _ => false
+        };
+
+    /// <summary>
+    ///     Gives true if each read of <paramref name="local" /> that the write at
+    ///     <paramref name="write" /> can get to is the handle. Then the rules follow
+    ///     the handle that the write stores.
+    /// </summary>
+    /// <param name="local">A local variable that a write gives the handle.</param>
+    /// <param name="write">The syntax of the declarator or of the assignment.</param>
+    /// <returns>True if the handle stays the handle at each read.</returns>
+    public bool KeepsTheHandle(ILocalSymbol local, SyntaxNode write) =>
+        this.Operations.OfType<ILocalReferenceOperation>()
+            .Where(
+                predicate: read =>
+                    SymbolEqualityComparer.Default.Equals(x: read.Local, y: local) && LocalValues.IsRead(reference: read))
+            .All(
+                predicate: read =>
+                    this.values.Value.WritesTo(read: read, cancellationToken: this.cancellationToken) is { } writes
+                    && (!writes.Contains(item: write) || this.IsHandle(operation: read)));
 
     /// <summary>
     ///     Gives each value that <paramref name="read" /> can get. See
     ///     <see cref="LocalValues" />.
     /// </summary>
     /// <param name="read">A read of a local variable in the lambda.</param>
-    /// <param name="cancellationToken">Stops the search when the compiler cancels the analysis.</param>
     /// <returns>
     ///     The values without conversions. None is a local variable. Empty if the
     ///     analyzer cannot know the value.
     /// </returns>
-    public ImmutableArray<IOperation> ValuesOf(ILocalReferenceOperation read, CancellationToken cancellationToken) =>
-        this.values.Value.Of(read: read, cancellationToken: cancellationToken);
+    public ImmutableArray<IOperation> ValuesOf(ILocalReferenceOperation read) =>
+        this.values.Value.Of(read: read, cancellationToken: this.cancellationToken).Values;
 
     /// <summary>
     ///     Gives true if <paramref name="function" /> is a continuation with a handle
@@ -140,60 +163,57 @@ internal sealed class Continuation
     /// <param name="function">A lambda in the body of this continuation.</param>
     /// <returns>True for a continuation.</returns>
     public bool IsContinuation(IAnonymousFunctionOperation function) =>
-        From(lambda: function, symbols: this.Symbols, graph: this.graph) is not null;
+        From(lambda: function, symbols: this.Symbols, graph: this.graph, cancellationToken: this.cancellationToken)
+            is not null;
 
-    // A local variable holds the handle when its declaration gives it the handle. A second variable
-    // can get its value from the first, thus the search repeats until it finds no more.
-    private static ImmutableHashSet<ILocalSymbol> FindAliases(
-        ISymbol handle,
-        KnownSymbols symbols,
-        ImmutableArray<IOperation> operations)
-    {
-        ImmutableHashSet<ILocalSymbol> aliases =
-            ImmutableHashSet.Create<ILocalSymbol>(equalityComparer: SymbolEqualityComparer.Default);
-
-        IReadOnlyList<IVariableDeclaratorOperation>
-            declarators = [.. operations.OfType<IVariableDeclaratorOperation>()];
-
-        while (true)
-        {
-            ImmutableHashSet<ILocalSymbol> known = aliases;
-
-            ImmutableHashSet<ILocalSymbol> found =
-                known.Union(
-                    other: declarators
-                        .Where(
-                            predicate: declarator =>
-                                IsHandle(
-                                    operation: declarator.GetVariableInitializer()?.Value,
-                                    handle: handle,
-                                    symbols: symbols,
-                                    aliases: known))
-                        .Select(selector: static declarator => declarator.Symbol));
-
-            if (found.Count == known.Count)
-            {
-                return found;
-            }
-
-            aliases = found;
-        }
-    }
-
-    private static bool IsHandle(
-        IOperation? operation,
-        ISymbol handle,
-        KnownSymbols symbols,
-        ImmutableHashSet<ILocalSymbol> aliases) =>
+    private bool IsHandle(IOperation? operation, HashSet<IOperation> assumed) =>
         OperationTree.Unwrap(operation: operation) switch
         {
             IParameterReferenceOperation parameter => SymbolEqualityComparer.Default.Equals(
                 x: parameter.Parameter,
-                y: handle),
-            ILocalReferenceOperation local => aliases.Contains(item: local.Local),
+                y: this.Handle),
+            ILocalReferenceOperation read => this.IsHandleRead(read: read, assumed: assumed),
             IInvocationOperation invocation =>
-                symbols.IsSelect(method: invocation.TargetMethod)
-                && IsHandle(operation: invocation.Instance, handle: handle, symbols: symbols, aliases: aliases),
+                this.Symbols.IsSelect(method: invocation.TargetMethod)
+                && this.IsHandle(operation: invocation.Instance, assumed: assumed),
             _ => false
         };
+
+    // A read is the handle when the analyzer knows each value that can get to it, and each value is the
+    // handle. Only a variable of a handle type can be the handle, thus no graph is made for other types.
+    // A Select in a loop can read the value that it gave before. The search takes such a read as the handle
+    // while it is in that read. Thus, the other values give the result. A result that used that assumption is not kept,
+    // except for the read where the search started.
+    private bool IsHandleRead(ILocalReferenceOperation read, HashSet<IOperation> assumed)
+    {
+        if (!this.Symbols.IsHandle(type: read.Local.Type))
+        {
+            return false;
+        }
+
+        if (this.handleReads.TryGetValue(key: read, value: out bool known))
+        {
+            return known;
+        }
+
+        if (!assumed.Add(item: read))
+        {
+            return true;
+        }
+
+        LocalRead found = this.values.Value.Of(read: read, cancellationToken: this.cancellationToken);
+
+        bool isHandle =
+            found is { IsComplete: true, Values.Length: > 0 }
+            && found.Values.All(predicate: value => this.IsHandle(operation: value, assumed: assumed));
+
+        assumed.Remove(item: read);
+
+        if (assumed.Count == 0)
+        {
+            this.handleReads.Add(key: read, value: isHandle);
+        }
+
+        return isHandle;
+    }
 }

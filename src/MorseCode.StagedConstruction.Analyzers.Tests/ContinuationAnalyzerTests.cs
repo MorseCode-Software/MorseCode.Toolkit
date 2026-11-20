@@ -674,12 +674,115 @@ internal sealed class ContinuationAnalyzerTests
             .IsEquivalentTo(expected: ["MC1006", "MC1004"], ordering: CollectionOrdering.Matching);
     }
 
+    // A local variable is the handle at a read only where each value that can get to the read is the
+    // handle. Thus, a write that replaces the handle with a different handle ends the rules for the handle.
+    // A write that is not a declaration can start them. A write to the variable and an out argument do
+    // not use the handle, thus MC1007 does not report them. Before, the declaration alone made a variable
+    // the handle, at each read.
+    [Test]
+    public async Task AVariableIsTheHandleOnlyWhereEachValueIsTheHandle()
+    {
+        IReadOnlyList<Diagnostic> replacedThenValue =
+            await AnalyzeBody(
+                    statements: $"""
+                                 Constructor<Values> next = construct;
+                                 next = Constructor.From(values: new Values());
+                                 _ = next.Construct({Samples.Make}).Value;
+
+                                 return construct.Construct({Samples.Make});
+                                 """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        IReadOnlyList<Diagnostic> replacedThenDiscarded =
+            await AnalyzeBody(
+                    statements: $"""
+                                 Constructor<Values> next = construct;
+                                 next = Constructor.From(values: new Values());
+                                 next.Construct({Samples.Make});
+
+                                 return construct.Construct({Samples.Make});
+                                 """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        IReadOnlyList<Diagnostic> replacedByAnOutArgument =
+            await AnalyzeBody(
+                    statements: $"""
+                                 Constructor<Values> next = construct;
+                                 Swap(handle: out next);
+                                 _ = next.Construct({Samples.Make}).Value;
+
+                                 return construct.Construct({Samples.Make});
+
+                                 static void Swap(out Constructor<Values> handle) => handle = Constructor.From(values: new Values());
+                                 """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        IReadOnlyList<Diagnostic> replacedOnOnePath =
+            await AnalyzeBody(
+                    statements: $$"""
+                                  Constructor<Values> next = construct;
+
+                                  if (Use.Flag)
+                                  {
+                                      next = Constructor.From(values: new Values());
+                                  }
+
+                                  _ = next.Construct({{Samples.Make}}).Value;
+
+                                  return construct.Construct({{Samples.Make}});
+                                  """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        IReadOnlyList<Diagnostic> assignedThenValue =
+            await AnalyzeBody(
+                    statements: $"""
+                                 Constructor<Values> next;
+                                 next = construct;
+                                 _ = next.Construct({Samples.Make}).Value;
+
+                                 return construct.Construct({Samples.Make});
+                                 """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        IReadOnlyList<Diagnostic> selectedInALoop =
+            await AnalyzeBody(
+                    statements: $$"""
+                                  Constructor<Values> next = construct;
+
+                                  for (int step = 0; step < 3; step++)
+                                  {
+                                      next = next.Select(selector: static values => values);
+                                  }
+
+                                  _ = next.Construct({{Samples.Make}}).Value;
+
+                                  return construct.Construct({{Samples.Make}});
+                                  """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        await Assert.That(replacedThenValue).IsEmpty();
+        await Assert.That(replacedThenDiscarded).IsEmpty();
+        await Assert.That(replacedByAnOutArgument).IsEmpty();
+
+        await Assert.That(Ids(found: replacedOnOnePath))
+            .IsEquivalentTo(expected: ["MC1007"], ordering: CollectionOrdering.Matching);
+
+        await Assert.That(Covered(found: replacedOnOnePath))
+            .IsEquivalentTo(expected: ["construct"], ordering: CollectionOrdering.Matching);
+
+        await Assert.That(Ids(found: assignedThenValue))
+            .IsEquivalentTo(expected: ["MC1001"], ordering: CollectionOrdering.Matching);
+
+        await Assert.That(Ids(found: selectedInALoop))
+            .IsEquivalentTo(expected: ["MC1001"], ordering: CollectionOrdering.Matching);
+    }
+
     // MC1004 also follows a local variable that holds a handle, or a lambda that a returned call runs. In
-    // the first sample, the handle in the variable is from Constructor.From on one path. In the second, a
-    // subsequent write replaces the handle from Constructor.From. In the two samples, a write that is not a
-    // declaration stores the handle, which is MC1007. In the third sample, a subsequent write replaces the
-    // lambda that returns the result of the handle. The first lambda holds the handle and is not an
-    // argument, which is MC1007.
+    // the first sample, the handle in the variable is from Constructor.From on one path. Thus, the read of
+    // the variable is not the handle, and the write of the handle into it is MC1007. In the second, a
+    // subsequent write replaces the handle from Constructor.From. The read is the handle, thus no rule
+    // reports. In the third sample, a subsequent write replaces the lambda that returns the result of the
+    // handle. The first lambda holds the handle and is not an argument, which is MC1007.
     [Test]
     public async Task AHandleAndALambdaInAVariableAreFollowedToEachValue()
     {
@@ -720,8 +823,7 @@ internal sealed class ContinuationAnalyzerTests
         await Assert.That(Ids(found: handleOnOnePath))
             .IsEquivalentTo(expected: ["MC1007", "MC1004"], ordering: CollectionOrdering.Matching);
 
-        await Assert.That(Ids(found: handleReplaced))
-            .IsEquivalentTo(expected: ["MC1007"], ordering: CollectionOrdering.Matching);
+        await Assert.That(handleReplaced).IsEmpty();
 
         await Assert.That(Ids(found: lambdaReplaced))
             .IsEquivalentTo(expected: ["MC1007", "MC1004"], ordering: CollectionOrdering.Matching);
