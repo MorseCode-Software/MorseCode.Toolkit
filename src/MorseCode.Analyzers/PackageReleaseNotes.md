@@ -30,6 +30,14 @@ cast. A cast from dynamic no longer says it is not needed at all: the cast runs 
 conversion when the code runs and the code without it an implicit one, so a long in a dynamic
 converts to int with the cast and throws without it. The rule still reports every cast.
 
+Changed: MC0002 now also reports a foreach, and a range variable of a query, with a type that each
+element converts to explicitly: foreach (string text in objects) over an IEnumerable<object>,
+foreach (int number in longs) over an IEnumerable<long>, and from string text in objects, which
+calls Cast<string>(). The compiler makes those conversions with no cast in the source, and they fail
+or lose data as a cast does. The report marks the type of the variable. A loop with var, or with a
+type that the elements convert to implicitly, gives no report. Because the rule now reports more, a
+build with -warnaserror can fail where it passed with 0.1.2.
+
 New: code fixes for MC0001 and MC0003, in a second assembly, MorseCode.Analyzers.CodeFixes, beside
 the analyzer under analyzers/dotnet/cs. An editor loads it, and the compiler does not, because a
 code fix needs the Roslyn workspaces. For MC0001, the fix puts the arguments in the order of the

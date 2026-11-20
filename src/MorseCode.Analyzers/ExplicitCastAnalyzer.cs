@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Linq;
 using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -23,9 +24,15 @@ namespace MorseCode.Analyzers;
 ///         The analyzer reports each cast expression, whatever the conversion is. The
 ///         report marks the type in parentheses, such as <c>(int)</c>, and not the
 ///         value after it. Thus, a cast on a long expression does not mark the whole
-///         expression. It does not report <c>as</c>, <c>is</c>, a pattern, or a conversion that the
-///         compiler makes without a cast. The message names the target type and says
-///         which way out suits the kind of conversion.
+///         expression. It does not report <c>as</c>, <c>is</c>, a pattern, or an
+///         implicit conversion that the compiler makes without a cast. The message names
+///         the target type and says which way out suits the kind of conversion.
+///     </para>
+///     <para>
+///         A <c>foreach</c> with a type converts each element to that type, with no
+///         cast in the source. A range variable of a query with a type does the same.
+///         The analyzer reports them too, when the conversion is explicit, and marks
+///         the type.
 ///     </para>
 /// </remarks>
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
@@ -95,6 +102,149 @@ public sealed class ExplicitCastAnalyzer : DiagnosticAnalyzer
                         ]));
             },
             syntaxKinds: SyntaxKind.CastExpression);
+
+        context.RegisterSyntaxNodeAction(action: CheckForEach, syntaxKinds: SyntaxKind.ForEachStatement);
+
+        context.RegisterSyntaxNodeAction(
+            action: CheckRangeVariable,
+            syntaxKinds: ImmutableArray.Create(item1: SyntaxKind.FromClause, item2: SyntaxKind.JoinClause));
+    }
+
+    // A foreach with a type converts each element to that type. The compiler says which conversion it makes.
+    private static void CheckForEach(SyntaxNodeAnalysisContext context)
+    {
+        if (context.Node is not ForEachStatementSyntax loop)
+        {
+            return;
+        }
+
+        ForEachStatementInfo info = context.SemanticModel.GetForEachStatementInfo(forEachStatement: loop);
+
+        if (!info.ElementConversion.IsExplicit || info.ElementType is not { } element)
+        {
+            return;
+        }
+
+        ReportEachElement(
+            context: context,
+            type: loop.Type,
+            conversion: info.ElementConversion,
+            element: element,
+            construct: "the foreach casts each element");
+    }
+
+    // A range variable with a type makes the query call Cast. The compiler calls it for each type, thus the
+    // analyzer classifies the conversion from the type of the elements itself.
+    private static void CheckRangeVariable(SyntaxNodeAnalysisContext context)
+    {
+        (TypeSyntax? type, ExpressionSyntax? sequence) =
+            context.Node switch
+            {
+                FromClauseSyntax from => (from.Type, from.Expression),
+                JoinClauseSyntax join => (join.Type, join.InExpression),
+                _ => (null, null)
+            };
+
+        if (type is null
+            || sequence is null
+            || context.SemanticModel.GetTypeInfo(expression: type, cancellationToken: context.CancellationToken).Type
+                is not { } target
+            || ElementType(
+                    sequence: context.SemanticModel.GetTypeInfo(
+                            expression: sequence,
+                            cancellationToken: context.CancellationToken)
+                        .Type,
+                    compilation: context.SemanticModel.Compilation) is not { } element)
+        {
+            return;
+        }
+
+        Conversion conversion =
+            context.SemanticModel.Compilation.ClassifyConversion(source: element, destination: target);
+
+        if (conversion.IsExplicit)
+        {
+            ReportEachElement(
+                context: context,
+                type: type,
+                conversion: conversion,
+                element: element,
+                construct: "the query casts each element with Cast");
+        }
+    }
+
+    // The type of each element of a sequence: T for an IEnumerable<T>, and object for an IEnumerable that is not
+    // generic. Null when the type has more than one IEnumerable<T>, because then the element is not known.
+    private static ITypeSymbol? ElementType(ITypeSymbol? sequence, Compilation compilation)
+    {
+        if (sequence is null or IErrorTypeSymbol)
+        {
+            return null;
+        }
+
+        INamedTypeSymbol generic =
+            compilation.GetSpecialType(specialType: SpecialType.System_Collections_Generic_IEnumerable_T);
+
+        INamedTypeSymbol[] enumerables =
+        [
+            .. sequence.AllInterfaces.Prepend(element: sequence as INamedTypeSymbol)
+                .OfType<INamedTypeSymbol>()
+                .Where(
+                    predicate: candidate =>
+                        SymbolEqualityComparer.Default.Equals(x: candidate.OriginalDefinition, y: generic))
+                .Distinct(comparer: SymbolEqualityComparer.Default)
+                .OfType<INamedTypeSymbol>()
+        ];
+
+        return enumerables.Length switch
+        {
+            0 => compilation.GetSpecialType(specialType: SpecialType.System_Object),
+            1 => enumerables[0].TypeArguments[0],
+            _ => null
+        };
+    }
+
+    private static void ReportEachElement(
+        SyntaxNodeAnalysisContext context,
+        ExpressionSyntax type,
+        Conversion conversion,
+        ITypeSymbol element,
+        string construct)
+    {
+        if (context.SemanticModel.GetTypeInfo(expression: type, cancellationToken: context.CancellationToken).Type is
+            not { } target
+            || target is IErrorTypeSymbol)
+        {
+            return;
+        }
+
+        context.ReportDiagnostic(
+            diagnostic: Diagnostic.Create(
+                descriptor: Rule,
+                location: type.GetLocation(),
+                messageArgs:
+                [
+                    target.ToDisplayString(format: SymbolDisplayFormat.CSharpShortErrorMessageFormat),
+                    $"{construct}; {EachElement(conversion: conversion, element: element, target: target)}"
+                ]));
+    }
+
+    // The way out for a conversion that a foreach or a query makes for each element.
+    private static string EachElement(Conversion conversion, ITypeSymbol element, ITypeSymbol target)
+    {
+        if (conversion.IsUnboxing || conversion.IsReference || (!element.IsValueType && !target.IsValueType))
+        {
+            return "use a sequence of that type, or filter it with OfType";
+        }
+
+        if (conversion.IsNumeric || conversion.IsEnumeration || conversion.IsNullable)
+        {
+            return "keep the elements in a type of the right size, or convert them in one place with a name";
+        }
+
+        return conversion.IsUserDefined
+            ? "call a method that converts each element, with a name that says what it does"
+            : "change the code so that the conversion is not necessary";
     }
 
     // The way out that suits the conversion. The order matters. A cast from dynamic runs an explicit conversion

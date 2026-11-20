@@ -333,6 +333,93 @@ internal sealed class ExplicitCastAnalyzerTests
             .IsEquivalentTo(expected: [DiagnosticSeverity.Warning], ordering: CollectionOrdering.Matching);
     }
 
+    // A foreach with a type makes the conversion that a cast makes, for each element, and the source has no cast.
+    // The report marks the type of the loop variable. A loop with var, with the type of the elements, or with a
+    // type that the elements convert to implicitly, gives no report.
+    [Test]
+    public async Task AForeachThatConvertsEachElementExplicitlyIsReported()
+    {
+        IReadOnlyList<Diagnostic> found =
+            await AnalyzerHarness.Analyze(
+                    analyzer: new ExplicitCastAnalyzer(),
+                    source: """
+                            using System.Collections;
+                            using System.Collections.Generic;
+
+                            public static class Loops
+                            {
+                                public static void Run(
+                                    IEnumerable<object> objects,
+                                    IEnumerable untyped,
+                                    IEnumerable<long> longs,
+                                    IEnumerable<string> strings)
+                                {
+                                    foreach (string text in objects) { _ = text; }
+                                    foreach (string text in untyped) { _ = text; }
+                                    foreach (int number in longs) { _ = number; }
+                                    foreach (var text in objects) { _ = text; }
+                                    foreach (string text in strings) { _ = text; }
+                                    foreach (object value in strings) { _ = value; }
+                                    foreach (long number in longs) { _ = number; }
+                                }
+                            }
+                            """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        await Assert.That(found.Select(selector: static diagnostic => Covered(diagnostic: diagnostic)))
+            .IsEquivalentTo(expected: ["string", "string", "int"], ordering: CollectionOrdering.Matching);
+
+        await Assert.That(found.Select(selector: static diagnostic => diagnostic.GetMessage()))
+            .IsEquivalentTo(
+                expected:
+                [
+                    "Avoid the explicit cast to string: the foreach casts each element; use a sequence of that type, or filter it with OfType",
+                    "Avoid the explicit cast to string: the foreach casts each element; use a sequence of that type, or filter it with OfType",
+                    "Avoid the explicit cast to int: the foreach casts each element; keep the elements in a type of the right size, or convert them in one place with a name"
+                ],
+                ordering: CollectionOrdering.Matching);
+    }
+
+    // A range variable with a type makes the query call Cast for each element, and the source has no cast. The
+    // report marks the type in a from clause and in a join clause. A range variable with no type, or with a
+    // type that the elements convert to implicitly, gives no report.
+    [Test]
+    public async Task AQueryRangeVariableThatConvertsEachElementExplicitlyIsReported()
+    {
+        IReadOnlyList<Diagnostic> found =
+            await AnalyzerHarness.Analyze(
+                    analyzer: new ExplicitCastAnalyzer(),
+                    source: """
+                            using System.Collections;
+                            using System.Collections.Generic;
+                            using System.Linq;
+
+                            public static class Queries
+                            {
+                                public static void Run(IEnumerable<object> objects, IEnumerable untyped, IEnumerable<string> strings)
+                                {
+                                    _ = from string text in objects select text.Length;
+                                    _ = from string text in untyped select text.Length;
+                                    _ = from text in strings join string other in objects on text equals other select text;
+                                    _ = from text in strings select text.Length;
+                                    _ = from object value in strings select value;
+                                }
+                            }
+                            """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        await Assert.That(found.Select(selector: static diagnostic => Covered(diagnostic: diagnostic)))
+            .IsEquivalentTo(expected: ["string", "string", "string"], ordering: CollectionOrdering.Matching);
+
+        await Assert.That(found.Select(selector: static diagnostic => diagnostic.GetMessage()).Distinct())
+            .IsEquivalentTo(
+                expected:
+                [
+                    "Avoid the explicit cast to string: the query casts each element with Cast; use a sequence of that type, or filter it with OfType"
+                ],
+                ordering: CollectionOrdering.Matching);
+    }
+
     // A suppression is how the few places that need a cast say so. The reason goes next to it. The compiler
     // does not give a diagnostic that a pragma suppresses, thus only the cast after the pragma is left.
     [Test]
