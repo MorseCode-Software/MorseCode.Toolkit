@@ -25,7 +25,9 @@ namespace MorseCode.Analyzers;
 ///         because a positional parameter of a record makes a property and cannot be
 ///         <c>in</c>. It does not report a <c>params</c> parameter, which cannot be
 ///         <c>in</c> either. It does not report a parameter of an attribute, because
-///         C# refuses a use of an attribute with an <c>in</c> parameter.
+///         C# refuses a use of an attribute with an <c>in</c> parameter. It does
+///         not report a by-value <c>scoped</c> parameter, because no spelling with
+///         <c>in</c> keeps its value scoped.
 ///     </para>
 ///     <para>
 ///         The analyzer uses nullable types and not Maybe, because it runs in the
@@ -144,7 +146,17 @@ public sealed class PrimaryConstructorParameterAnalyzer : DiagnosticAnalyzer
         return false;
     }
 
-    // A params parameter cannot be in, thus it is not reported.
+    // The rule does not report a params parameter, because it cannot be in. It does not report a by-value scoped
+    // parameter either. Scoped in limits the reference and not the value, thus no spelling with in keeps the value
+    // scoped. The compiler refuses a member that uses a ref-like parameter (CS9110), and a field that a scoped value
+    // initializes (CS8352). Thus, the parameter cannot become hidden state.
     private static bool IsNotIn(ParameterSyntax parameter) =>
-        !parameter.Modifiers.Any(kind: SyntaxKind.InKeyword) && !parameter.Modifiers.Any(kind: SyntaxKind.ParamsKeyword);
+        !parameter.Modifiers.Any(kind: SyntaxKind.InKeyword)
+        && !parameter.Modifiers.Any(kind: SyntaxKind.ParamsKeyword)
+        && !IsScopedByValue(parameter: parameter);
+
+    private static bool IsScopedByValue(BaseParameterSyntax parameter) =>
+        parameter.Modifiers.Any(kind: SyntaxKind.ScopedKeyword)
+        && !parameter.Modifiers.Any(kind: SyntaxKind.RefKeyword)
+        && !parameter.Modifiers.Any(kind: SyntaxKind.OutKeyword);
 }

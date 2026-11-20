@@ -130,6 +130,50 @@ internal sealed class PrimaryConstructorParameterAnalyzerTests
             .IsEquivalentTo(expected: ["count", "value"], ordering: CollectionOrdering.Matching);
     }
 
+    // A by-value scoped parameter cannot be in and stay scoped: scoped in limits the reference, and the value is
+    // then not scoped. The compiler refuses a member that uses a ref-like parameter (CS9110), and a field that a
+    // scoped value initializes (CS8352). Thus, the rule does not report it. The caller returns a value that a
+    // stackalloc span made, which compiles only while the parameter has scoped. A ref-like parameter without
+    // scoped can be in, and it gets the report as before.
+    [Test]
+    public async Task AByValueScopedParameterIsNotReported()
+    {
+        IReadOnlyList<Diagnostic> found =
+            await Analyze(
+                    source: """
+                            using System;
+
+                            public ref struct Window(scoped ReadOnlySpan<int> values)
+                            {
+                                public int Length { get; } = values.Length;
+                            }
+
+                            public ref struct Open(ReadOnlySpan<int> values)
+                            {
+                                public int Length { get; } = values.Length;
+                            }
+
+                            public static class Callers
+                            {
+                                public static Window Make()
+                                {
+                                    Span<int> local = stackalloc int[1];
+
+                                    return new Window(values: local);
+                                }
+                            }
+                            """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        await Assert.That(Covered(found: found))
+            .IsEquivalentTo(expected: ["values"], ordering: CollectionOrdering.Matching);
+
+        await Assert.That(found[0].GetMessage())
+            .IsEqualTo(
+                expected: "The primary constructor parameter values of Open is not in: write in, or copy the value "
+                          + "to a field");
+    }
+
     // An editor can analyze code before it loads the references. Then the compilation has no System.Attribute,
     // and the rule reports a parameter as it does for each class that is not an attribute.
     [Test]

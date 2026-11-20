@@ -27,10 +27,9 @@ namespace MorseCode.Analyzers.CodeFixes;
 ///         the person makes.
 ///     </para>
 ///     <para>
-///         The fix writes <c>in</c> only on a parameter with no modifier, or
-///         with only <c>scoped</c>. A <c>ref</c>, <c>out</c>, or
-///         <c>ref readonly</c> parameter has a different meaning, and the fix does
-///         not change it.
+///         The fix writes <c>in</c> only on a parameter with no modifier. A
+///         <c>ref</c>, <c>out</c>, or <c>ref readonly</c> parameter has a different
+///         meaning, and the fix does not change it.
 ///     </para>
 /// </remarks>
 [ExportCodeFixProvider(LanguageNames.CSharp, Name = nameof(PrimaryConstructorParameterCodeFixProvider))]
@@ -134,9 +133,9 @@ public sealed class PrimaryConstructorParameterCodeFixProvider : CodeFixProvider
     private static ParameterSyntax? Find(SyntaxNode root, Diagnostic diagnostic) =>
         root.FindToken(position: diagnostic.Location.SourceSpan.Start).Parent as ParameterSyntax;
 
-    // The parameter with in, or null when it has a modifier other than scoped. Scoped comes before in. With no
-    // modifier, in takes the leading trivia of the type, which is the space after an attribute or the indent of
-    // a line.
+    // The parameter with in, or null when it has a modifier. With no modifier, in takes the leading trivia of
+    // the type, which is the space after an attribute or the indent of a line. The rule does not report a
+    // by-value scoped parameter, thus the fix gets none.
     private static ParameterSyntax? WithIn(ParameterSyntax parameter)
     {
         SyntaxToken @in =
@@ -148,8 +147,6 @@ public sealed class PrimaryConstructorParameterCodeFixProvider : CodeFixProvider
                 .WithType(type: type.WithLeadingTrivia())
                 .WithModifiers(
                     modifiers: SyntaxFactory.TokenList(token: @in.WithLeadingTrivia(trivia: type.GetLeadingTrivia()))),
-            { Modifiers: { Count: 1 } modifiers } when modifiers[index: 0].IsKind(kind: SyntaxKind.ScopedKeyword) =>
-                parameter.AddModifiers(items: @in),
             _ => null
         };
     }

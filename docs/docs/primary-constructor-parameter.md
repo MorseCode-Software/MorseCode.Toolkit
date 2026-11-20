@@ -59,6 +59,9 @@ It doesn't report:
 - A `params` parameter, which can't be `in`.
 - A parameter of an attribute. C# won't apply an attribute whose constructor has an `in` parameter
   (CS8358), so `in` would break every use of it.
+- A by-value `scoped` parameter, as in `ref struct Window(scoped ReadOnlySpan<int> values)`.
+  `scoped in` scopes the reference and not the value, so no spelling with `in` keeps the value
+  scoped, and the compiler already refuses to let a member use the parameter (CS9110).
 - A type with an ordinary constructor.
 
 The warning marks the name of the parameter.
@@ -85,7 +88,7 @@ Studio 2022 17.4 or later.
 ## Fixing it
 
 From version 0.1.3, an editor that offers the code fixes of Roslyn analyzers, such as Visual Studio,
-offers **Make the parameter in**. It writes `in` before the type, or after `scoped`.
+offers **Make the parameter in**. It writes `in` before the type.
 
 It's offered only where `in` compiles. The fix first compiles each part of the type with the change,
 including a part in another file, and isn't offered when that adds an error: where a member captures

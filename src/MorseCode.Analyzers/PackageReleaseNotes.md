@@ -7,6 +7,14 @@ library those uses are in other projects, where the library's own build does not
 now leaves out a type that derives from System.Attribute, directly or through another attribute,
 abstract or not, as it already left out a params parameter.
 
+Fixed: MC0003 reported a by-value scoped parameter, such as
+ref struct Window(scoped ReadOnlySpan<int> values). No spelling with in keeps such a value scoped:
+scoped in limits the reference, and the value is then not scoped, so a caller in another type that
+returns what the constructor made no longer compiles (CS8347). The other advice of the message, to
+copy the value to a field, is what the compiler refuses for a scoped value (CS8352). The compiler
+also refuses a member that uses a ref-like parameter (CS9110), so such a parameter cannot become the
+hidden state that the rule is about. The rule no longer reports it.
+
 Changed: MC0001 now also checks the arguments of an indexer, such as grid[column: 2, row: 1], and
 the constructor arguments of an attribute, such as [Range(maximum: 9, minimum: 1)]. Before, it
 checked calls of methods, local functions, delegates, and constructors only, so named arguments out
@@ -54,7 +62,7 @@ an effect, or one has and each other argument is a constant, the title of the fi
 puts the arguments in order. In each other case, the title says that it changes the order in which
 they run, and the fix has a different equivalence key, so a fix of all reports with the first key
 never moves an effect. The fix is not offered when one argument declares a variable that a
-different argument names. For MC0003, the fix writes in before the type, or after scoped. It first
+different argument names. For MC0003, the fix writes in before the type. It first
 compiles each part of the type with the change, and is offered only when that adds no error, so it
 is not offered for a parameter that a member captures, that a lambda uses, or that code writes. It
 does not change a ref, out, or ref readonly parameter. Each fix has a fix of all reports for a
