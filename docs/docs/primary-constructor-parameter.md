@@ -88,12 +88,19 @@ Studio 2022 17.4 or later.
 ## Fixing it
 
 From version 0.1.3, an editor that offers the code fixes of Roslyn analyzers, such as Visual Studio,
-offers **Make the parameter in**. It writes `in` before the type.
+offers **Make the parameter in**. It writes `in` before the type. On a parameter of a ref struct it
+offers **Make the parameter scoped in** instead, and writes `scoped in`.
 
 It's offered only where `in` compiles. The fix first compiles each part of the type with the change,
 including a part in another file, and isn't offered when that adds an error: where a member captures
 the parameter (CS9109), where a lambda or a local function uses it (CS1628), or where code writes
 it. Those need the value copied to a field, as above, and the fix leaves that to you.
+
+A ref struct needs `scoped in` because plain `in` lets the value the constructor makes hold the
+reference. A caller that returns that value from one of its own parameters, from a constant, or from
+an array then stops compiling (CS8347), and that caller is often in another type or project, where
+the fix's check doesn't look. The warning on such a parameter says `write scoped in` for the same
+reason.
 
 It doesn't change a `ref`, `out`, or `ref readonly` parameter, which means something else. A fix of
 all reports, in a document, a project, or a solution, writes `in` wherever it compiles.

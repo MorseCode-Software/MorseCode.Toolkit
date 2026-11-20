@@ -170,8 +170,49 @@ internal sealed class PrimaryConstructorParameterAnalyzerTests
 
         await Assert.That(found[0].GetMessage())
             .IsEqualTo(
-                expected: "The primary constructor parameter values of Open is not in: write in, or copy the value "
-                          + "to a field");
+                expected: "The primary constructor parameter values of Open is not in: write scoped in, or copy the "
+                          + "value to a field");
+    }
+
+    // An in parameter of the constructor of a ref struct lets the result capture the reference. Thus, a caller
+    // that returns the result does not compile. Scoped in does not let it. Thus, the report on a parameter of a
+    // ref struct says scoped in, also for a readonly ref struct. The report on a different struct says in.
+    [Test]
+    public async Task TheReportOnAParameterOfARefStructSaysScopedIn()
+    {
+        IReadOnlyList<Diagnostic> found =
+            await Analyze(
+                    source: """
+                            using System;
+
+                            public ref struct Number(int value)
+                            {
+                                public int Value { get; } = value;
+                            }
+
+                            public readonly ref struct Open(ReadOnlySpan<int> values)
+                            {
+                                public int Length { get; } = values.Length;
+                            }
+
+                            public struct Plain(int value)
+                            {
+                                public int Value { get; } = value;
+                            }
+                            """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        await Assert.That(found.Select(selector: static diagnostic => diagnostic.GetMessage()))
+            .IsEquivalentTo(
+                expected:
+                [
+                    "The primary constructor parameter value of Number is not in: write scoped in, or copy the value "
+                    + "to a field",
+                    "The primary constructor parameter values of Open is not in: write scoped in, or copy the value "
+                    + "to a field",
+                    "The primary constructor parameter value of Plain is not in: write in, or copy the value to a field"
+                ],
+                ordering: CollectionOrdering.Matching);
     }
 
     // The parameter of a derived class that goes to the base is a primary constructor parameter too.
