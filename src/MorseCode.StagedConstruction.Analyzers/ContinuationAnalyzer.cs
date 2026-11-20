@@ -70,7 +70,8 @@ public sealed class ContinuationAnalyzer : DiagnosticAnalyzer
     private static void Check(OperationAnalysisContext context, KnownSymbols symbols)
     {
         if (context.Operation is not IAnonymousFunctionOperation lambda
-            || Continuation.From(lambda: lambda, symbols: symbols) is not { } continuation)
+            || Continuation.From(lambda: lambda, symbols: symbols, graph: context.GetControlFlowGraph) is not
+                { } continuation)
         {
             return;
         }
@@ -138,7 +139,6 @@ public sealed class ContinuationAnalyzer : DiagnosticAnalyzer
     private static HashSet<IOperation> ResultFunctions(Continuation continuation, CancellationToken cancellationToken)
     {
         HashSet<IOperation> functions = [continuation.Lambda];
-        HashSet<ILocalSymbol> readLocals = new(comparer: SymbolEqualityComparer.Default);
         Stack<IOperation> toRead = new(collection: [continuation.Lambda]);
 
         while (toRead.Count > 0)
@@ -154,7 +154,6 @@ public sealed class ContinuationAnalyzer : DiagnosticAnalyzer
                 from lambda in LambdasOfTheValue(
                     continuation: continuation,
                     value: leaf,
-                    readLocals: readLocals,
                     cancellationToken: cancellationToken)
                 select lambda;
 
@@ -169,66 +168,59 @@ public sealed class ContinuationAnalyzer : DiagnosticAnalyzer
     }
 
     // The lambdas that a call gets for its value. Each is an argument that is a lambda, or a local variable
-    // that a lambda initializes. Each returns a Constructed and is not a continuation. For a local variable
-    // that holds the value, the search reads its initial value. The search reads each local variable one
-    // time. Thus, it ends also at a local variable that reads its own value.
+    // that can hold a lambda. Each returns a Constructed and is not a continuation. For a local variable
+    // that holds the value, the search reads each value that the variable can hold. No such value is a
+    // local variable, thus the search ends.
     private static IEnumerable<IAnonymousFunctionOperation> LambdasOfTheValue(
         Continuation continuation,
         IOperation value,
-        ISet<ILocalSymbol> readLocals,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        switch (OperationTree.Unwrap(operation: value))
+        return OperationTree.Unwrap(operation: value) switch
         {
-            case ILocalReferenceOperation local:
-                if (!readLocals.Add(item: local.Local)
-                    || continuation.InitialValue(local: local.Local) is not { } initial)
-                {
-                    return [];
-                }
-
-                return
-                [
-                    .. OperationTree.Leaves(value: initial)
-                        .SelectMany(
-                            selector: leaf => LambdasOfTheValue(
-                                continuation: continuation,
-                                value: leaf,
-                                readLocals: readLocals,
-                                cancellationToken: cancellationToken))
-                ];
-            case IInvocationOperation call:
-                return
-                [
-                    .. from argument in call.Arguments
-                    let lambda = Lambda(continuation: continuation, argument: argument.Value, readLocals: readLocals)
-                    where lambda is not null
-                          && continuation.Symbols.IsConstructed(type: lambda.Symbol.ReturnType)
-                          && !continuation.IsContinuation(function: lambda)
-                    select lambda
-                ];
-            default:
-                return [];
-        }
+            ILocalReferenceOperation local =>
+            [
+                .. continuation.ValuesOf(read: local, cancellationToken: cancellationToken)
+                    .SelectMany(
+                        selector: held => LambdasOfTheValue(
+                            continuation: continuation,
+                            value: held,
+                            cancellationToken: cancellationToken))
+            ],
+            IInvocationOperation call =>
+            [
+                .. from argument in call.Arguments
+                from lambda in Lambdas(
+                    continuation: continuation,
+                    argument: argument.Value,
+                    cancellationToken: cancellationToken)
+                where continuation.Symbols.IsConstructed(type: lambda.Symbol.ReturnType)
+                      && !continuation.IsContinuation(function: lambda)
+                select lambda
+            ],
+            _ => []
+        };
     }
 
-    // The lambda that an argument gives: the lambda itself, or a local variable that a lambda initializes.
-    private static IAnonymousFunctionOperation? Lambda(
+    // The lambdas that an argument gives: the lambda itself, or each lambda that a local variable can hold.
+    private static IEnumerable<IAnonymousFunctionOperation> Lambdas(
         Continuation continuation,
         IOperation? argument,
-        ISet<ILocalSymbol> readLocals) =>
+        CancellationToken cancellationToken) =>
         OperationTree.Unwrap(operation: argument) switch
         {
-            IDelegateCreationOperation { Target: IAnonymousFunctionOperation lambda } => lambda,
-            IAnonymousFunctionOperation lambda => lambda,
-            ILocalReferenceOperation local when readLocals.Add(item: local.Local) =>
-                Lambda(
-                    continuation: continuation,
-                    argument: continuation.InitialValue(local: local.Local),
-                    readLocals: readLocals),
-            _ => null
+            IDelegateCreationOperation { Target: IAnonymousFunctionOperation lambda } => [lambda],
+            IAnonymousFunctionOperation lambda => [lambda],
+            ILocalReferenceOperation local =>
+                continuation.ValuesOf(read: local, cancellationToken: cancellationToken)
+                    .SelectMany(
+                        selector: held => Lambdas(
+                            continuation: continuation,
+                            argument: held,
+                            cancellationToken: cancellationToken)),
+            _ => []
         };
 
     private static IEnumerable<Diagnostic> ReturnedValue(
@@ -247,15 +239,25 @@ public sealed class ContinuationAnalyzer : DiagnosticAnalyzer
             ];
         }
 
-        // A variable that holds the result stands for the call that made it.
-        IOperation? value =
-            leaf is ILocalReferenceOperation local ? continuation.InitialValue(local: local.Local) : leaf;
+        // A variable that holds the result stands for each call that can give it its value.
+        IEnumerable<IOperation> values =
+            leaf is ILocalReferenceOperation local
+                ? continuation.ValuesOf(read: local, cancellationToken: cancellationToken)
+                : ImmutableArray.Create(item: leaf);
 
-        if (value is IInvocationOperation call
-            && continuation.Symbols.IsConstruct(method: call.TargetMethod)
-            && Source(continuation: continuation, handle: call.Instance, cancellationToken: cancellationToken) is
-                IInvocationOperation source
-            && continuation.Symbols.IsConstructorFrom(method: source.TargetMethod))
+        bool isForeign =
+            values.OfType<IInvocationOperation>()
+                .Where(predicate: call => continuation.Symbols.IsConstruct(method: call.TargetMethod))
+                .SelectMany(
+                    selector: call =>
+                        Sources(
+                            continuation: continuation,
+                            handle: call.Instance,
+                            cancellationToken: cancellationToken))
+                .OfType<IInvocationOperation>()
+                .Any(predicate: source => continuation.Symbols.IsConstructorFrom(method: source.TargetMethod));
+
+        if (isForeign)
         {
             return
             [
@@ -269,38 +271,44 @@ public sealed class ContinuationAnalyzer : DiagnosticAnalyzer
         return [];
     }
 
-    // The operation that made a handle. The search goes back through each Select and through each local
-    // variable. If the search finds a local variable a second time, the variable reads its own value in
-    // its declaration. That does not compile, but an editor analyzes the code while the user types it.
-    // Thus, the search stops there, and the handle has no source. The search also stops when the compiler
-    // cancels the analysis.
-    private static IOperation? Source(
+    // Each operation that can make a handle. The search goes back through each Select and through each
+    // value that a local variable can hold. A Select in a loop can read the value that it gave before,
+    // thus the search reads each operation one time. The search also stops when the compiler cancels the
+    // analysis.
+    private static IEnumerable<IOperation> Sources(
         Continuation continuation,
         IOperation? handle,
         CancellationToken cancellationToken)
     {
-        HashSet<ILocalSymbol> visited = new(comparer: SymbolEqualityComparer.Default);
-        IOperation? current = OperationTree.Unwrap(operation: handle);
+        HashSet<IOperation> visited = [];
+        Stack<IOperation?> toRead = new(collection: [handle]);
 
-        while (true)
+        while (toRead.Count > 0)
         {
             cancellationToken.ThrowIfCancellationRequested();
+
+            if (OperationTree.Unwrap(operation: toRead.Pop()) is not { } current || !visited.Add(item: current))
+            {
+                continue;
+            }
 
             switch (current)
             {
                 case IInvocationOperation select when continuation.Symbols.IsSelect(method: select.TargetMethod):
-                    current = OperationTree.Unwrap(operation: select.Instance);
+                    toRead.Push(item: select.Instance);
                     break;
-                case ILocalReferenceOperation local when continuation.InitialValue(local: local.Local) is { } initial:
-                    if (!visited.Add(item: local.Local))
+                case ILocalReferenceOperation local:
+                    foreach (IOperation value in continuation.ValuesOf(
+                                 read: local,
+                                 cancellationToken: cancellationToken))
                     {
-                        return null;
+                        toRead.Push(item: value);
                     }
 
-                    current = initial;
                     break;
                 default:
-                    return current;
+                    yield return current;
+                    break;
             }
         }
     }

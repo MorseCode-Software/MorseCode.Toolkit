@@ -475,6 +475,261 @@ internal sealed class ContinuationAnalyzerTests
             .IsEquivalentTo(expected: ["MC1004"], ordering: CollectionOrdering.Matching);
     }
 
+    // MC1004 follows a returned local variable to each value that can get to the return. A subsequent write
+    // replaces an earlier write. The analyzer follows a chain of variables, and each path through a branch,
+    // a loop, and a try statement counts. An out argument and a write in a lambda give a value that the analyzer cannot
+    // know, thus they give no report. Before, the analyzer read only the declaration of the variable. The
+    // chain does not use the handle, which is MC1006.
+    [Test]
+    public async Task AReturnedVariableIsFollowedToEachValueThatCanGetToTheReturn()
+    {
+        IReadOnlyList<Diagnostic> replaced =
+            await AnalyzeBody(
+                    statements: $"""
+                                 Constructed<Thing> made = {Samples.Foreign};
+                                 made = construct.Construct({Samples.Make});
+                                 return made;
+                                 """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        IReadOnlyList<Diagnostic> chain =
+            await AnalyzeBody(
+                    statements: $"""
+                                 Constructed<Thing> first = {Samples.Foreign};
+                                 Constructed<Thing> second = first;
+                                 return second;
+                                 """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        IReadOnlyList<Diagnostic> branch =
+            await AnalyzeBody(
+                    statements: $$"""
+                                  Constructed<Thing> made = construct.Construct({{Samples.Make}});
+
+                                  if (Use.Flag)
+                                  {
+                                      made = {{Samples.Foreign}};
+                                  }
+
+                                  return made;
+                                  """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        IReadOnlyList<Diagnostic> loopThatRunsOnce =
+            await AnalyzeBody(
+                    statements: $$"""
+                                  Constructed<Thing> made = {{Samples.Foreign}};
+
+                                  do
+                                  {
+                                      made = construct.Construct({{Samples.Make}});
+                                  }
+                                  while (Use.Flag);
+
+                                  return made;
+                                  """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        IReadOnlyList<Diagnostic> loopLeftAtABreak =
+            await AnalyzeBody(
+                    statements: $$"""
+                                  Constructed<Thing> made = {{Samples.Foreign}};
+
+                                  while (true)
+                                  {
+                                      made = construct.Construct({{Samples.Make}});
+
+                                      break;
+                                  }
+
+                                  return made;
+                                  """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        IReadOnlyList<Diagnostic> tryAndCatch =
+            await AnalyzeBody(
+                    statements: $$"""
+                                  Constructed<Thing> made = construct.Construct({{Samples.Make}});
+
+                                  try
+                                  {
+                                      made = {{Samples.Foreign}};
+                                  }
+                                  catch (InvalidOperationException)
+                                  {
+                                      made = construct.Construct({{Samples.Make}});
+                                  }
+
+                                  return made;
+                                  """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        IReadOnlyList<Diagnostic> outArgument =
+            await AnalyzeBody(
+                    statements: $"""
+                                 Constructed<Thing> made = {Samples.Foreign};
+                                 Replace(value: out made);
+
+                                 return made;
+
+                                 void Replace(out Constructed<Thing> value) => value = construct.Construct({Samples.Make});
+                                 """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        IReadOnlyList<Diagnostic> writtenInALambda =
+            await AnalyzeBody(
+                    statements: $"""
+                                 Constructed<Thing> made = {Samples.Foreign};
+                                 _ = Helpers.Now(f: () => made = construct.Construct({Samples.Make}));
+
+                                 return made;
+                                 """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        await Assert.That(replaced).IsEmpty();
+
+        await Assert.That(Ids(found: chain))
+            .IsEquivalentTo(expected: ["MC1006", "MC1004"], ordering: CollectionOrdering.Matching);
+
+        await Assert.That(Covered(found: chain))
+            .IsEquivalentTo(expected: ["construct", "second"], ordering: CollectionOrdering.Matching);
+
+        await Assert.That(Ids(found: branch))
+            .IsEquivalentTo(expected: ["MC1004"], ordering: CollectionOrdering.Matching);
+
+        await Assert.That(loopThatRunsOnce).IsEmpty();
+        await Assert.That(loopLeftAtABreak).IsEmpty();
+
+        await Assert.That(Ids(found: tryAndCatch))
+            .IsEquivalentTo(expected: ["MC1004"], ordering: CollectionOrdering.Matching);
+
+        await Assert.That(outArgument).IsEmpty();
+        await Assert.That(writtenInALambda).IsEmpty();
+    }
+
+    // A write in a finally block and a write through a ref local can occur out of the order of the graph.
+    // Thus, the variable gives no value, and no report. A lambda can read a variable of the continuation at
+    // any time. Thus, it gets a value only from a variable with one write. In the last sample, that write
+    // is the result of a different handle. That sample does not use the handle, which is MC1006.
+    [Test]
+    public async Task AVariableThatCanChangeOutOfOrderIsNotFollowed()
+    {
+        IReadOnlyList<Diagnostic> finallyWrite =
+            await AnalyzeBody(
+                    statements: $$"""
+                                  Constructed<Thing> made = {{Samples.Foreign}};
+
+                                  try
+                                  {
+                                      made = {{Samples.Foreign}};
+                                  }
+                                  finally
+                                  {
+                                      made = construct.Construct({{Samples.Make}});
+                                  }
+
+                                  return made;
+                                  """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        IReadOnlyList<Diagnostic> refAlias =
+            await AnalyzeBody(
+                    statements: $"""
+                                 Constructed<Thing> made = {Samples.Foreign};
+                                 ref Constructed<Thing> alias = ref made;
+                                 alias = construct.Construct({Samples.Make});
+
+                                 return made;
+                                 """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        IReadOnlyList<Diagnostic> readInALambdaAfterTwoWrites =
+            await AnalyzeBody(
+                    statements: $$"""
+                                  Constructed<Thing> made = construct.Construct({{Samples.Make}});
+
+                                  if (Use.Flag)
+                                  {
+                                      made = {{Samples.Foreign}};
+                                  }
+
+                                  return Transaction.Run(f: () => made);
+                                  """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        IReadOnlyList<Diagnostic> readInALambdaAfterOneWrite =
+            await AnalyzeBody(
+                    statements: $"""
+                                 Constructed<Thing> made = {Samples.Foreign};
+
+                                 return Transaction.Run(f: () => made);
+                                 """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        await Assert.That(finallyWrite).IsEmpty();
+        await Assert.That(refAlias).IsEmpty();
+        await Assert.That(readInALambdaAfterTwoWrites).IsEmpty();
+
+        await Assert.That(Ids(found: readInALambdaAfterOneWrite))
+            .IsEquivalentTo(expected: ["MC1006", "MC1004"], ordering: CollectionOrdering.Matching);
+    }
+
+    // MC1004 also follows a local variable that holds a handle, or a lambda that a returned call runs. In
+    // the first sample, the handle in the variable is from Constructor.From on one path. In the second, a
+    // subsequent write replaces the handle from Constructor.From. In the two samples, a write that is not a
+    // declaration stores the handle, which is MC1007. In the third sample, a subsequent write replaces the
+    // lambda that returns the result of the handle. The first lambda holds the handle and is not an
+    // argument, which is MC1007.
+    [Test]
+    public async Task AHandleAndALambdaInAVariableAreFollowedToEachValue()
+    {
+        IReadOnlyList<Diagnostic> handleOnOnePath =
+            await AnalyzeBody(
+                    statements: $$"""
+                                  Constructor<Values> next = Constructor.From(values: new Values());
+
+                                  if (Use.Flag)
+                                  {
+                                      next = construct;
+                                  }
+
+                                  return next.Construct({{Samples.Make}});
+                                  """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        IReadOnlyList<Diagnostic> handleReplaced =
+            await AnalyzeBody(
+                    statements: $"""
+                                 Constructor<Values> next = Constructor.From(values: new Values());
+                                 next = construct;
+
+                                 return next.Construct({Samples.Make});
+                                 """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        IReadOnlyList<Diagnostic> lambdaReplaced =
+            await AnalyzeBody(
+                    statements: $"""
+                                 Func<Constructed<Thing>> run = () => construct.Construct({Samples.Make});
+                                 run = () => {Samples.Foreign};
+
+                                 return Transaction.Run(f: run);
+                                 """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        await Assert.That(Ids(found: handleOnOnePath))
+            .IsEquivalentTo(expected: ["MC1007", "MC1004"], ordering: CollectionOrdering.Matching);
+
+        await Assert.That(Ids(found: handleReplaced))
+            .IsEquivalentTo(expected: ["MC1007"], ordering: CollectionOrdering.Matching);
+
+        await Assert.That(Ids(found: lambdaReplaced))
+            .IsEquivalentTo(expected: ["MC1007", "MC1004"], ordering: CollectionOrdering.Matching);
+
+        await Assert.That(Covered(found: lambdaReplaced))
+            .IsEquivalentTo(expected: ["construct", Samples.Foreign], ordering: CollectionOrdering.Matching);
+    }
+
     // A lambda in an inner continuation is also in the outer continuation. Before, the two continuations
     // took its return as their result. Thus, each value had two reports, and one of them named the handle
     // of the outer continuation.
@@ -865,6 +1120,10 @@ internal sealed class ContinuationAnalyzerTests
 
     private static Task<IReadOnlyList<Diagnostic>> Analyze(string source) =>
         AnalyzerHarness.Analyze(analyzer: new ContinuationAnalyzer(), source: source);
+
+    // A continuation of a base whose body is the statements.
+    private static Task<IReadOnlyList<Diagnostic>> AnalyzeBody(string statements) =>
+        Analyze(source: Samples.OfBase(continuation: $"(output, construct) =>\n{{\n{statements}\n}}"));
 
     private static List<string> Ids(IEnumerable<Diagnostic> found) =>
     [

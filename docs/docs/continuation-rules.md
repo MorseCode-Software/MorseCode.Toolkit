@@ -114,6 +114,14 @@ made its handle. It reports only when that call is `Constructor.From` inside the
 value that comes out of a helper method is not reported, because the analyzer can't see where it
 came from.
 
+For a local variable, the rule reads every value that can reach the point where the variable is
+read, along any path through the code. A later assignment replaces an earlier one, and a branch, a
+loop, or a `try` statement adds the values from each path through it. A chain of variables is
+followed to its end. Where the analyzer can't know the value, it reports nothing: after an `out` or
+`ref` argument, or for a variable that a lambda or a `finally` block assigns, or that a `ref` local
+refers to. A lambda can run at any time, so when a lambda reads a variable of the continuation, the
+rule follows that variable only if it is assigned once.
+
 MC1003 and MC1004 read the values that the continuation can return. A call that returns the value of
 a lambda it gets, such as `Transaction.Run(() => ...)`, makes that lambda's returns part of the
 result, also when a local variable holds the lambda or the value of the call. A lambda whose value

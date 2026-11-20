@@ -1,7 +1,10 @@
+using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Threading;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.FlowAnalysis;
 using Microsoft.CodeAnalysis.Operations;
 
 namespace MorseCode.StagedConstruction.Analyzers;
@@ -13,19 +16,29 @@ namespace MorseCode.StagedConstruction.Analyzers;
 internal sealed class Continuation
 {
     private readonly ImmutableHashSet<ILocalSymbol> aliases;
+    private readonly Func<ControlFlowGraph> graph;
+
+    // Most continuations return the result of Construct directly and read no local variable. Thus, the
+    // graph and its analysis occur only at the first read.
+    private readonly Lazy<LocalValues> values;
 
     private Continuation(
         IAnonymousFunctionOperation lambda,
         IParameterSymbol handle,
         KnownSymbols symbols,
         ImmutableArray<IOperation> operations,
-        ImmutableHashSet<ILocalSymbol> aliases)
+        ImmutableHashSet<ILocalSymbol> aliases,
+        Func<ControlFlowGraph> graph)
     {
         this.Lambda = lambda;
         this.Handle = handle;
         this.Symbols = symbols;
         this.Operations = operations;
         this.aliases = aliases;
+        this.graph = graph;
+
+        this.values = new Lazy<LocalValues>(
+            valueFactory: () => new LocalValues(lambda: lambda, operations: operations, rootGraph: graph));
     }
 
     /// <summary>
@@ -53,13 +66,20 @@ internal sealed class Continuation
     /// </summary>
     /// <param name="lambda">The lambda.</param>
     /// <param name="symbols">The types of the library.</param>
+    /// <param name="graph">
+    ///     Gives the control flow graph of the method body or the initializer that
+    ///     holds the lambda.
+    /// </param>
     /// <returns>
     ///     The continuation. Null if the lambda does not become a
     ///     <c>StageContinuation</c>, or if its second parameter is not a handle. A
     ///     stage can give a value of a different type to its continuation, and no
     ///     rule applies to that continuation.
     /// </returns>
-    public static Continuation? From(IAnonymousFunctionOperation lambda, KnownSymbols symbols)
+    public static Continuation? From(
+        IAnonymousFunctionOperation lambda,
+        KnownSymbols symbols,
+        Func<ControlFlowGraph> graph)
     {
         if (lambda.Parent is not IDelegateCreationOperation creation
             || !symbols.IsContinuation(type: creation.Type)
@@ -77,7 +97,8 @@ internal sealed class Continuation
             handle: handle,
             symbols: symbols,
             operations: operations,
-            aliases: FindAliases(handle: handle, symbols: symbols, operations: operations));
+            aliases: FindAliases(handle: handle, symbols: symbols, operations: operations),
+            graph: graph);
     }
 
     /// <summary>
@@ -100,18 +121,17 @@ internal sealed class Continuation
         operation is IParameterReferenceOperation or ILocalReferenceOperation && this.IsHandle(operation: operation);
 
     /// <summary>
-    ///     Gives the value that the declaration of <paramref name="local" /> gives to
-    ///     it.
+    ///     Gives each value that <paramref name="read" /> can get. See
+    ///     <see cref="LocalValues" />.
     /// </summary>
-    /// <param name="local">A local variable of the lambda.</param>
-    /// <returns>The value without conversions, or null if the declaration has none.</returns>
-    public IOperation? InitialValue(ILocalSymbol local) =>
-        OperationTree.Unwrap(
-            operation: this.Operations.OfType<IVariableDeclaratorOperation>()
-                .FirstOrDefault(
-                    predicate: declarator => SymbolEqualityComparer.Default.Equals(x: declarator.Symbol, y: local))
-                ?.GetVariableInitializer()
-                ?.Value);
+    /// <param name="read">A read of a local variable in the lambda.</param>
+    /// <param name="cancellationToken">Stops the search when the compiler cancels the analysis.</param>
+    /// <returns>
+    ///     The values without conversions. None is a local variable. Empty if the
+    ///     analyzer cannot know the value.
+    /// </returns>
+    public ImmutableArray<IOperation> ValuesOf(ILocalReferenceOperation read, CancellationToken cancellationToken) =>
+        this.values.Value.Of(read: read, cancellationToken: cancellationToken);
 
     /// <summary>
     ///     Gives true if <paramref name="function" /> is a continuation with a handle
@@ -120,7 +140,7 @@ internal sealed class Continuation
     /// <param name="function">A lambda in the body of this continuation.</param>
     /// <returns>True for a continuation.</returns>
     public bool IsContinuation(IAnonymousFunctionOperation function) =>
-        From(lambda: function, symbols: this.Symbols) is not null;
+        From(lambda: function, symbols: this.Symbols, graph: this.graph) is not null;
 
     // A local variable holds the handle when its declaration gives it the handle. A second variable
     // can get its value from the first, thus the search repeats until it finds no more.
