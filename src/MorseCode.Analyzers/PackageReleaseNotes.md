@@ -1,5 +1,12 @@
 0.1.3
 
+Fixed: MC0003 reported the primary constructor parameter of an attribute, such as
+class MarkAttribute(int level) : Attribute. C# refuses to apply an attribute whose constructor has an
+in parameter (CS8358), so the change the rule asked for broke every use of the attribute, and in a
+library those uses are in other projects, where the library's own build does not see them. The rule
+now leaves out a type that derives from System.Attribute, directly or through another attribute,
+abstract or not, as it already left out a params parameter.
+
 Changed: MC0001 now also checks the arguments of an indexer, such as grid[column: 2, row: 1], and
 the constructor arguments of an attribute, such as [Range(maximum: 9, minimum: 1)]. Before, it
 checked calls of methods, local functions, delegates, and constructors only, so named arguments out

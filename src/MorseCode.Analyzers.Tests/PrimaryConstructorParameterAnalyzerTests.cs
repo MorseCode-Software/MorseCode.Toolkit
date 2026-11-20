@@ -80,6 +80,56 @@ internal sealed class PrimaryConstructorParameterAnalyzerTests
         await Assert.That(found).IsEmpty();
     }
 
+    // C# refuses a use of an attribute whose constructor has an in parameter (CS8358). Thus, the parameter of
+    // an attribute cannot be in, and the rule does not report it. That is so for an attribute that derives
+    // directly, for one that derives through a different attribute, and for an abstract attribute. The
+    // sample applies the attributes, thus it does not compile if a parameter is in. A class whose name ends
+    // in Attribute, and that does not derive from Attribute, gets the report, as each other class does.
+    [Test]
+    public async Task AParameterOfAnAttributeIsNotReported()
+    {
+        IReadOnlyList<Diagnostic> found =
+            await Analyze(
+                    source: """
+                            using System;
+
+                            [AttributeUsage(AttributeTargets.Class)]
+                            public sealed class MarkAttribute(int level) : Attribute
+                            {
+                                public int Level { get; } = level;
+                            }
+
+                            public abstract class BaseLabelAttribute(int level) : Attribute
+                            {
+                                public int Level { get; } = level;
+                            }
+
+                            [AttributeUsage(AttributeTargets.Class)]
+                            public sealed class LabelAttribute(int level, string text) : BaseLabelAttribute(level)
+                            {
+                                public string Text { get; } = text;
+                            }
+
+                            public class CountAttribute(int count)
+                            {
+                                public int Count { get; } = count;
+                            }
+
+                            public class Holder(int value)
+                            {
+                                public int Value { get; } = value;
+                            }
+
+                            [Mark(1)]
+                            [Label(2, "two")]
+                            public static class Marked;
+                            """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        await Assert.That(Covered(found: found))
+            .IsEquivalentTo(expected: ["count", "value"], ordering: CollectionOrdering.Matching);
+    }
+
     // The parameter of a derived class that goes to the base is a primary constructor parameter too.
     [Test]
     public async Task AParameterThatGoesToTheBaseIsReported()

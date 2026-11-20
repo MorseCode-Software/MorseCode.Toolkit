@@ -24,7 +24,8 @@ namespace MorseCode.Analyzers;
 ///         The analyzer examines classes and structs. It does not examine records,
 ///         because a positional parameter of a record makes a property and cannot be
 ///         <c>in</c>. It does not report a <c>params</c> parameter, which cannot be
-///         <c>in</c> either.
+///         <c>in</c> either. It does not report a parameter of an attribute, because
+///         C# refuses a use of an attribute with an <c>in</c> parameter.
 ///     </para>
 ///     <para>
 ///         The analyzer uses nullable types and not Maybe, because it runs in the
@@ -62,14 +63,29 @@ public sealed class PrimaryConstructorParameterAnalyzer : DiagnosticAnalyzer
         context.ConfigureGeneratedCodeAnalysis(analysisMode: GeneratedCodeAnalysisFlags.None);
         context.EnableConcurrentExecution();
 
-        // A record has its own syntax kinds, thus this registration does not see one.
-        context.RegisterSyntaxNodeAction(
-            action: static syntaxContext =>
-                Check(context: syntaxContext, type: (BaseTypeDeclarationSyntax)syntaxContext.Node),
-            syntaxKinds: ImmutableArray.Create(item1: SyntaxKind.ClassDeclaration, item2: SyntaxKind.StructDeclaration));
+        context.RegisterCompilationStartAction(
+            action: static start =>
+            {
+                INamedTypeSymbol? attribute =
+                    start.Compilation.GetTypeByMetadataName(fullyQualifiedMetadataName: "System.Attribute");
+
+                // A record has its own syntax kinds, thus this registration does not see one.
+                start.RegisterSyntaxNodeAction(
+                    action: syntaxContext =>
+                        Check(
+                            context: syntaxContext,
+                            type: (BaseTypeDeclarationSyntax)syntaxContext.Node,
+                            attribute: attribute),
+                    syntaxKinds: ImmutableArray.Create(
+                        item1: SyntaxKind.ClassDeclaration,
+                        item2: SyntaxKind.StructDeclaration));
+            });
     }
 
-    private static void Check(SyntaxNodeAnalysisContext context, BaseTypeDeclarationSyntax type)
+    private static void Check(
+        SyntaxNodeAnalysisContext context,
+        BaseTypeDeclarationSyntax type,
+        INamedTypeSymbol? attribute)
     {
         // Roslyn 4.4, the oldest compiler that runs the package, has no ParameterList on a class or a
         // struct. Their primary constructors came with C# 12. A newer compiler still puts the list in
@@ -81,7 +97,15 @@ public sealed class PrimaryConstructorParameterAnalyzer : DiagnosticAnalyzer
             return;
         }
 
-        foreach (ParameterSyntax parameter in parameters.Parameters.Where(predicate: IsNotIn))
+        ParameterSyntax[] notIn = [.. parameters.Parameters.Where(predicate: IsNotIn)];
+
+        // The analyzer reads the semantic model only for a type that has a parameter to report.
+        if (notIn.Length == 0 || IsAttribute(context: context, type: type, attribute: attribute))
+        {
+            return;
+        }
+
+        foreach (ParameterSyntax parameter in notIn)
         {
             context.ReportDiagnostic(
                 diagnostic: Diagnostic.Create(
@@ -89,6 +113,35 @@ public sealed class PrimaryConstructorParameterAnalyzer : DiagnosticAnalyzer
                     location: parameter.Identifier.GetLocation(),
                     messageArgs: [parameter.Identifier.Text, type.Identifier.Text]));
         }
+    }
+
+    // C# refuses a use of an attribute whose constructor has an in parameter (CS8358). Thus, a parameter of an
+    // attribute cannot be in, and the rule does not report it. The code fix then breaks each use. A use is frequently
+    // in a different project, and the build of this project does not show its errors. The check reads the chain of base
+    // types, thus it finds an attribute that derives through a different attribute. No code can apply an abstract
+    // attribute, but the rule leaves it out too, so that one rule covers each attribute.
+    private static bool IsAttribute(
+        SyntaxNodeAnalysisContext context,
+        BaseTypeDeclarationSyntax type,
+        INamedTypeSymbol? attribute)
+    {
+        if (attribute is null
+            || context.SemanticModel.GetDeclaredSymbol(
+                declarationSyntax: type,
+                cancellationToken: context.CancellationToken) is not { } symbol)
+        {
+            return false;
+        }
+
+        for (INamedTypeSymbol? current = symbol.BaseType; current is not null; current = current.BaseType)
+        {
+            if (SymbolEqualityComparer.Default.Equals(x: current, y: attribute))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     // A params parameter cannot be in, thus it is not reported.
