@@ -113,9 +113,11 @@
     <!--
         The analyzers of MorseCode.Analyzers, in every project but their own, their code fixes, and
         their tests, so the toolkit keeps the conventions that the package reports. The analyzer
-        project references the code fix project, thus a reference back is a cycle. A finding is a warning of the build,
-        and -warnaserror fails it. ReferenceOutputAssembly keeps the analyzer out of the references
-        of a project. PrivateAssets keeps it out of the dependencies of a package that pack makes.
+        project references the code fix project, thus a reference back is a cycle. A finding is a
+        warning of the build. The Build and Pack tasks of build.cake make each warning an error, as
+        -warnaserror does, and a build in an editor shows it as a warning. ReferenceOutputAssembly
+        keeps the analyzer out of the references of a project. PrivateAssets keeps it out of the
+        dependencies of a package that pack makes.
     -->
     <ItemGroup Condition="'$(MSBuildProjectName)' != 'MorseCode.Analyzers' And '$(MSBuildProjectName)' != 'MorseCode.Analyzers.CodeFixes' And '$(MSBuildProjectName)' != 'MorseCode.Analyzers.Tests'">
         <ProjectReference Include="$(MSBuildThisFileDirectory)MorseCode.Analyzers\MorseCode.Analyzers.csproj"

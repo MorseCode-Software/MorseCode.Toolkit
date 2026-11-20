@@ -238,6 +238,57 @@ internal sealed class NamedArgumentOrderAnalyzerTests
             .IsEquivalentTo(expected: [run + 1, run + 2, run + 3, run + 4, run + 5], ordering: CollectionOrdering.Matching);
     }
 
+    // An argument in parentheses, in checked or unchecked, or with the null-forgiving operator has no
+    // operation of its own. Thus, Roslyn gives the operation of the argument the syntax of the expression in
+    // it. Before, the analyzer found such an argument only for one null-forgiving operator. Each other one
+    // took the last parameter, and a call in order gave a report. The last call has a params array in an
+    // argument of an outer call, which must not take the argument of the outer call.
+    [Test]
+    public async Task AnArgumentInsideParenthesesCheckedOrSuppressionKeepsItsPosition()
+    {
+        IReadOnlyList<Diagnostic> found =
+            await Analyze(
+                    body: """
+                          int x = 1;
+                          string text = "x";
+                          _ = Three(a: (x), b: 2, c: 3);
+                          _ = Three((x), b: 2, c: 3);
+                          _ = Three(a: checked(x * 2), b: 2, c: 3);
+                          _ = Three(a: unchecked(x + 1), b: (2), c: checked((3)));
+                          _ = Three(a: ((x)), b: 2, c: 3);
+                          _ = Suppressed(a: 1, b: (text + "y")!, c: 3);
+                          _ = Suppressed(a: 1, b: (text!), c: 3);
+                          _ = Sum(start: (1), (2), checked(3));
+                          _ = Three(a: Sum(start: (1), 2, 3), b: 2, c: 3);
+                          """,
+                    baseArguments: "a: (1), b: checked(2)")
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        await Assert.That(found).IsEmpty();
+    }
+
+    // An argument in a wrapper that is out of order gives a report too, and the report is on the call.
+    [Test]
+    public async Task AnArgumentInsideAWrapperThatIsOutOfOrderGivesAReport()
+    {
+        IReadOnlyList<Diagnostic> found =
+            await Analyze(
+                    body: """
+                          int x = 1;
+                          _ = Three(b: (2), a: 1, c: 3);
+                          _ = Three(c: checked(x * 3), b: 2, a: (x));
+                          _ = Three(a: 1, c: unchecked(3), b: ((2)));
+                          """,
+                    baseArguments: "a: 1, b: 2")
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        int run = Declarations.Split(separator: '\n').Length;
+
+        await Assert.That(
+                found.Select(selector: static diagnostic => diagnostic.Location.GetLineSpan().StartLinePosition.Line))
+            .IsEquivalentTo(expected: [run + 1, run + 2, run + 3], ordering: CollectionOrdering.Matching);
+    }
+
     // The compiler adds the value of an optional parameter that a call leaves out, and an empty params array.
     // When the call is itself an argument, Roslyn gives such an added argument the syntax of the outer
     // argument. That syntax comes before the arguments of the call. The compiler also makes a call for an
@@ -416,6 +467,44 @@ internal sealed class NamedArgumentOrderAnalyzerTests
                                     + grid.Count
                                     + grid[column: 2, row: 1]
                                     + (maybe?[column: 2, row: 1] ?? 0);
+                            }
+                            """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        await Assert.That(Covered(found: found))
+            .IsEquivalentTo(
+                expected: ["[column: 2, row: 1]", "[column: 2, row: 1]"],
+                ordering: CollectionOrdering.Matching);
+
+        await Assert.That(found[0].GetMessage())
+            .IsEqualTo(
+                expected: "The arguments of Grid.this[int, int] are not in the order of its parameters: row, column");
+    }
+
+    // The arguments of an indexer in an object initializer. The source has a list out of order, a list in
+    // order, and a nested initializer. Each report covers the brackets, as for an indexer elsewhere.
+    [Test]
+    public async Task TheArgumentsOfAnIndexerInAnObjectInitializerAreChecked()
+    {
+        IReadOnlyList<Diagnostic> found =
+            await AnalyzerHarness.Analyze(
+                    analyzer: new NamedArgumentOrderAnalyzer(),
+                    source: """
+                            public sealed class Grid
+                            {
+                                public int this[int row, int column] { get => (row * 10) + column; set { } }
+                            }
+
+                            public sealed class Holder
+                            {
+                                public Grid Inner { get; } = new();
+                            }
+
+                            public static class Use
+                            {
+                                public static Grid Make() => new() { [column: 2, row: 1] = 3, [row: 1, column: 2] = 4 };
+
+                                public static Holder Nested() => new() { Inner = { [column: 2, row: 1] = 5 } };
                             }
                             """)
                 .ConfigureAwait(continueOnCapturedContext: false);
