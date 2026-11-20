@@ -48,7 +48,7 @@ compiler doesn't run it.
 - Calls of constructors: `new Pair(...)`, `new(...)`, `base(...)`, `this(...)`, and the base type of
   a primary constructor, as in `class Named(int value) : Pair(...)`.
 - From version 0.1.3, the arguments of an indexer, as in `grid[column: 2, row: 1]`, also through
-  `grid?[...]`.
+  `grid?[...]` and in an object initializer, as in `new Grid { [column: 2, row: 1] = 3 }`.
 - From version 0.1.3, the constructor arguments of an attribute, as in
   `[Range(maximum: 9, minimum: 1)]`. A name with an equals sign, as in `Extra = 3`, sets a property
   and not a parameter, so it isn't part of the order.

@@ -430,6 +430,44 @@ internal sealed class NamedArgumentOrderAnalyzerTests
                 expected: "The arguments of Grid.this[int, int] are not in the order of its parameters: row, column");
     }
 
+    // The arguments of an indexer in an object initializer. The source has a list out of order, a list in
+    // order, and a nested initializer. Each report covers the brackets, as for an indexer elsewhere.
+    [Test]
+    public async Task TheArgumentsOfAnIndexerInAnObjectInitializerAreChecked()
+    {
+        IReadOnlyList<Diagnostic> found =
+            await AnalyzerHarness.Analyze(
+                    analyzer: new NamedArgumentOrderAnalyzer(),
+                    source: """
+                            public sealed class Grid
+                            {
+                                public int this[int row, int column] { get => (row * 10) + column; set { } }
+                            }
+
+                            public sealed class Holder
+                            {
+                                public Grid Inner { get; } = new();
+                            }
+
+                            public static class Use
+                            {
+                                public static Grid Make() => new() { [column: 2, row: 1] = 3, [row: 1, column: 2] = 4 };
+
+                                public static Holder Nested() => new() { Inner = { [column: 2, row: 1] = 5 } };
+                            }
+                            """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        await Assert.That(Covered(found: found))
+            .IsEquivalentTo(
+                expected: ["[column: 2, row: 1]", "[column: 2, row: 1]"],
+                ordering: CollectionOrdering.Matching);
+
+        await Assert.That(found[0].GetMessage())
+            .IsEqualTo(
+                expected: "The arguments of Grid.this[int, int] are not in the order of its parameters: row, column");
+    }
+
     // The text that each report covers, in the order of the source.
     private static List<string> Covered(IEnumerable<Diagnostic> found) =>
     [

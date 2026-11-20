@@ -136,6 +136,9 @@ public sealed class NamedArgumentOrderAnalyzer : DiagnosticAnalyzer
                 PrimaryConstructorBaseTypeSyntax baseType => baseType.ArgumentList,
                 ElementAccessExpressionSyntax access => access.ArgumentList,
                 ElementBindingExpressionSyntax binding => binding.ArgumentList,
+
+                // An indexer in an object initializer, as in new Grid { [row: 1, column: 2] = 3 }.
+                ImplicitElementAccessSyntax implicitAccess => implicitAccess.ArgumentList,
                 _ => null
             };
 
