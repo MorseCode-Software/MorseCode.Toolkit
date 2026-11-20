@@ -274,6 +274,27 @@ internal sealed class PrimaryConstructorParameterAnalyzerTests
                 ordering: CollectionOrdering.Matching);
     }
 
+    // An editor can analyze code before it loads the references. Then the compilation has no System.Attribute,
+    // and the rule reports a parameter as it does for each class that is not an attribute.
+    [Test]
+    public async Task WithNoCoreLibraryAParameterIsReported()
+    {
+        IReadOnlyList<Diagnostic> found =
+            await AnalyzerHarness.Analyze(
+                    analyzer: new PrimaryConstructorParameterAnalyzer(),
+                    source: """
+                            public class Count(int count)
+                            {
+                                public int Value { get; } = count;
+                            }
+                            """,
+                    errors: ["CS0518", "CS0518", "CS1729", "CS0518", "CS0518"],
+                    platform: false)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        await Assert.That(Covered(found: found)).IsEquivalentTo(expected: ["count"], ordering: CollectionOrdering.Matching);
+    }
+
     // The parameter of a derived class that goes to the base is a primary constructor parameter too.
     [Test]
     public async Task AParameterThatGoesToTheBaseIsReported()

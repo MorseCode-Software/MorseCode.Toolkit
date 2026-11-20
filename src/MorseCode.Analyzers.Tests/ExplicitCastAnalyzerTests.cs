@@ -275,6 +275,34 @@ internal sealed class ExplicitCastAnalyzerTests
                 ordering: CollectionOrdering.Matching);
     }
 
+    // The initializer of a property with a declared type is a destination too. It is a member and not a
+    // statement, thus it has a sample of its own.
+    [Test]
+    public async Task ACastInThePropertyInitializerOfItsTypeIsNotNeeded()
+    {
+        IReadOnlyList<Diagnostic> found =
+            await AnalyzerHarness.Analyze(
+                    analyzer: new ExplicitCastAnalyzer(),
+                    source: """
+                            public static class Values
+                            {
+                                public static long Wide { get; } = (long)1;
+
+                                public static object Boxed { get; } = (long)1;
+                            }
+                            """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        await Assert.That(found.Select(selector: static diagnostic => diagnostic.GetMessage()))
+            .IsEquivalentTo(
+                expected:
+                [
+                    "Avoid the explicit cast to long: an implicit conversion exists, thus the cast is not needed",
+                    "Avoid the explicit cast to long: an implicit conversion exists: put the value in a variable of that type in place of the cast"
+                ],
+                ordering: CollectionOrdering.Matching);
+    }
+
     // A pointer cast is a cast too. It needs an unsafe context, thus it has a sample of its own.
     [Test]
     public async Task APointerCastGivesOneReportForTheType()
@@ -380,6 +408,49 @@ internal sealed class ExplicitCastAnalyzerTests
                 ordering: CollectionOrdering.Matching);
     }
 
+    // The way out of a foreach follows the kind of the conversion, as the way out of a cast does. A conversion
+    // that the user wrote gets the advice for a method. A conversion of a tuple, and a conversion from dynamic,
+    // get the last advice.
+    [Test]
+    public async Task AForeachGivesTheWayOutThatSuitsItsConversion()
+    {
+        IReadOnlyList<Diagnostic> found =
+            await AnalyzerHarness.Analyze(
+                    analyzer: new ExplicitCastAnalyzer(),
+                    source: """
+                            using System.Collections.Generic;
+
+                            public readonly struct Meters
+                            {
+                                public static explicit operator Meters(double value) => default;
+                            }
+
+                            public static class Loops
+                            {
+                                public static void Run(
+                                    IEnumerable<double> lengths,
+                                    IEnumerable<(long, long)> pairs,
+                                    IEnumerable<dynamic> values)
+                                {
+                                    foreach (Meters length in lengths) { _ = length; }
+                                    foreach ((int, int) pair in pairs) { _ = pair; }
+                                    foreach (int value in values) { _ = value; }
+                                }
+                            }
+                            """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        await Assert.That(found.Select(selector: static diagnostic => diagnostic.GetMessage()))
+            .IsEquivalentTo(
+                expected:
+                [
+                    "Avoid the explicit cast to Meters: the foreach casts each element; call a method that converts each element, with a name that says what it does",
+                    "Avoid the explicit cast to (int, int): the foreach casts each element; change the code so that the conversion is not necessary",
+                    "Avoid the explicit cast to int: the foreach casts each element; change the code so that the conversion is not necessary"
+                ],
+                ordering: CollectionOrdering.Matching);
+    }
+
     // A range variable with a type makes the query call Cast for each element, and the source has no cast. The
     // report marks the type in a from clause and in a join clause. A range variable with no type, or with a
     // type that the elements convert to implicitly, gives no report.
@@ -418,6 +489,73 @@ internal sealed class ExplicitCastAnalyzerTests
                     "Avoid the explicit cast to string: the query casts each element with Cast; use a sequence of that type, or filter it with OfType"
                 ],
                 ordering: CollectionOrdering.Matching);
+    }
+
+    // A type with two IEnumerable<T> has no one type of element. Thus, the analyzer cannot classify the
+    // conversion of a range variable over it, and it gives no report. The query over objects shows that the
+    // analyzer ran.
+    [Test]
+    public async Task AQueryOverATypeWithTwoTypesOfElementGivesNoReport()
+    {
+        IReadOnlyList<Diagnostic> found =
+            await AnalyzerHarness.Analyze(
+                    analyzer: new ExplicitCastAnalyzer(),
+                    source: """
+                            using System.Collections;
+                            using System.Collections.Generic;
+                            using System.Linq;
+
+                            public sealed class Both : IEnumerable<int>, IEnumerable<long>
+                            {
+                                IEnumerator<int> IEnumerable<int>.GetEnumerator() => new List<int>().GetEnumerator();
+
+                                IEnumerator<long> IEnumerable<long>.GetEnumerator() => new List<long>().GetEnumerator();
+
+                                IEnumerator IEnumerable.GetEnumerator() => new List<int>().GetEnumerator();
+                            }
+
+                            public static class Queries
+                            {
+                                public static void Run(Both both, IEnumerable<object> objects)
+                                {
+                                    _ = from byte number in both select number;
+                                    _ = from string text in objects select text;
+                                }
+                            }
+                            """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        await Assert.That(found.Select(selector: static diagnostic => Covered(diagnostic: diagnostic)))
+            .IsEquivalentTo(expected: ["string"], ordering: CollectionOrdering.Matching);
+    }
+
+    // An editor analyzes code before it compiles. A cast, a foreach, or a range variable whose type has an
+    // error gives no report. A query over a sequence with an error also gives no report.
+    [Test]
+    public async Task CodeWithAnErrorInTheTypeGivesNoReport()
+    {
+        IReadOnlyList<Diagnostic> found =
+            await AnalyzerHarness.Analyze(
+                    analyzer: new ExplicitCastAnalyzer(),
+                    source: """
+                            using System.Collections.Generic;
+                            using System.Linq;
+
+                            public static class Broken
+                            {
+                                public static void Run(object value, IEnumerable<object> objects)
+                                {
+                                    _ = (Missing)value;
+                                    _ = from int number in missing select number;
+                                    _ = from Missing item in objects select item;
+                                    foreach (Missing item in objects) { _ = item; }
+                                }
+                            }
+                            """,
+                    errors: ["CS0246", "CS0103", "CS0246", "CS0246"])
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        await Assert.That(found).IsEmpty();
     }
 
     // A suppression is how the few places that need a cast say so. The reason goes next to it. The compiler

@@ -106,18 +106,26 @@ public sealed class ExplicitCastAnalyzer : DiagnosticAnalyzer
         context.RegisterSyntaxNodeAction(action: CheckForEach, syntaxKinds: SyntaxKind.ForEachStatement);
 
         context.RegisterSyntaxNodeAction(
-            action: CheckRangeVariable,
-            syntaxKinds: ImmutableArray.Create(item1: SyntaxKind.FromClause, item2: SyntaxKind.JoinClause));
+            action: static nodeContext =>
+            {
+                FromClauseSyntax from = (FromClauseSyntax)nodeContext.Node;
+                CheckRangeVariable(context: nodeContext, type: from.Type, sequence: from.Expression);
+            },
+            syntaxKinds: SyntaxKind.FromClause);
+
+        context.RegisterSyntaxNodeAction(
+            action: static nodeContext =>
+            {
+                JoinClauseSyntax join = (JoinClauseSyntax)nodeContext.Node;
+                CheckRangeVariable(context: nodeContext, type: join.Type, sequence: join.InExpression);
+            },
+            syntaxKinds: SyntaxKind.JoinClause);
     }
 
     // A foreach with a type converts each element to that type. The compiler says which conversion it makes.
     private static void CheckForEach(SyntaxNodeAnalysisContext context)
     {
-        if (context.Node is not ForEachStatementSyntax loop)
-        {
-            return;
-        }
-
+        ForEachStatementSyntax loop = (ForEachStatementSyntax)context.Node;
         ForEachStatementInfo info = context.SemanticModel.GetForEachStatementInfo(forEachStatement: loop);
 
         if (!info.ElementConversion.IsExplicit || info.ElementType is not { } element)
@@ -135,18 +143,12 @@ public sealed class ExplicitCastAnalyzer : DiagnosticAnalyzer
 
     // A range variable with a type makes the query call Cast. The compiler calls it for each type, thus the
     // analyzer classifies the conversion from the type of the elements itself.
-    private static void CheckRangeVariable(SyntaxNodeAnalysisContext context)
+    private static void CheckRangeVariable(
+        SyntaxNodeAnalysisContext context,
+        TypeSyntax? type,
+        ExpressionSyntax sequence)
     {
-        (TypeSyntax? type, ExpressionSyntax? sequence) =
-            context.Node switch
-            {
-                FromClauseSyntax from => (from.Type, from.Expression),
-                JoinClauseSyntax join => (join.Type, join.InExpression),
-                _ => (null, null)
-            };
-
         if (type is null
-            || sequence is null
             || context.SemanticModel.GetTypeInfo(expression: type, cancellationToken: context.CancellationToken).Type
                 is not { } target
             || ElementType(
