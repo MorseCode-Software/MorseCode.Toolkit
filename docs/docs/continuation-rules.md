@@ -124,8 +124,10 @@ rule follows that variable only if it is assigned once.
 
 MC1003 and MC1004 read the values that the continuation can return. A call that returns the value of
 a lambda it gets, such as `Transaction.Run(() => ...)`, makes that lambda's returns part of the
-result, also when a local variable holds the lambda or the value of the call. A lambda whose value
-never becomes the result, such as one kept in a variable and not run, is not read. A continuation
+result, also when a local variable holds the lambda or the value of the call. A call of a local
+function by its name, such as `return Make();`, makes that function's returns part of the result in
+the same way. A function whose value never becomes the result, such as a lambda kept in a variable
+and not run, or a local function whose value is discarded, is not read. A continuation
 inside another, such as the one that `Advance` gets, is read on its own, against its own handle, so
 each value is reported once and names the right handle.
 

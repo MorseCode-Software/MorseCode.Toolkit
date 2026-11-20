@@ -20,8 +20,9 @@ handle of the continuation. MC1001 reports Value read directly from Construct or
 handle. MC1002 reports a result of that call that is not used. MC1003 reports a null return. MC1004
 reports the result of a handle that the continuation made with Constructor.From. Both read what the
 continuation returns, also through a call that returns the value of a lambda, such as the function
-of Transaction.Run. A lambda whose value does not get to the result is not read, and a continuation
-inside another is read only for its own handle. MC1004 follows a local variable to each value that
+of Transaction.Run, and through a call of a local function by its name. A function whose value does
+not get to the result is not read, and a continuation inside another is read only for its own
+handle. MC1004 follows a local variable to each value that
 can reach the read, across assignments, branches, loops, and try statements. A variable that a
 pattern declares for the value it tests, such as is var next, gets that value. A local variable is
 the handle at a read only when each value that can reach the read is the handle. MC1005 reports a

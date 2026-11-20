@@ -136,9 +136,10 @@ public sealed class ContinuationAnalyzer : DiagnosticAnalyzer
 
     // The functions whose returns give the result of the continuation. The search starts at the
     // continuation. A call in a result can give the value of a lambda that it gets, as Transaction.Run
-    // does. Thus, the search also reads the returns of that lambda. A lambda whose value does not get to
-    // the result is not in the set, also when it returns a Constructed. A continuation in the body is not
-    // in the set either, because the analyzer examines it with its own handle.
+    // does. A call of a local function by its name gives the value of that function. Thus, the search
+    // also reads the returns of that lambda or local function. A function whose value does not get to the
+    // result is not in the set, also when it returns a Constructed. A continuation in the body is not in
+    // the set either, because the analyzer examines it with its own handle.
     private static HashSet<IOperation> ResultFunctions(Continuation continuation, CancellationToken cancellationToken)
     {
         HashSet<IOperation> functions = [continuation.Lambda];
@@ -150,31 +151,33 @@ public sealed class ContinuationAnalyzer : DiagnosticAnalyzer
 
             IOperation function = toRead.Pop();
 
-            IEnumerable<IAnonymousFunctionOperation> lambdas =
+            IEnumerable<IOperation> found =
                 from result in continuation.Operations.OfType<IReturnOperation>()
                 where ReferenceEquals(objA: OperationTree.Owner(operation: result), objB: function)
                 from leaf in OperationTree.Leaves(value: result.ReturnedValue)
-                from lambda in LambdasOfTheValue(
+                from next in FunctionsOfTheValue(
                     continuation: continuation,
                     value: leaf,
                     cancellationToken: cancellationToken)
-                select lambda;
+                select next;
 
-            // The set takes each lambda one time. Thus, the search reads each lambda one time, and it ends.
-            foreach (IAnonymousFunctionOperation lambda in lambdas.Where(predicate: functions.Add))
+            // The set takes each function one time. Thus, the search reads each function one time, and it
+            // ends.
+            foreach (IOperation next in found.Where(predicate: functions.Add))
             {
-                toRead.Push(item: lambda);
+                toRead.Push(item: next);
             }
         }
 
         return functions;
     }
 
-    // The lambdas that a call gets for its value. Each is an argument that is a lambda, or a local variable
-    // that can hold a lambda. Each returns a Constructed and is not a continuation. For a local variable
-    // that holds the value, the search reads each value that the variable can hold. No such value is a
-    // local variable, thus the search ends.
-    private static IEnumerable<IAnonymousFunctionOperation> LambdasOfTheValue(
+    // The functions that give a value: the local function that a call names, and the lambdas that a call
+    // gets. Each lambda is an argument that is a lambda, or a local variable that can hold a lambda. Each
+    // returns a Constructed and is not a continuation. For a local variable that holds the value, the
+    // search reads each value that the variable can hold. No such value is a local variable, thus the
+    // search ends.
+    private static IEnumerable<IOperation> FunctionsOfTheValue(
         Continuation continuation,
         IOperation value,
         CancellationToken cancellationToken)
@@ -187,13 +190,18 @@ public sealed class ContinuationAnalyzer : DiagnosticAnalyzer
             [
                 .. continuation.ValuesOf(read: local)
                     .SelectMany(
-                        selector: held => LambdasOfTheValue(
+                        selector: held => FunctionsOfTheValue(
                             continuation: continuation,
                             value: held,
                             cancellationToken: cancellationToken))
             ],
             IInvocationOperation call =>
             [
+                .. continuation.Operations.OfType<ILocalFunctionOperation>()
+                    .Where(
+                        predicate: function => SymbolEqualityComparer.Default.Equals(
+                            x: function.Symbol,
+                            y: call.TargetMethod.OriginalDefinition)),
                 .. from argument in call.Arguments
                 from lambda in Lambdas(continuation: continuation, argument: argument.Value)
                 where continuation.Symbols.IsConstructed(type: lambda.Symbol.ReturnType)
