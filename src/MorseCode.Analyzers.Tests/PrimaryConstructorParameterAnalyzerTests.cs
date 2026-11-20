@@ -46,6 +46,65 @@ internal sealed class PrimaryConstructorParameterAnalyzerTests
                           + "to a field");
     }
 
+    // A parameter by reference: ref, out, ref readonly, and scoped ref. The compiler refuses a member that uses
+    // such a parameter (CS9109), thus it cannot become hidden state. A write through ref or out changes the
+    // variable of the caller, which is what the modifier is for, and in changes that contract. Thus, the rule
+    // does not report it. Before, it did, and only a suppression removed the report. The initializers use each
+    // parameter, and the callers pass each one. The parameter by value gets its report as before.
+    [Test]
+    public async Task AParameterByReferenceIsNotReported()
+    {
+        IReadOnlyList<Diagnostic> found =
+            await Analyze(
+                    source: """
+                            using System;
+
+                            public class Doubled(ref int value)
+                            {
+                                public int Value { get; } = value *= 2;
+                            }
+
+                            public class Written(out int value)
+                            {
+                                public int Value { get; } = value = 7;
+                            }
+
+                            public class Copied(ref readonly int value)
+                            {
+                                public int Value { get; } = value;
+                            }
+
+                            public ref struct Window(scoped ref Span<int> values)
+                            {
+                                public int Length { get; } = values.Length;
+                            }
+
+                            public class Plain(int value)
+                            {
+                                public int Value { get; } = value;
+                            }
+
+                            public static class Callers
+                            {
+                                public static int Use()
+                                {
+                                    int number = 3;
+                                    Span<int> values = stackalloc int[1];
+                                    Doubled doubled = new(value: ref number);
+                                    Written written = new(value: out int set);
+                                    Copied copied = new(value: in number);
+                                    Window window = new(values: ref values);
+
+                                    return doubled.Value + written.Value + set + copied.Value + window.Length;
+                                }
+                            }
+                            """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        await Assert.That(Covered(found: found)).IsEquivalentTo(expected: ["value"], ordering: CollectionOrdering.Matching);
+        await Assert.That(found[0].GetMessage()).Contains(expected: "of Plain is not in");
+    }
+
     // A parameter with in, a params parameter, a record, a record struct, and a type with an ordinary
     // constructor. None of these gives a report.
     [Test]

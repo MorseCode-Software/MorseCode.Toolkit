@@ -62,6 +62,9 @@ It doesn't report:
 - A by-value `scoped` parameter, as in `ref struct Window(scoped ReadOnlySpan<int> values)`.
   `scoped in` scopes the reference and not the value, so no spelling with `in` keeps the value
   scoped, and the compiler already refuses to let a member use the parameter (CS9110).
+- A `ref`, `out`, or `ref readonly` parameter. The compiler already refuses to let a member capture
+  it (CS9109), a write through `ref` or `out` is meant to reach the caller's variable, and `in` would
+  change what the parameter means to the caller.
 - A type with an ordinary constructor.
 
 The warning marks the name of the parameter.
