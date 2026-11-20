@@ -40,6 +40,8 @@ internal sealed class NamedArgumentOrderCodeFixTests
 
             public static int Next() => 0;
 
+            public static int Use(int a, Func<int> b) => a + b();
+
             public static int Store(int a, out int b)
             {
                 b = a;
@@ -49,7 +51,11 @@ internal sealed class NamedArgumentOrderCodeFixTests
 
         public sealed class Grid
         {
+            public int Rows = 2;
+
             public int this[int row, int column] => row * column;
+
+            public int Size() => this.Rows;
         }
 
         public class Base(int a, int b)
@@ -272,6 +278,143 @@ internal sealed class NamedArgumentOrderCodeFixTests
         await Assert.That(offers.Select(selector: static offer => Changed(result: offer.Result)))
             .IsEquivalentTo(
                 expected: ["result = Calls.Three(\n            a: 1,\n            b: 2,\n            c: 3);"],
+                ordering: CollectionOrdering.Matching);
+    }
+
+    // A directive between two arguments guards the argument at its position. Before, the fix moved the arguments
+    // and left the directive. Thus, the directive guarded a different argument. The provider offers no fix for
+    // such a list. The second call has no directive, and gets its fix. The analyzer reports the two calls.
+    [Test]
+    public async Task NoFixIsOfferedWhereADirectiveIsBetweenTheArguments()
+    {
+        const string body =
+            """
+                    result = Calls.Pair(
+            #if !NOT_DEFINED
+                        b: 2,
+            #endif
+                        a: 1);
+                    result = Calls.Pair(b: 2, a: 1);
+            """;
+
+        IReadOnlyList<CodeFixHarness.Offer> offers =
+            await Offers(body: body).ConfigureAwait(continueOnCapturedContext: false);
+
+        await Assert.That(offers.Select(selector: static offer => offer.Result))
+            .IsEquivalentTo(
+                expected: [Source(body: body.Replace(oldValue: "Pair(b: 2, a: 1)", newValue: "Pair(a: 1, b: 2)"))],
+                ordering: CollectionOrdering.Matching);
+    }
+
+    // A comment goes with its argument, and the whitespace stays at its position. That is so for a comment in the
+    // argument, for a comment on the line above it, and for a comment after its comma. Before, each comment
+    // stayed at its position and then described a different argument. A comment to the end of the line cannot
+    // go before a closing parenthesis on the same line. Thus, the provider offers no fix for the third call.
+    [Test]
+    public async Task CommentsMoveWithTheirArguments()
+    {
+        const string body =
+            """
+                    result = Calls.Pair(b: 2 /* second */, a: 1 /* first */);
+                    result = Calls.Three(
+                        // the third
+                        c: 3, // three
+                        a: 1, // one
+                        b: 2
+                    );
+                    result = Calls.Pair(
+                        b: 2, // two
+                        a: 1);
+            """;
+
+        IReadOnlyList<CodeFixHarness.Offer> offers =
+            await Offers(body: body).ConfigureAwait(continueOnCapturedContext: false);
+
+        await Assert.That(offers.Select(selector: static offer => offer.Result))
+            .IsEquivalentTo(
+                expected:
+                [
+                    Source(
+                        body: body.Replace(
+                            oldValue: "Pair(b: 2 /* second */, a: 1 /* first */)",
+                            newValue: "Pair(a: 1 /* first */, b: 2 /* second */)")),
+                    Source(
+                        body: body.Replace(
+                            oldValue: """
+                                      Three(
+                                                  // the third
+                                                  c: 3, // three
+                                                  a: 1, // one
+                                                  b: 2
+                                              );
+                                      """,
+                            newValue: """
+                                      Three(
+                                                  a: 1, // one
+                                                  b: 2,
+                                                  // the third
+                                                  c: 3 // three
+                                              );
+                                      """))
+                ],
+                ordering: CollectionOrdering.Matching);
+    }
+
+    // A cast that can throw, such as an unbox, is an effect. With a second effect, the new order can change which
+    // exception the call throws, thus the title says that the order of evaluation changes. Before, the fix read
+    // the cast as its operand, which is a constant here, and kept the title that says it does not.
+    [Test]
+    public async Task ACastThatCanThrowIsAnEffect()
+    {
+        IReadOnlyList<CodeFixHarness.Offer> offers =
+            await Offers(body: """        result = Calls.Pair(b: Calls.Next(), a: (int)(object)"text");""")
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        await Assert.That(offers.Select(selector: static offer => offer.Title))
+            .IsEquivalentTo(expected: [InOrderAndChangesEvaluation], ordering: CollectionOrdering.Matching);
+
+        await Assert.That(offers.Select(selector: static offer => offer.Key ?? string.Empty))
+            .IsEquivalentTo(expected: [ChangesEvaluationKey], ordering: CollectionOrdering.Matching);
+    }
+
+    // A delegate from a method of an instance throws ArgumentException when the instance is null, and a field read
+    // through that instance throws NullReferenceException. Thus, the new order can change the type of the exception.
+    // The delegate is an effect, with a method group, with new, and with a cast. A delegate from a static method,
+    // or from a method of a value, cannot throw. Two field reads can only throw NullReferenceException in each order,
+    // thus they keep the title that says the order stays. Before, the fix read a delegate with new or with a cast as
+    // a read, and kept that title. It read each method group as an effect, also a static method and a value.
+    [Test]
+    public async Task ADelegateFromAMethodOfAnInstanceIsAnEffect()
+    {
+        const string body =
+            """
+                    result = Calls.Use(b: grid.Size, a: grid.Rows);
+                    result = Calls.Use(b: new Func<int>(grid.Size), a: grid.Rows);
+                    result = Calls.Use(b: (Func<int>)grid.Size, a: grid.Rows);
+                    result = Calls.Use(b: Calls.Next, a: grid.Rows);
+                    result = Calls.Use(b: x.GetHashCode, a: grid.Rows);
+                    result = Calls.Pair(b: grid.Rows, a: grid.Rows);
+            """;
+
+        IReadOnlyList<CodeFixHarness.Offer> offers =
+            await Offers(body: body).ConfigureAwait(continueOnCapturedContext: false);
+
+        await Assert.That(offers.Select(selector: static offer => offer.Title))
+            .IsEquivalentTo(
+                expected:
+                [
+                    InOrderAndChangesEvaluation, InOrderAndChangesEvaluation, InOrderAndChangesEvaluation, InOrder,
+                    InOrder, InOrder
+                ],
+                ordering: CollectionOrdering.Matching);
+
+        await Assert.That(offers.Select(selector: static offer => offer.Key ?? string.Empty))
+            .IsEquivalentTo(
+                expected:
+                [
+                    ChangesEvaluationKey, ChangesEvaluationKey, ChangesEvaluationKey, KeepsEvaluationKey,
+                    KeepsEvaluationKey, KeepsEvaluationKey
+                ],
                 ordering: CollectionOrdering.Matching);
     }
 
