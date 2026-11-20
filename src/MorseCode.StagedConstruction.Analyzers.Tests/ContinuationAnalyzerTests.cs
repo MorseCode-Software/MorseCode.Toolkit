@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using MorseCode.Analyzers.Tests;
@@ -727,6 +728,32 @@ internal sealed class ContinuationAnalyzerTests
 
         await Assert.That(severities.Values.Count(predicate: static severity => severity == DiagnosticSeverity.Warning))
             .IsEqualTo(expected: 6);
+    }
+
+    // Each sample has a local variable that reads its own value in its declaration. That does not compile,
+    // but an editor analyzes the code while the user types it. The search for the source of the handle must
+    // stop. The time limit makes the test fail if the search does not stop. The continuation does not use
+    // its handle, which is MC1006.
+    [Test]
+    [Timeout(timeoutInMilliseconds: 60_000)]
+    [Arguments("Constructor<Values> other = other.Select(selector: static values => values);")]
+    [Arguments("Constructor<Values> other = other;")]
+    public async Task ALocalVariableThatReadsItselfEndsTheAnalysis(
+        string declaration,
+        CancellationToken cancellationToken)
+    {
+        IReadOnlyList<Diagnostic> found =
+            await AnalyzerHarness.Analyze(
+                    analyzer: new ContinuationAnalyzer(),
+                    source: Samples.OfBase(
+                        continuation:
+                        $"(output, construct) => {{ {declaration} return other.Construct({Samples.Make}); }}"),
+                    errors: ["CS0165"],
+                    cancellationToken: cancellationToken)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        await Assert.That(Ids(found: found))
+            .IsEquivalentTo(expected: ["MC1006"], ordering: CollectionOrdering.Matching);
     }
 
     private static Task<IReadOnlyList<Diagnostic>> Analyze(string source) =>

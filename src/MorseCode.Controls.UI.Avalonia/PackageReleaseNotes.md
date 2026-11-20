@@ -57,6 +57,17 @@ for no content. The base clears the content of a container before its template, 
 ContentPresenter of Avalonia 12 builds an explicit template also when the content is null. The
 control now clears the template first.
 
+Fixed: a scroll request made while the list was hidden was reported as handled, and the list
+never scrolled. The control checked only that it was loaded and had a panel. The panel of Avalonia
+does nothing in ScrollIntoView while it is not effectively visible, so the control reported a
+scroll that never happened and the view model cleared the request. A list in a collapsed Expander,
+or under a panel bound to IsVisible, lost its request this way. A list hidden from the start had a
+second gap: it had no panel at its Loaded event, and nothing asked for the scroll again once it
+showed, so its request waited for good and the list stayed at the top. The control now scrolls only
+while the list and every parent are visible. After each layout, it asks again for a request that
+waits and can now apply, which is how it finds that the list has shown or that its panel exists.
+Avalonia 12.1.3 has no public event for a change of IsEffectivelyVisible.
+
 Fixed: a change of a row on screen could make the control and the view model exchange ranges and
 rows without end. The panel of Avalonia recycles the container of a replaced item at once and makes
 it again at the next layout. The control measured between the two, found fewer containers, and
@@ -106,19 +117,27 @@ the row of a position changes. An item that is a Control, and a container that i
 ContentPresenter or a ContentControl, are replaced through the panel as before. A change of more
 than 512 rows is no longer a reset. Only a change of the count by more than 512 positions is.
 
+Fixed: a row that is itself a ContentControl, such as a Button or a UserControl, lost its own
+content. Such an item is its own container, and the control set the row template as the
+ContentTemplate of that container, as it does for a container it makes. The presenter of the row
+then built a row view in place of what the row held: a Button with the content OK showed a row
+view, and a UserControl showed a row view in place of its XAML. A ContentTemplate that the row set
+for itself was replaced the same way. The control now leaves an item that is its own container as
+it is, as the base ItemsControl does.
+
 Breaking: the Buffer property is gone. The control now decides how far ahead of the screen it asks
 for rows: one screen of positions on each side, and never fewer than 10. A scroll shows no
 placeholder when its step is no longer than the positions on one side, so a fixed number was right
 for one window size only. With 20 rows on screen and Buffer at 10, every step of one screen showed
 placeholders. Remove Buffer from your XAML.
 
-Breaking: the control reports a ReportedRange where it reported an ItemRange, and the member of the
-source is the action RangeReported, where it was the value VisibleRange. A ReportedRange holds two
-ranges from the same instant. Visible is the positions on screen, where a row that is only partly
-on screen counts, so a view model can now tell what the user sees. Constructed is the positions
-that the control wants rows for. Both stay inside the list. On the overload for a view model with
-its own rows, the parameter visibleRange is now reportedRanges, a StreamSink of ReportedRange. The
-view model holds that stream, and builds rows for Constructed.
+Breaking: the control reports a ReportedRange through the action RangeReported of its Source,
+where 0.2.1 wrote an ItemRange to its own property VisibleRange. A ReportedRange holds two ranges
+from the same instant. Visible is the positions on screen, where a row that is only partly on
+screen counts, so a view model can now tell what the user sees. Constructed is the positions that
+the control wants rows for. Both stay inside the list. A view model with its own rows builds them
+for Constructed. It gets the reports from a StreamSink of ReportedRange that it passes to
+CreateVirtualItemsSource, which the notes of MorseCode.Controls.ViewModels describe.
 
 A row that is added at an end of the list that is on screen no longer shows as a placeholder first.
 A source made from a collection slices past the end of the list by the positions that the control
@@ -142,6 +161,11 @@ SodaFlow.Bindable.ObjectModel, next to Avalonia and SodaFlow.Functional. To move
 the source in the view model with CreateVirtualItemsSource, expose it as an IVirtualItemsSource,
 and replace the bindings in the view with Source="{Binding Source}".
 
+Fixed: with no PlaceholderTemplate, a placeholder showed the name of an internal type,
+MorseCode.Controls.UI.Avalonia.RowPlaceholder. It is now an empty line of text, as high as before.
+A PlaceholderTemplate that is set or changed while placeholders are on screen now reaches them.
+Before, they kept the old look until Avalonia used their containers for other positions.
+
 Changed: the dependencies on SodaFlow packages now have a ceiling at their next major version, as
 the dependencies between the packages of this repository already did: SodaFlow.Bindable.ObjectModel
 [4.0.0, 5.0.0) and SodaFlow.Functional [3.0.2, 4.0.0). Before, the one on SodaFlow.Functional was a
@@ -164,7 +188,10 @@ New: the control keeps the view of a row that leaves the screen, and gives it to
 comes on the screen. Thus, a scroll builds no row view. Avalonia uses the container of such a row
 again, but it removes the view, and the presenter asks the row template for a new one when it
 joins the tree again. The control keeps a view only for a row template that uses its view again:
-each XAML DataTemplate, and a FuncDataTemplate with supportsRecycling true. A kept view gets its
+each XAML DataTemplate, and a FuncDataTemplate with supportsRecycling true. It keeps only a view that
+the row template built. An item that the row template does not match, such as an item of another
+type with a typed template, is shown by a template that Avalonia finds, and that view goes to no
+other row. A kept view gets its
 next row as its data context, and it keeps each state that is not bound, as a view does when its
 row changes in place. The new property RecyclesRowViews, true by default, stops this for a row view
 with such state. Measured with no screen on .NET 10, with XAML row templates: one row that comes on

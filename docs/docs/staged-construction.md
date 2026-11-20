@@ -62,9 +62,9 @@ the base to that function.
 The compiler infers `TResult` from the lambdas, so a `Create` method writes no type arguments.
 
 `construct.Construct` returns a `Constructed<TResult>`, and the continuation must return one. Only
-`Construct` makes that type, so a continuation that returns without calling `Construct` does not
-compile. `Animal.CreateBase` reads `.Value` on what the continuation returns and gives the finished
-`Dog` to its caller.
+`Construct` makes that type, so a continuation that never calls `Construct` does not compile unless
+it returns `null!`. `Animal.CreateBase` reads `.Value` on what the continuation returns and gives
+the finished `Dog` to its caller.
 
 The compiler checks only that the continuation returns a `Constructed<TResult>`, and not that it
 came from this handle. The analyzer inside the package reports the usual ways to return a different
@@ -77,9 +77,11 @@ one: see [Continuation rules](continuation-rules.md).
 - **The order of the work is set by the types.** A subclass cannot reach the constructor before the
   base finishes, when the base keeps the constructor of its values private. The handle is then the
   only source of the values.
-- **A continuation cannot skip the constructor.** The only value a continuation can return is the
-  one `Construct` gives it, so a `Create` method that forgets the call does not compile. The
-  runtime check in a base such as `ViewModelBase` still covers a continuation that throws, which
+- **A continuation cannot skip the constructor by mistake.** It must return a
+  `Constructed<TResult>`, and only `Construct` makes one, so a `Create` method that forgets the call
+  does not compile. The compiler does accept `null!`, and the result of a handle made with
+  `Constructor.From`. The analyzer reports both, as MC1003 and MC1004 in
+  [Continuation rules](continuation-rules.md). The runtime check in a base such as `ViewModelBase` still covers a continuation that throws, which
   the compiler cannot see.
 - **A base can wrap the work of its subclass.** The base calls the continuation. It can do work
   before the call, and after it, for example inside a transaction:

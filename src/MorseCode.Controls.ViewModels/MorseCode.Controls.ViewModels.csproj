@@ -60,12 +60,10 @@
     </ItemGroup>
 
     <!--
-        ReportedRange.Ahead is internal. The control writes it, and the tests of the control read it.
-        CreateScrollRequest is internal, and its tests call it.
+        CreateScrollRequest is internal, and its tests call it. The control uses only the public
+        surface, so that a control of a different package can do all that it does.
     -->
     <ItemGroup>
-        <InternalsVisibleTo Include="MorseCode.Controls.UI.Avalonia"/>
-        <InternalsVisibleTo Include="MorseCode.Controls.UI.Avalonia.Tests"/>
         <InternalsVisibleTo Include="MorseCode.Controls.ViewModels.Tests"/>
     </ItemGroup>
 

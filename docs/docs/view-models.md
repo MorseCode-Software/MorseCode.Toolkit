@@ -36,7 +36,9 @@ The base has one stage. It gives the view model two things:
 
 The continuation returns the `Constructed<TResult>` that `construct.Construct` gives, and
 `CreateBase` returns the value inside it. Only `Construct` makes a `Constructed<TResult>`, so a
-continuation that does not call it does not compile.
+continuation that never calls it does not compile unless it returns `null!`. The compiler does not
+check that the value came from this handle. The analyzer of `MorseCode.StagedConstruction` reports
+the usual ways to return a different one: see [Continuation rules](continuation-rules.md).
 
 `CreateBase` also checks, at run time, that the value it returns is the value the constructor
 returned: the same instance for a class, and an equal value for a struct. A continuation that calls
