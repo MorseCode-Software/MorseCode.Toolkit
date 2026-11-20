@@ -212,6 +212,10 @@ where it allocated 643 KB, for one of 43. A scroll of 100 px for each step with 
 visuals had 8 to 31 steps of 600 that took more than 8.33 ms, where it had 53 to 107. The view
 still leaves the tree and joins it again, and that is the larger part of what remains.
 
+New: each assembly in the package carries its PDB, with Source Link to the commit on GitHub. A
+debugger can step into the source with no symbol server, and a stack trace on .NET shows line
+numbers. The package has a readme, and its metadata gives the URL of the repository.
+
 0.2.2
 
 Changed: a large change of TotalCount now raises one reset of the list, where it raised an

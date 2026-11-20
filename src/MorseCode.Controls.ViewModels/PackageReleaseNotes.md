@@ -77,6 +77,10 @@ What a view model on SodaFlow gives to a control of the MorseCode toolkit, and t
 build it, with no dependency on a UI framework. It is part of the MorseCode toolkit, which holds
 the conventions that MorseCode Software builds its own applications with.
 
+New: each assembly in the package carries its PDB, with Source Link to the commit on GitHub. A
+debugger can step into the source with no symbol server, and a stack trace on .NET shows line
+numbers. The package has a readme, and its metadata gives the URL of the repository.
+
 Targets net472, net6.0, net8.0, and netstandard2.0. Depends on MorseCode.Mvvm, SodaFlow,
 SodaFlow.Bindable.ObjectModel, SodaFlow.Collections, and SodaFlow.Functional.
 

@@ -21,6 +21,7 @@
         <Title>MorseCode.Controls.UI.Avalonia</Title>
         <Description>Avalonia controls and converters for views that bind to view models written in a functional reactive style on SodaFlow.</Description>
         <PackageIcon>MorseCode.png</PackageIcon>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
         <AssemblyName>MorseCode.Controls.UI.Avalonia</AssemblyName>
         <RootNamespace>MorseCode.Controls.UI.Avalonia</RootNamespace>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
@@ -72,6 +73,7 @@
         <None Include="..\..\logo\MorseCode.png" Pack="true" PackagePath="\">
             <Link>MorseCode.png</Link>
         </None>
+        <None Include="README.md" Pack="true" PackagePath="\"/>
     </ItemGroup>
 
 </Project>

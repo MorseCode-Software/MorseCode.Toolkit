@@ -90,6 +90,9 @@ method of an instance that can be null, also when it is written with new or a ca
 throws ArgumentException where a field read would throw NullReferenceException. A delegate from a
 static method, from this, or from a value does not count, also as a method group.
 
+New: each assembly in the package carries its PDB, with Source Link to the commit on GitHub. The
+package has a readme, and its metadata gives the URL of the repository.
+
 0.1.2
 
 New rule: MC0003 reports a primary constructor parameter of a class or a struct that is not

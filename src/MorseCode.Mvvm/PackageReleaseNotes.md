@@ -72,6 +72,10 @@ compiled against 0.2.x still binds to that overload, which has the same signatur
 later, a call with separate entries, an array, or a collection expression now goes to the array
 overload; each overload copies its entries, so nothing changes at run time.
 
+New: each assembly in the package carries its PDB, with Source Link to the commit on GitHub. A
+debugger can step into the source with no symbol server, and a stack trace on .NET shows line
+numbers. The package has a readme, and its metadata gives the URL of the repository.
+
 0.2.4
 
 New: BindableFactoryExtensions.CreateScrollRequest, an extension method of

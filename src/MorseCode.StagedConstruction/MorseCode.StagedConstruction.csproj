@@ -17,6 +17,7 @@
         <Title>MorseCode.StagedConstruction</Title>
         <Description>Construction of immutable objects in ordered stages, with no access to a partly built object.</Description>
         <PackageIcon>MorseCode.png</PackageIcon>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
         <AssemblyName>MorseCode.StagedConstruction</AssemblyName>
         <RootNamespace>MorseCode.StagedConstruction</RootNamespace>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
@@ -54,6 +55,7 @@
       <None Include="..\..\logo\MorseCode.png" Pack="true" PackagePath="\">
         <Link>MorseCode.png</Link>
       </None>
+      <None Include="README.md" Pack="true" PackagePath="\"/>
     </ItemGroup>
 
 </Project>

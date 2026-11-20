@@ -47,6 +47,10 @@ trims this one too. The net472, net6.0, and netstandard2.0 builds are not marked
 has no such analyzers for them. A native AOT publish that roots the assembly reports nothing in its
 code.
 
+New: each assembly in the package carries its PDB, with Source Link to the commit on GitHub. A
+debugger can step into the source with no symbol server, and a stack trace on .NET shows line
+numbers. The package has a readme, and its metadata gives the URL of the repository.
+
 0.2.1
 
 No signature or behavior changed. This release reformats the code and the
