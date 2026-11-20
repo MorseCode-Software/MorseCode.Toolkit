@@ -24,6 +24,10 @@
 #addin nuget:?package=Cake.Issues&version=6.0.0
 #addin nuget:?package=Cake.Issues.Sarif&version=6.0.0
 
+using System.IO.Compression;
+using System.Net;
+using System.Net.Http;
+using System.Text.Json;
 using System.Xml.Linq;
 
 var target = Argument("target", "Default");
@@ -35,6 +39,7 @@ var sampleName = Argument("sample", string.Empty);
 var solution = File("./src/MorseCode.Toolkit.slnx");
 var artifactsDirectory = Directory("./artifacts");
 var coverageDirectory = Directory("./coverage");
+var coverageSettings = File("./coverage.runsettings");
 var inspectionDirectory = Directory("./inspection");
 // Kept between runs, and keyed by the settings in force; see InspectionCacheFor. Not
 // inspectionDirectory, which is cleaned at the start of every inspection.
@@ -50,8 +55,9 @@ var mirroredInspectionSettings = new[]
 {
     File("./samples/Workbench/MorseCode.Toolkit.Samples.Workbench.sln.DotSettings"),
 };
-// Overridable so a release can be rehearsed against a local folder feed. nuget.org does not allow a
-// version to be deleted or reused.
+// Overridable so a release can be rehearsed against a local folder feed: --tag names the package, and
+// this names the folder. RELEASING.md gives the command. nuget.org does not allow a version to be
+// deleted or reused.
 var nugetSource = Argument("nuget-source", "https://api.nuget.org/v3/index.json");
 
 //////////////////////////////////////////////////////////////////////
@@ -87,9 +93,18 @@ Task("Restore")
     DotNetRestore(solution);
 });
 
+// Each build of this script makes each warning an error, as -warnaserror does on the command line.
+// Inspect-Code reports each warning of the compiler and of the analyzers, on each target. It does
+// not report a warning of an MSBuild task, such as MSB3277, a NETSDK warning, or a warning of the
+// XAML compiler of Avalonia. Only the build sees those. A build in an editor does not use this
+// script, thus a warning there does not stop an edit.
+DotNetMSBuildSettings WarningsAsErrors() =>
+    new DotNetMSBuildSettings { TreatAllWarningsAs = MSBuildTreatAllWarningsAs.Error };
+
 Task("Build")
-    .Description("Builds the solution.")
+    .Description("Builds the solution, with each warning as an error.")
     .IsDependentOn("Verify-Inspection-Settings")
+    .IsDependentOn("Verify-Coverage-Settings")
     .IsDependentOn("Restore")
     .Does(() =>
 {
@@ -99,6 +114,7 @@ Task("Build")
         {
             Configuration = configuration,
             NoRestore = true,
+            MSBuildSettings = WarningsAsErrors(),
         });
 });
 
@@ -113,7 +129,7 @@ Task("Test")
     // after the -- belongs to them rather than to the SDK. Coverage is the Microsoft Code Coverage
     // collector, which arrives with TUnit and writes Cobertura; coverage.runsettings scopes it.
     var resultsDirectory = MakeAbsolute(coverageDirectory).FullPath;
-    var coverageSettings = MakeAbsolute(File("./coverage.runsettings")).FullPath;
+    var coverageSettingsPath = MakeAbsolute(coverageSettings).FullPath;
 
     DotNetTest(
         solution,
@@ -126,7 +142,7 @@ Task("Test")
                 .Append("--results-directory").AppendQuoted(resultsDirectory)
                 .Append("--coverage")
                 .Append("--coverage-output-format").Append("cobertura")
-                .Append("--coverage-settings").AppendQuoted(coverageSettings)
+                .Append("--coverage-settings").AppendQuoted(coverageSettingsPath)
                 .Append("--report-trx"),
         });
 
@@ -159,12 +175,18 @@ Task("Pack")
     CleanDirectory(artifactsDirectory);
 
     // Test projects set IsPackable false, so one pack over the solution produces only the packages.
+    //
+    // A pack builds again, and it can give warnings of its own, thus it also makes them errors. It
+    // does not restore, as Build does not, because the Restore task restores. Thus, a NuGet warning
+    // of a restore, such as an audit advisory, stays a warning.
     DotNetPack(
         solution,
         new DotNetPackSettings
         {
             Configuration = configuration,
             OutputDirectory = artifactsDirectory,
+            NoRestore = true,
+            MSBuildSettings = WarningsAsErrors(),
         });
 
     foreach (var package in GetFiles($"{artifactsDirectory.Path}/*.nupkg").OrderBy(p => p.FullPath))
@@ -251,6 +273,93 @@ Task("Verify-Inspection-Settings")
         mirroredInspectionSettings.Length,
         inspectionSettings.Path);
 });
+
+// A dependency of Build, as Verify-Inspection-Settings is. The collector does not put an assembly in
+// the report if coverage.runsettings does not name it. Coveralls then shows no code to cover, and not
+// code with no tests. A person keeps the list by hand. This check reads from the projects what the
+// packages ship, as PackagesByPrefix reads the prefixes, and compares the two.
+Task("Verify-Coverage-Settings")
+    .Description("Checks that coverage.runsettings names each assembly that a package ships, and no other.")
+    .Does(() =>
+{
+    var expected = ShippedAssemblies().Select(CoverageModulePath).ToList();
+    var listed = XDocument.Load(MakeAbsolute(coverageSettings).FullPath)
+        .Descendants("Include")
+        .Descendants("ModulePath")
+        .Select(modulePath => modulePath.Value)
+        .ToList();
+
+    var problems = expected
+        .Except(listed, StringComparer.Ordinal)
+        .Select(modulePath => $"Missing: <ModulePath>{modulePath}</ModulePath>")
+        .Concat(listed
+            .Except(expected, StringComparer.Ordinal)
+            .Select(modulePath => $"Names no assembly that a package ships: <ModulePath>{modulePath}</ModulePath>"))
+        .ToList();
+
+    foreach (var problem in problems)
+    {
+        Error("  {0}", problem);
+    }
+
+    if (problems.Count > 0)
+    {
+        throw new Exception(
+            $"{problems.Count} line(s) of {coverageSettings.Path} out of step with the packages under src, listed "
+            + "above. Add each missing line to its Include list, and remove each line that names no shipped assembly.");
+    }
+
+    Information("{0} names all {1} assemblies that the packages ship.", coverageSettings.Path, expected.Count);
+});
+
+// The assemblies that the packages in src ship. Each package ships its build output, unless it sets
+// IncludeBuildOutput to false, and each dll that it packs in analyzers/dotnet/cs. Read from the
+// projects, where each package says what it holds.
+List<string> ShippedAssemblies()
+{
+    var assemblies = new SortedSet<string>(StringComparer.Ordinal);
+    foreach (var project in GetFiles("./src/**/*.csproj"))
+    {
+        var document = XDocument.Load(project.FullPath);
+        if (!document.Descendants("PackageId").Any())
+        {
+            continue;
+        }
+
+        var assemblyName = document.Descendants("AssemblyName").SingleOrDefault()?.Value
+            ?? throw new Exception($"{project} declares a PackageId and no AssemblyName.");
+
+        if (document.Descendants("IncludeBuildOutput").SingleOrDefault()?.Value != "false")
+        {
+            assemblies.Add(assemblyName);
+        }
+
+        var analyzers = document.Descendants().Where(item =>
+            item.Attribute("Pack")?.Value == "true" && item.Attribute("PackagePath")?.Value == "analyzers/dotnet/cs");
+        foreach (var analyzer in analyzers)
+        {
+            var include = analyzer.Attribute("Include")?.Value ?? string.Empty;
+            var fileName = include
+                .Replace("$(OutputPath)", string.Empty)
+                .Replace("$(AssemblyName)", assemblyName)
+                .Replace('\\', '/')
+                .Split('/')
+                .Last();
+            if (!fileName.EndsWith(".dll", StringComparison.Ordinal) || fileName.Contains("$("))
+            {
+                throw new Exception($"{project} packs '{include}' as an analyzer; its assembly name cannot be read.");
+            }
+
+            assemblies.Add(fileName.Substring(0, fileName.Length - ".dll".Length));
+        }
+    }
+
+    return assemblies.ToList();
+}
+
+// The ModulePath that coverage.runsettings gives an assembly. Each line has the same pattern with a
+// different name. Thus, the check compares the text and does not run the pattern.
+string CoverageModulePath(string assemblyName) => @".*\" + assemblyName.Replace(".", @"\.") + @"\.dll$";
 
 // A subdirectory of inspectionCacheDirectory named by a hash of every file that decides what an
 // inspection reports. inspectcode revalidates a cache against source edits but not against the
@@ -426,6 +535,35 @@ List<string> PrefixesOf(string tag, IEnumerable<string> prefixes) =>
 bool IsTagOf(string tag, string prefix) =>
     tag.StartsWith(prefix, StringComparison.Ordinal) && tag.Length > prefix.Length && char.IsDigit(tag[prefix.Length]);
 
+// The one package that a tag releases. Thrown rather than skipped, for a tag that names no package as
+// for one that names more than one: a tag build that quietly released nothing is the failure hardest to
+// notice, and publishing the wrong package cannot be undone. The likely way to name none is a tag with
+// the prefix that a package had before a rename, such as morsecode-avalonia-controls- for what is now
+// MorseCode.Controls.UI.Avalonia. The message lists the prefixes that the projects declare now.
+(string Id, FilePath Project) PackageOfTag(string tag, Dictionary<string, (string Id, FilePath Project)> packages)
+{
+    var prefixes = PrefixesOf(tag, packages.Keys);
+
+    if (prefixes.Count == 0)
+    {
+        throw new Exception(
+            $"Tag '{tag}' does not name a package in this repository, so this build would release " +
+            "nothing. A release tag is the MinVerTagPrefix of a project under src followed by its version. " +
+            "The prefixes are: " +
+            string.Join(", ", packages.Keys.OrderBy(p => p, StringComparer.Ordinal)) + ". " +
+            "Delete the tag, and push one with the prefix of the package.");
+    }
+
+    if (prefixes.Count > 1)
+    {
+        throw new Exception(
+            $"Tag '{tag}' matches more than one package prefix: {string.Join(", ", prefixes)}. " +
+            "Rename one of them so that neither extends the other.");
+    }
+
+    return packages[prefixes[0]];
+}
+
 // The projects that a project file names in a ProjectReference. The references that
 // src/Directory.Build.props adds are analyzers, which a package does not depend on, and they are not
 // in the project file.
@@ -544,34 +682,23 @@ List<string> UnreleasedReferences(FilePath project, Dictionary<string, (string I
 // through a different project, with the last tag of that project. It does not see a change that is
 // not in those folders, for example in src/Directory.Build.props.
 Task("Verify-Release-Order")
-    .Description("Fails when the tagged package compiles against a package here that changed after its last tag.")
+    .Description(
+        "Fails when the tag names no package, or when the tagged package compiles against a package here that " +
+        "changed after its last tag.")
     .Does(() =>
 {
     // With --tag, the check runs for a tag before the push.
-    var tag = Argument(
-        "tag",
-        BuildSystem.IsRunningOnGitHubActions &&
-        GitHubActions.Environment.Workflow.RefType == GitHubActionsRefType.Tag
-            ? GitHubActions.Environment.Workflow.RefName
-            : string.Empty);
-
+    var tag = ReleaseTag();
     if (string.IsNullOrEmpty(tag))
     {
         Information("Not a tag build, and no --tag was given - nothing to check.");
         return;
     }
 
+    // Fails here, before the build and the tests, for a tag that names no package or more than one. This
+    // failure skips the publish job, which would otherwise release nothing or the wrong package.
     var packages = PackagesByPrefix();
-    var prefixes = PrefixesOf(tag, packages.Keys);
-
-    // Publish refuses a tag that names more than one package, and skips one that names none.
-    if (prefixes.Count != 1)
-    {
-        Information("Tag '{0}' does not name exactly one package - nothing to check.", tag);
-        return;
-    }
-
-    var (packageId, project) = packages[prefixes[0]];
+    var (packageId, project) = PackageOfTag(tag, packages);
     var unreleased = UnreleasedReferences(project, packages);
 
     if (unreleased.Count > 0)
@@ -580,73 +707,43 @@ Task("Verify-Release-Order")
             $"Tag '{tag}' releases {packageId}, which compiles against packages of this repository that " +
             "changed after their last tag. Release them first, in this order:" + Environment.NewLine +
             string.Join(Environment.NewLine, unreleased.Select(entry => "  " + entry)) + Environment.NewLine +
-            "Tag each one on this commit and wait for its package to publish. Then run this build again.");
+            "Tag each one on this commit, and wait until nuget.org lists its version. Then run this build " +
+            "again. RELEASING.md gives the steps.");
     }
 
     Information("Tag '{0}' releases {1}, and each package that it compiles against is released.", tag, packageId);
 });
 
-Task("Publish")
-    .Description("Pushes the one package this build's tag names to nuget.org.")
-    .Does(() =>
-{
-    // Gated on a tag, and a tag build publishes exactly the one package its tag names, so the order
-    // packages reach nuget.org is the order their tags are pushed. Push dependencies first, and wait
-    // for each run to publish before pushing the next.
-    if (!BuildSystem.IsRunningOnGitHubActions ||
-        GitHubActions.Environment.Workflow.RefType != GitHubActionsRefType.Tag)
-    {
-        Information("Not a tag build - skipping NuGet push.");
-        return;
-    }
+// True for the build of a tag in GitHub Actions, which is the one build that publishes.
+bool IsTagBuild() =>
+    BuildSystem.IsRunningOnGitHubActions &&
+    GitHubActions.Environment.Workflow.RefType == GitHubActionsRefType.Tag;
 
-    var tag = GitHubActions.Environment.Workflow.RefName;
-    if (string.IsNullOrEmpty(tag))
+// The tag that this run releases: --tag, or else the tag of a tag build. Empty for each other run. Thus,
+// --tag runs the release tasks on a machine, for a rehearsal, with the tag that a push gives.
+string ReleaseTag()
+{
+    var tag = Argument("tag", IsTagBuild() ? GitHubActions.Environment.Workflow.RefName : string.Empty);
+    if (IsTagBuild() && string.IsNullOrEmpty(tag))
     {
         throw new Exception(
             "This is a tag build but the tag name is empty, so there is no way to tell which " +
             "package it releases.");
     }
 
-    // Minted by the NuGet login step in build.yml through trusted publishing; nothing here stores a
-    // key. Thrown rather than skipped: a tag build that quietly released nothing is the failure
-    // hardest to notice.
-    var apiKey = EnvironmentVariable("NUGET_API_KEY");
-    if (string.IsNullOrEmpty(apiKey))
-    {
-        throw new Exception(
-            "NUGET_API_KEY is not set. It is minted by the NuGet login step in "
-            + ".github/workflows/build.yml, which exchanges this run's OIDC token for a short-lived "
-            + "key. An empty value means that exchange did not happen or was refused - check that a "
-            + "trusted publishing policy for this repository and workflow exists on nuget.org, owned "
-            + "by the MorseCodeSoftware organization.");
-    }
+    return tag;
+}
 
-    var packagesByPrefix = PackagesByPrefix();
+// The feed as a URL, or null when it is a folder.
+Uri FeedUrl() =>
+    Uri.TryCreate(nugetSource, UriKind.Absolute, out var source) &&
+    (source.Scheme == Uri.UriSchemeHttp || source.Scheme == Uri.UriSchemeHttps)
+        ? source
+        : null;
 
-    // More than one match is refused rather than tie-broken, because publishing the wrong package
-    // cannot be undone.
-    var prefixes = PrefixesOf(tag, packagesByPrefix.Keys);
-
-    if (prefixes.Count == 0)
-    {
-        Information("Tag '{0}' does not name a package in this repository - skipping NuGet push.", tag);
-        Information(
-            "Known prefixes: {0}",
-            string.Join(", ", packagesByPrefix.Keys.OrderBy(p => p, StringComparer.Ordinal)));
-        return;
-    }
-
-    if (prefixes.Count > 1)
-    {
-        throw new Exception(
-            $"Tag '{tag}' matches more than one package prefix: {string.Join(", ", prefixes)}. " +
-            "Rename one of them so that neither extends the other.");
-    }
-
-    var packageId = packagesByPrefix[prefixes[0]].Id;
-    Information("Tag '{0}' releases {1}.", tag, packageId);
-
+// The one package file of a package in artifacts.
+FilePath PackageFileOf(string packageId)
+{
     // Matched by name rather than by glob, which would also match every package whose id extends
     // this one. The legacy *.symbols.nupkg that IncludeSymbols emits is excluded, because nuget.org
     // rejects it.
@@ -667,14 +764,220 @@ Task("Publish")
             $"Expected exactly one {packageId} package in artifacts, found {packages.Count}.");
     }
 
-    Information("Pushing {0} to {1}", packages[0].GetFilename(), nugetSource);
+    return packages[0];
+}
+
+// The dependencies that the nuspec of a package declares, each with the lowest version of its
+// range. Each target framework has its own group, thus a dependency can occur more than once.
+List<(string Id, string Version)> DependenciesOf(FilePath package)
+{
+    using var archive = ZipFile.OpenRead(package.FullPath);
+    var nuspec = archive.Entries.Single(entry =>
+        !entry.FullName.Contains('/') && entry.FullName.EndsWith(".nuspec", StringComparison.OrdinalIgnoreCase));
+
+    using var stream = nuspec.Open();
+    return XDocument.Load(stream)
+        .Descendants()
+        .Where(element => element.Name.LocalName == "dependency")
+        .Select(element => (
+            Id: element.Attribute("id")?.Value ?? throw new Exception($"A dependency in {nuspec.FullName} has no id."),
+            Version: LowestVersionOf(element.Attribute("version")?.Value ?? string.Empty)))
+        .Distinct()
+        .ToList();
+}
+
+// The lowest version that a NuGet range accepts. A version with no brackets is the lowest version. A
+// range with no lowest version, or one that does not include it, has no one version to look for.
+string LowestVersionOf(string range)
+{
+    var text = range.Trim();
+    if (text.StartsWith("[", StringComparison.Ordinal))
+    {
+        text = text.Substring(1).Split(',', ']')[0].Trim();
+    }
+    else if (text.StartsWith("(", StringComparison.Ordinal))
+    {
+        text = string.Empty;
+    }
+
+    if (text.Length == 0)
+    {
+        throw new Exception(
+            $"The range '{range}' has no lowest version that it includes, so there is no version to look for.");
+    }
+
+    return text;
+}
+
+// True when the feed has the version of a package. For nuget.org, that is true only after it
+// validates and indexes the package, and not when it accepts the push. A folder feed is for a
+// rehearsal.
+async Task<bool> IsOnFeed(HttpClient client, string id, string version)
+{
+    // The feed keeps IDs and versions in lowercase, and a version with no build metadata.
+    var lowerId = id.ToLowerInvariant();
+    var lowerVersion = version.Split('+')[0].ToLowerInvariant();
+
+    var source = FeedUrl();
+    if (source == null)
+    {
+        return FolderFeedHas(lowerId, lowerVersion);
+    }
+
+    // The service index gives the address of the flat container, and the flat container gives the
+    // versions of a package. A package with no versions gives 404.
+    using var index = JsonDocument.Parse(await client.GetStringAsync(source));
+    var baseAddress = index.RootElement.GetProperty("resources")
+        .EnumerateArray()
+        .Where(resource => resource.GetProperty("@type").GetString() == "PackageBaseAddress/3.0.0")
+        .Select(resource => resource.GetProperty("@id").GetString())
+        .FirstOrDefault()
+        ?? throw new Exception($"The service index at {nugetSource} has no PackageBaseAddress/3.0.0 resource.");
+
+    var versionsAddress = new Uri(new Uri(baseAddress.TrimEnd('/') + "/"), $"{lowerId}/index.json");
+    using var response = await client.GetAsync(versionsAddress);
+    if (response.StatusCode == HttpStatusCode.NotFound)
+    {
+        return false;
+    }
+
+    response.EnsureSuccessStatusCode();
+
+    using var versions = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+    return versions.RootElement.GetProperty("versions")
+        .EnumerateArray()
+        .Any(listed => string.Equals(listed.GetString(), lowerVersion, StringComparison.OrdinalIgnoreCase));
+}
+
+// dotnet nuget push puts a package at the top of a folder feed, with the case of its ID. Thus, this
+// compares the name with no case, which also holds on a file system that has case.
+bool FolderFeedHas(string lowerId, string lowerVersion)
+{
+    var folder = MakeAbsolute(Directory(nugetSource)).FullPath;
+    if (!System.IO.Directory.Exists(folder))
+    {
+        throw new Exception($"The feed {nugetSource} is not a URL, and no folder of that name exists.");
+    }
+
+    var name = $"{lowerId}.{lowerVersion}.nupkg";
+    return System.IO.Directory.EnumerateFiles(folder, "*.nupkg")
+        .Any(file => string.Equals(System.IO.Path.GetFileName(file), name, StringComparison.OrdinalIgnoreCase));
+}
+
+// nuget.org accepts a package whose dependency it does not have, and nobody can replace a version
+// on it. The tag build of a package can push before the tag build of its dependency, or the build
+// of the dependency can fail. Thus, before the push, this check reads the dependencies from the
+// package itself, and it does not use the tags. Each dependency that is a package of this repository
+// must be on the feed at the lowest version of its range. The publish job has no history, and this
+// check needs none.
+Task("Verify-Published-Dependencies")
+    .Description("Fails when the package to publish depends on a package here that is not on the feed yet.")
+    .Does(async () =>
+{
+    var tag = ReleaseTag();
+    if (string.IsNullOrEmpty(tag))
+    {
+        Information("Not a tag build, and no --tag was given - nothing to check.");
+        return;
+    }
+
+    var (packageId, _) = PackageOfTag(tag, PackagesByPrefix());
+    Information("Tag '{0}' releases {1}.", tag, packageId);
+
+    var package = PackageFileOf(packageId);
+    var ours = new HashSet<string>(PackagesByPrefix().Values.Select(p => p.Id), StringComparer.OrdinalIgnoreCase);
+    var dependencies = DependenciesOf(package).Where(dependency => ours.Contains(dependency.Id)).ToList();
+
+    using var client = new HttpClient();
+    var missing = new List<string>();
+    foreach (var (id, version) in dependencies)
+    {
+        if (await IsOnFeed(client, id, version))
+        {
+            Information("{0} {1} is on {2}.", id, version, nugetSource);
+        }
+        else
+        {
+            missing.Add($"{id} {version}");
+        }
+    }
+
+    if (missing.Count > 0)
+    {
+        throw new Exception(
+            $"{package.GetFilename()} depends on packages of this repository that are not on {nugetSource} yet:" +
+            Environment.NewLine +
+            string.Join(Environment.NewLine, missing.Select(entry => "  " + entry)) + Environment.NewLine +
+            "Nothing was pushed. Wait until the feed lists each one, then run the failed jobs of this run " +
+            "again. RELEASING.md gives the steps.");
+    }
+
+    if (dependencies.Count == 0)
+    {
+        Information("{0} depends on no package of this repository.", package.GetFilename());
+    }
+    else
+    {
+        Information(
+            "{0} depends on {1} package(s) of this repository, and the feed has each one.",
+            package.GetFilename(),
+            dependencies.Count);
+    }
+});
+
+Task("Publish")
+    .Description("Pushes the one package this build's tag names to nuget.org.")
+    .IsDependentOn("Verify-Published-Dependencies")
+    .Does(() =>
+{
+    // Gated on a tag, and a tag build publishes exactly the one package its tag names, so the order
+    // packages reach nuget.org is the order their tags are pushed. Verify-Published-Dependencies
+    // refuses a package that is early. RELEASING.md gives the order.
+    var tag = ReleaseTag();
+    if (string.IsNullOrEmpty(tag))
+    {
+        Information("Not a tag build, and no --tag was given - skipping NuGet push.");
+        return;
+    }
+
+    // A rehearsal pushes to a folder only. From a machine, a push to a URL is a real release, and
+    // nobody can replace a version on nuget.org.
+    if (!IsTagBuild() && FeedUrl() != null)
+    {
+        throw new Exception(
+            $"--tag rehearses a release, and a rehearsal pushes only to a folder, not to {nugetSource}. " +
+            "Give --nuget-source=<folder>. A release pushes its tag, and GitHub Actions publishes it.");
+    }
+
+    // Minted by the NuGet login step in build.yml through trusted publishing; nothing here stores a
+    // key. Thrown rather than skipped: a tag build that quietly released nothing is the failure
+    // hardest to notice. A push to a folder needs no key.
+    var apiKey = EnvironmentVariable("NUGET_API_KEY");
+    if (IsTagBuild() && string.IsNullOrEmpty(apiKey))
+    {
+        throw new Exception(
+            "NUGET_API_KEY is not set. It is minted by the NuGet login step in "
+            + ".github/workflows/build.yml, which exchanges this run's OIDC token for a short-lived "
+            + "key. An empty value means that exchange did not happen or was refused - check that a "
+            + "trusted publishing policy for this repository and workflow exists on nuget.org, owned "
+            + "by the MorseCodeSoftware organization.");
+    }
+
+    // Verify-Release-Order already failed for a tag that names no package or more than one, and its
+    // failure skips this job. Checked again, so that this target alone never pushes the wrong package or
+    // quietly pushes none.
+    var (packageId, _) = PackageOfTag(tag, PackagesByPrefix());
+    Information("Tag '{0}' releases {1}.", tag, packageId);
+
+    var package = PackageFileOf(packageId);
+    Information("Pushing {0} to {1}", package.GetFilename(), nugetSource);
 
     // --skip-duplicate makes re-running a tag build a no-op for a package it already pushed.
     DotNetNuGetPush(
-        packages[0].FullPath,
+        package.FullPath,
         new DotNetNuGetPushSettings
         {
-            ApiKey = apiKey,
+            ApiKey = string.IsNullOrEmpty(apiKey) ? null : apiKey,
             Source = nugetSource,
             SkipDuplicate = true,
         });

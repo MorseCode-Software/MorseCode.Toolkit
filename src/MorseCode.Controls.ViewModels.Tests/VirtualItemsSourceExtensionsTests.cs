@@ -293,6 +293,75 @@ public sealed class VirtualItemsSourceExtensionsTests
         await Assert.That(source.VisibleRows.Sample()).IsEmpty();
     }
 
+    // A place can start before the list, stop at an end, or start after the list. The rows are the
+    // positions of the place that the list has. The test gets the expected positions with a filter, and
+    // the code gets them with Math.Min and Math.Max.
+    [Test]
+    [Arguments(12, 0, 5)]
+    [Arguments(12, 7, 5)]
+    [Arguments(12, 10, 5)]
+    [Arguments(12, 12, 5)]
+    [Arguments(12, 20, 5)]
+    [Arguments(12, -3, 5)]
+    [Arguments(12, -10, 5)]
+    [Arguments(12, 0, 0)]
+    [Arguments(12, 0, 20)]
+    [Arguments(0, 0, 5)]
+    public async Task TheRowsOfAWholeListAreThePositionsOfThePlaceThatTheListHas(int total, int first, int count)
+    {
+        (IVirtualItemsSource<VirtualRow> source, ViewModelBase viewModel) =
+            Make(make: output => output.CreateVirtualItemsSource(rows: Cell.Constant(value: Rows(count: total))));
+
+        using ViewModelBase owner = viewModel;
+
+        source.RangeReported.Execute(parameter: Reported(first: first, count: count));
+
+        int[] expected =
+        [
+            .. Enumerable.Range(start: 0, count: total)
+                .Where(predicate: position => position >= first && position < first + count)
+        ];
+
+        await Assert.That(source.ConstructedRows.Sample().Select(selector: static row => row.Position))
+            .IsEquivalentTo(expected: expected, ordering: CollectionOrdering.Matching);
+
+        await Assert.That(source.VisibleRows.Sample().Select(selector: static row => row.Position))
+            .IsEquivalentTo(expected: expected, ordering: CollectionOrdering.Matching);
+    }
+
+    // The rows of a place are a copy. The second calm compares new rows with the rows of its last value.
+    // Thus, an owner that changes its list and sends it again gets new rows, and a consumer cannot
+    // change the rows.
+    [Test]
+    public async Task TheRowsOfAWholeListKeepTheRowsOfTheirInstant()
+    {
+        List<VirtualRow> list = [.. Rows(count: 12)];
+        CellSink<IReadOnlyList<VirtualRow>> rows = Cell.CreateSink<IReadOnlyList<VirtualRow>>(initialValue: list);
+
+        (IVirtualItemsSource<VirtualRow> source, ViewModelBase viewModel) =
+            Make(make: output => output.CreateVirtualItemsSource(rows: rows));
+
+        using ViewModelBase owner = viewModel;
+
+        source.RangeReported.Execute(parameter: Reported(first: 2, count: 5));
+
+        IReadOnlyList<VirtualRow> before = source.VisibleRows.Sample();
+        VirtualRow first = before[index: 0];
+        list[index: 2] = new VirtualRow(Position: 2);
+
+        await Assert.That(source.VisibleRows.Sample()[index: 0]).IsSameReferenceAs(expected: first);
+
+        rows.Send(a: list);
+
+        await Assert.That(source.VisibleRows.Sample()[index: 0]).IsSameReferenceAs(expected: list[index: 2]);
+
+        // An array is also an IList<T>, and it accepts the write. Its IsReadOnly is true, thus this test
+        // writes and does not read IsReadOnly.
+        IList<VirtualRow>? writable = before as IList<VirtualRow>;
+
+        await Assert.That(() => writable?[index: 0] = list[index: 0]).Throws<NotSupportedException>();
+    }
+
     [Test]
     public async Task ACollectionGivesItsCountAndOnlyTheRowsOfTheRangeAtTheirOffset()
     {
@@ -400,6 +469,64 @@ public sealed class VirtualItemsSourceExtensionsTests
         requests.Send(a: 25);
 
         await Assert.That(source.ScrollRequest.Value).IsEqualTo(expected: Maybe<ScrollRequest>.None);
+    }
+
+    // One stream adds a key and asks for it. The source finds the key in the collection after the edit,
+    // thus the request is for the new last position.
+    [Test]
+    public async Task ARequestByKeyCanNameAKeyThatTheSameTransactionAdds()
+    {
+        StreamSink<int> added = Stream.CreateSink<int>();
+
+        ReactiveCollection<int, int, int> collection =
+            Collection(
+                keys: [10, 20, 30],
+                edits: added.Map(
+                    f: static key => CollectionEdit<int, int, int>.Add(new Item<int, int>(identity: key, state: 0))));
+
+        (IVirtualItemsSource source, ViewModelBase viewModel) =
+            Make(
+                make: output =>
+                    output.CreateVirtualItemsSourceByKey(
+                        collection: collection,
+                        project: static key => new VirtualRow(Position: key),
+                        scrollRequests: added));
+
+        using ViewModelBase owner = viewModel;
+
+        added.Send(a: 40);
+
+        await Assert.That(source.Rows.Value.TotalCount).IsEqualTo(expected: 4);
+        await Assert.That(source.ScrollRequest.Value).IsEqualTo(expected: Asked(position: 3, number: 0));
+    }
+
+    // A removal and a request in one transaction. The position of key 30 is 1 after the removal of key 10.
+    // The position from before the removal is 2, which is past the end of the list.
+    [Test]
+    public async Task ARequestByKeyReadsTheKeysAfterAnEditInTheSameTransaction()
+    {
+        StreamSink<CollectionEdit<int, int, int>> edits = Stream.CreateSink<CollectionEdit<int, int, int>>();
+        StreamSink<int> requests = Stream.CreateSink<int>();
+
+        (IVirtualItemsSource source, ViewModelBase viewModel) =
+            Make(
+                make: output =>
+                    output.CreateVirtualItemsSourceByKey(
+                        collection: Collection(keys: [10, 20, 30], edits: edits),
+                        project: static key => new VirtualRow(Position: key),
+                        scrollRequests: requests));
+
+        using ViewModelBase owner = viewModel;
+
+        Transaction.RunVoid(
+            action: () =>
+            {
+                edits.Send(a: CollectionEdit<int, int, int>.Remove(10));
+                requests.Send(a: 30);
+            });
+
+        await Assert.That(source.Rows.Value.TotalCount).IsEqualTo(expected: 2);
+        await Assert.That(source.ScrollRequest.Value).IsEqualTo(expected: Asked(position: 1, number: 0));
     }
 
     [Test]
@@ -792,10 +919,15 @@ public sealed class VirtualItemsSourceExtensionsTests
         Collection(keys: Enumerable.Range(start: 0, count: total));
 
     private static ReactiveCollection<int, int, int> Collection(IEnumerable<int> keys) =>
+        Collection(keys: keys, edits: Stream.CreateSink<CollectionEdit<int, int, int>>());
+
+    private static ReactiveCollection<int, int, int> Collection(
+        IEnumerable<int> keys,
+        Stream<CollectionEdit<int, int, int>> edits) =>
         ReactiveCollection<int, int, int>.Create(
             keySelector: static identity => identity,
             initialItems: [.. keys.Select(selector: static key => new Item<int, int>(identity: key, state: 0))],
-            Stream.CreateSink<CollectionEdit<int, int, int>>());
+            edits);
 
     private static Exception Catch(Action action)
     {

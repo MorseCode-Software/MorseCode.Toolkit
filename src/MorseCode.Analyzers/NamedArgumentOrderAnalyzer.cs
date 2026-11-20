@@ -136,6 +136,9 @@ public sealed class NamedArgumentOrderAnalyzer : DiagnosticAnalyzer
                 PrimaryConstructorBaseTypeSyntax baseType => baseType.ArgumentList,
                 ElementAccessExpressionSyntax access => access.ArgumentList,
                 ElementBindingExpressionSyntax binding => binding.ArgumentList,
+
+                // An indexer in an object initializer, as in new Grid { [row: 1, column: 2] = 3 }.
+                ImplicitElementAccessSyntax implicitAccess => implicitAccess.ArgumentList,
                 _ => null
             };
 
@@ -144,30 +147,39 @@ public sealed class NamedArgumentOrderAnalyzer : DiagnosticAnalyzer
             return;
         }
 
+        // The position of the parameter that the compiler binds each argument of the source to. The syntax of
+        // the operation of an argument is the argument, or an expression in it. Parentheses, checked, unchecked,
+        // and the null-forgiving operator have no operation of their own. Thus, the analyzer goes up from that
+        // syntax to the argument around it, and keeps the argument only when it is in this list. The compiler
+        // adds a value for an optional parameter that a call leaves out. That value has the syntax of the call
+        // or of an outer argument, and the source does not have it.
+        Dictionary<ArgumentSyntax, int> positions = [];
+
+        foreach (IArgumentOperation operation in arguments)
+        {
+            if (operation.ArgumentKind != ArgumentKind.DefaultValue
+                && operation.Parameter is { } parameter
+                && operation.Syntax.FirstAncestorOrSelf<ArgumentSyntax>() is { } argument
+                && argument.Parent == list
+                && !positions.ContainsKey(key: argument))
+            {
+                positions.Add(key: argument, value: parameter.Ordinal);
+            }
+        }
+
+        // A value that goes into a params array has no operation of its own. Thus, it takes the last parameter,
+        // which is the params parameter.
         Report(
             report: context.ReportDiagnostic,
             target: target,
             parameters: parameters,
             list: list,
-            ordinals: [.. list.Arguments.Select(selector: Ordinal)]);
-
-        return;
-
-        // The position of the parameter that the compiler binds an argument to. A value that goes into a params
-        // array has no operation of its own, thus it takes the last parameter, which is the params parameter.
-        // The operation of an argument with the null-forgiving operator has the syntax of its expression
-        // without the operator.
-        int Ordinal(ArgumentSyntax argument)
-        {
-            ExpressionSyntax withoutSuppression = WithoutSuppression(expression: argument.Expression);
-
-            return arguments.FirstOrDefault(predicate: operation => operation.Syntax == argument)?.Parameter?.Ordinal
-                   ?? (withoutSuppression == argument.Expression
-                       ? null
-                       : arguments.FirstOrDefault(predicate: operation => operation.Syntax == withoutSuppression)
-                           ?.Parameter?.Ordinal)
-                   ?? parameters.Length - 1;
-        }
+            ordinals:
+            [
+                .. list.Arguments.Select(
+                    selector: argument =>
+                        positions.TryGetValue(key: argument, value: out int ordinal) ? ordinal : parameters.Length - 1)
+            ]);
     }
 
     private static void CheckAttribute(SyntaxNodeAnalysisContext context)
@@ -257,10 +269,4 @@ public sealed class NamedArgumentOrderAnalyzer : DiagnosticAnalyzer
                         values: parameters.Select(selector: static parameter => parameter.Name))
                 ]));
     }
-
-    private static ExpressionSyntax WithoutSuppression(ExpressionSyntax expression) =>
-        expression is PostfixUnaryExpressionSyntax suppressed
-        && suppressed.IsKind(kind: SyntaxKind.SuppressNullableWarningExpression)
-            ? suppressed.Operand
-            : expression;
 }

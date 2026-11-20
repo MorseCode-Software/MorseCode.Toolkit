@@ -26,10 +26,11 @@ a Stream of scroll positions. Each takes an optional Stream of clears that withd
 request.
 
 New: CreateVirtualItemsSourceByKey, which takes a Stream of keys instead of a Stream of positions.
-It finds the position of a key in the collection in the transaction of the request, so a view
-model does not keep positions, which move when the collection changes. A key that the collection
-does not have at that instant makes no request. It has its own name because a collection with int
-keys would make an overload by key the same as the overload by position.
+It finds the position of a key in the collection in the transaction of the request, after the edits
+of that transaction, so a view model does not keep positions, which move when the collection
+changes, and can add an item and scroll to it in one step. A key that the collection does not have
+after those edits makes no request. It has its own name because a collection with int keys would
+make an overload by key the same as the overload by position.
 
 Moved: the helper CreateScrollRequest of MorseCode.Mvvm 0.2.4 is now inside this package and is
 not public. CreateVirtualItemsSource uses it to make the request and the report.
