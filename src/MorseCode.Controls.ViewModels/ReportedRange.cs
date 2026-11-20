@@ -66,9 +66,22 @@ public readonly record struct ReportedRange(
             FirstVisibilityAmount: 0.0,
             LastVisibilityAmount: 0.0);
 
-    // The number of positions after the end of the list that the control also wants rows for, when
-    // the list gets them. A range in this value cannot hold them, because each range stays inside the
-    // list. Only the slice of a collection source reads this number. The control writes it from a
-    // different assembly, which the project file names as a friend.
-    internal int Ahead { get; init; }
+    /// <summary>
+    ///     Gets the number of positions after the end of the list that the control also wants
+    ///     rows for, when the list gets them.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         A range in this value cannot hold these positions, because each range stays inside
+    ///         the list. The number is 0 when <see cref="Constructed" /> stops before the end of the
+    ///         list.
+    ///     </para>
+    ///     <para>
+    ///         A view model that builds its own rows can build rows for these positions too, when
+    ///         its count gets them. Then, the row of a new position at the end comes with the new
+    ///         count, and the control does not wait for a second report. The source of a
+    ///         collection does this.
+    ///     </para>
+    /// </remarks>
+    public int Ahead { get; init; }
 }

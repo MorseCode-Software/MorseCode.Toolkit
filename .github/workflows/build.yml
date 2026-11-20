@@ -82,10 +82,11 @@ jobs:
       - name: Restore tools
         run: dotnet tool restore
 
-      # A tag build stops here when its package compiles against a package of this repository that
-      # changed after its last tag, because that release would depend on a version without the
-      # change. It runs here and not in the publish job, which has no history to read tags from. A
-      # failure skips the publish job. See Verify-Release-Order in build.cake.
+      # A tag build stops here when its tag names no package, which would release nothing, and when
+      # its package compiles against a package of this repository that changed after its last tag,
+      # because that release would depend on a version without the change. It runs here and not in
+      # the publish job, which has no history to read tags from. A failure skips the publish job.
+      # See Verify-Release-Order in build.cake.
       - name: Verify release order
         if: startsWith(github.ref, 'refs/tags/')
         run: dotnet cake --target=Verify-Release-Order --exclusive --configuration=${{ env.CONFIGURATION }}
@@ -247,6 +248,13 @@ jobs:
           name: packages
           path: artifacts
 
+      # A package must not reach nuget.org before a package of this repository that it depends on.
+      # This step fails, and pushes nothing, when such a dependency is not on nuget.org yet. When it
+      # is, run the failed jobs again. See Verify-Published-Dependencies in build.cake, and
+      # RELEASING.md.
+      - name: Verify dependencies are published
+        run: dotnet cake --target=Verify-Published-Dependencies --exclusive --configuration=${{ env.CONFIGURATION }}
+
       # The packages this repository publishes belong to the MorseCodeSoftware organization on
       # nuget.org, and the trusted publishing policy is owned by that organization. user is not the
       # owner: nuget.org documents it as the profile name of the member who created the policy,
@@ -260,4 +268,4 @@ jobs:
       - name: Publish
         env:
           NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
-        run: dotnet cake --target=Publish --configuration=${{ env.CONFIGURATION }}
+        run: dotnet cake --target=Publish --exclusive --configuration=${{ env.CONFIGURATION }}

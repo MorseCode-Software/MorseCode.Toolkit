@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using JetBrains.Annotations;
 using MorseCode.Mvvm;
@@ -24,8 +25,13 @@ public static class VirtualItemsSourceExtensions
     /// <remarks>
     ///     <para>
     ///         The count of the control is the number of keys in the collection. The count, the rows,
-    ///         and their offset come from one cell, so that they always agree. The request is the one
-    ///         that <c>CreateScrollRequest</c> makes.
+    ///         and their offset come from one cell, so that they always agree.
+    ///     </para>
+    ///     <para>
+    ///         <see cref="IVirtualItemsSource.ScrollRequest" /> is none at first. Each position on
+    ///         <paramref name="scrollRequests" /> makes it a request for that position, with the next
+    ///         number. A report of the control clears the request only if it is the request that is
+    ///         there now. Each value on <paramref name="clears" /> sets the request to none.
     ///     </para>
     ///     <para>
     ///         The <c>Map</c> keeps a row for a key that left the slice until more than
@@ -55,6 +61,9 @@ public static class VirtualItemsSourceExtensions
     /// <exception cref="ArgumentNullException">
     ///     <paramref name="output" />, <paramref name="collection" />, <paramref name="project" />,
     ///     or <paramref name="scrollRequests" /> is null.
+    /// </exception>
+    /// <exception cref="ArgumentOutOfRangeException">
+    ///     <paramref name="retainedBeyondTheView" /> is negative.
     /// </exception>
     public static IVirtualItemsSource<TRow> CreateVirtualItemsSource<TKey, TIdentity, TState, TRow>(
         this ViewModelBase.IOutput output,
@@ -137,8 +146,10 @@ public static class VirtualItemsSourceExtensions
     /// <remarks>
     ///     <para>
     ///         The source finds the position of a key in the collection in the transaction of the
-    ///         request. Thus, the view model does not keep positions, which move when the collection
-    ///         changes. A key that the collection does not have at that instant makes no request.
+    ///         request, after the edits of that transaction. Thus, the view model does not keep
+    ///         positions, which move when the collection changes. A request can name a key that the
+    ///         same transaction adds. A key that the collection does not have after the transaction
+    ///         makes no request.
     ///     </para>
     ///     <para>
     ///         This method has its own name. A collection with keys of type <c>int</c> would make an
@@ -167,6 +178,9 @@ public static class VirtualItemsSourceExtensions
     ///     <paramref name="output" />, <paramref name="collection" />, <paramref name="project" />,
     ///     or <paramref name="scrollRequests" /> is null.
     /// </exception>
+    /// <exception cref="ArgumentOutOfRangeException">
+    ///     <paramref name="retainedBeyondTheView" /> is negative.
+    /// </exception>
     public static IVirtualItemsSource<TRow> CreateVirtualItemsSourceByKey<TKey, TIdentity, TState, TRow>(
         this ViewModelBase.IOutput output,
         ReactiveCollection<TKey, TIdentity, TState> collection,
@@ -187,10 +201,16 @@ public static class VirtualItemsSourceExtensions
         return Transaction.Run(
             f: () =>
             {
-                // The position of the key at the instant of the request. A key that is not in the
-                // collection gives none, and the filter drops it.
+                // The position of the key in the keys after the edits of the transaction of the request.
+                // The source makes the rows from the same keys, thus the position and the rows agree.
+                // Snapshot gives the keys from before the edits. With those keys, a key that the
+                // transaction adds makes no request. Also, a removal before the key moves the request
+                // one position too far. The requests do not change the keys, thus SnapshotLatest closes
+                // no loop. A key that is not in the collection gives none, and the filter drops it.
                 Stream<int> positions =
-                    scrollRequests.Snapshot(c: collection.KeysCell, f: static (key, keys) => keys.IndexOf(key: key))
+                    scrollRequests.SnapshotLatest(
+                            c: collection.KeysCell,
+                            f: static (key, keys) => keys.IndexOf(key: key))
                         .FilterSome();
 
                 return output.CreateVirtualItemsSource(
@@ -329,7 +349,7 @@ public static class VirtualItemsSourceExtensions
     private static Cell<IReadOnlyList<TRow>> RowsAt<TRow>(Cell<IReadOnlyList<TRow>> items, Cell<ItemRange> place)
         where TRow : class =>
         place.Calm()
-            .Lift(c2: items, f: static (range, list) => RowsAt(items: list, place: range))
+            .Lift(c2: items, f: static IReadOnlyList<TRow> (range, list) => RowsAt(items: list, place: range))
             .Calm(areEqual: static (left, right) => HaveTheSameRows(left: left, right: right));
 
     // The two lists have the same objects in the same sequence. ReferenceEqualityComparer does not exist
@@ -342,13 +362,24 @@ public static class VirtualItemsSourceExtensions
 
     // The rows of a place in a list. The place stops at the two ends of the list. The report of the
     // control and the rows of the slice can be from different instants.
-    private static IReadOnlyList<TRow> RowsAt<TRow>(IReadOnlyList<TRow> items, ItemRange place)
+    private static ReadOnlyCollection<TRow> RowsAt<TRow>(IReadOnlyList<TRow> items, ItemRange place)
     {
         // Math.Clamp does not exist on netstandard2.0 and net472.
         int first = Math.Max(val1: 0, val2: Math.Min(val1: place.First, val2: items.Count));
         int end = Math.Max(val1: first, val2: Math.Min(val1: place.First + place.Count, val2: items.Count));
 
-        return [.. items.Skip(count: first).Take(count: end - first)];
+        // On .NET Framework, Skip reads each item before the place. At the end of an ImmutableList of
+        // 100,000 rows, that was 6.8 ms for each cell. The index reads only the rows of the place.
+        // The rows are a copy and not a view of the list, because the second calm compares them with the
+        // rows of the next value.
+        TRow[] rows = new TRow[end - first];
+
+        for (int index = 0; index < rows.Length; index++)
+        {
+            rows[index] = items[index: first + index];
+        }
+
+        return Array.AsReadOnly(array: rows);
     }
 
     private static VirtualItemsSource Build(

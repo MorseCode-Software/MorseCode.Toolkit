@@ -29,9 +29,15 @@ internal sealed class ExplicitCastAnalyzerTests
             public static implicit operator decimal(Money value) => 0m;
         }
 
-        public interface IShape { }
+        public interface IShape
+        {
+            int Sides { get; }
+        }
 
-        public class Square : IShape { }
+        public class Square : IShape
+        {
+            int IShape.Sides => 4;
+        }
 
         public static class Calls
         {
@@ -162,10 +168,11 @@ internal sealed class ExplicitCastAnalyzerTests
     }
 
     // A cast to or from dynamic is a cast, and the report names it. The compiler classes a conversion from
-    // dynamic as implicit, because int number = unknown compiles, thus the message says the cast is not needed.
-    // That is true, and the value is still checked only when the code runs.
+    // dynamic as implicit, because int number = unknown compiles. But the cast runs an explicit conversion when
+    // the code runs, and the code without it runs an implicit one. A long in unknown converts with the cast and
+    // throws without it. Thus, the message does not say that the cast is not needed. Before, it did.
     [Test]
-    public async Task ACastFromDynamicGivesOneReportAndACastToDynamicSaysItIsNotNeeded()
+    public async Task ACastFromDynamicGivesOneReportThatDoesNotSayItIsNotNeeded()
     {
         IReadOnlyList<Diagnostic> found =
             await Analyze(
@@ -180,8 +187,90 @@ internal sealed class ExplicitCastAnalyzerTests
             .IsEquivalentTo(
                 expected:
                 [
-                    "Avoid the explicit cast to int: an implicit conversion exists, thus the cast is not needed",
+                    "Avoid the explicit cast to int: change the code so that the conversion is not necessary",
                     "Avoid the explicit cast to dynamic: an implicit conversion exists, thus the cast is not needed"
+                ],
+                ordering: CollectionOrdering.Matching);
+    }
+
+    // An implicit conversion exists for each of these casts, but each one chooses something. The cast to double
+    // makes the division one of doubles. The casts to object make == compare the references. The cast to
+    // the interface reaches a member that the class implements explicitly. Without the cast, each one does a
+    // different thing or does not compile. Thus, the message tells how to keep the type without a cast. Before,
+    // it said that the cast is not needed.
+    [Test]
+    public async Task ACastThatChoosesAnOperationIsNotCalledNotNeeded()
+    {
+        IReadOnlyList<Diagnostic> found =
+            await Analyze(
+                    body: """
+                          int sum = 7;
+                          int count = 2;
+                          string left = "a";
+                          string right = "a";
+                          Square square = new();
+                          _ = (double)sum / count;
+                          _ = (object)left == (object)right;
+                          _ = ((IShape)square).Sides;
+                          """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        const string chooses =
+            "an implicit conversion exists: put the value in a variable of that type in place of the cast";
+
+        await Assert.That(found.Select(selector: static diagnostic => diagnostic.GetMessage()))
+            .IsEquivalentTo(
+                expected:
+                [
+                    $"Avoid the explicit cast to double: {chooses}",
+                    $"Avoid the explicit cast to object: {chooses}",
+                    $"Avoid the explicit cast to object: {chooses}",
+                    $"Avoid the explicit cast to IShape: {chooses}"
+                ],
+                ordering: CollectionOrdering.Matching);
+    }
+
+    // The message says that the cast is not needed only where the value goes directly to a destination of the
+    // type of the cast. Each destination is one of these: the initializer of a variable of that declared type, an
+    // assignment, or a return of that type. A variable with var gets its type from the cast, and the return of a
+    // lambda can get its type from it too. Thus, those get the other message.
+    [Test]
+    public async Task ACastToTheTypeOfItsDestinationIsNotNeeded()
+    {
+        IReadOnlyList<Diagnostic> found =
+            await Analyze(
+                    body: """
+                          object boxed = (object)big;
+                          IShape asShape = (IShape)new Square();
+                          long wide = 0;
+                          wide = (long)big;
+                          object Box() => (object)big;
+                          var guessed = (object)big;
+                          Func<object> later = () => (object)big;
+                          _ = boxed;
+                          _ = asShape;
+                          _ = wide;
+                          _ = Box();
+                          _ = guessed;
+                          _ = later;
+                          """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        const string notNeeded = "an implicit conversion exists, thus the cast is not needed";
+
+        const string chooses =
+            "an implicit conversion exists: put the value in a variable of that type in place of the cast";
+
+        await Assert.That(found.Select(selector: static diagnostic => diagnostic.GetMessage()))
+            .IsEquivalentTo(
+                expected:
+                [
+                    $"Avoid the explicit cast to object: {notNeeded}",
+                    $"Avoid the explicit cast to IShape: {notNeeded}",
+                    $"Avoid the explicit cast to long: {notNeeded}",
+                    $"Avoid the explicit cast to object: {notNeeded}",
+                    $"Avoid the explicit cast to object: {chooses}",
+                    $"Avoid the explicit cast to object: {chooses}"
                 ],
                 ordering: CollectionOrdering.Matching);
     }
@@ -242,6 +331,93 @@ internal sealed class ExplicitCastAnalyzerTests
 
         await Assert.That(found.Select(selector: static diagnostic => diagnostic.Severity).Distinct())
             .IsEquivalentTo(expected: [DiagnosticSeverity.Warning], ordering: CollectionOrdering.Matching);
+    }
+
+    // A foreach with a type makes the conversion that a cast makes, for each element, and the source has no cast.
+    // The report marks the type of the loop variable. A loop with var, with the type of the elements, or with a
+    // type that the elements convert to implicitly, gives no report.
+    [Test]
+    public async Task AForeachThatConvertsEachElementExplicitlyIsReported()
+    {
+        IReadOnlyList<Diagnostic> found =
+            await AnalyzerHarness.Analyze(
+                    analyzer: new ExplicitCastAnalyzer(),
+                    source: """
+                            using System.Collections;
+                            using System.Collections.Generic;
+
+                            public static class Loops
+                            {
+                                public static void Run(
+                                    IEnumerable<object> objects,
+                                    IEnumerable untyped,
+                                    IEnumerable<long> longs,
+                                    IEnumerable<string> strings)
+                                {
+                                    foreach (string text in objects) { _ = text; }
+                                    foreach (string text in untyped) { _ = text; }
+                                    foreach (int number in longs) { _ = number; }
+                                    foreach (var text in objects) { _ = text; }
+                                    foreach (string text in strings) { _ = text; }
+                                    foreach (object value in strings) { _ = value; }
+                                    foreach (long number in longs) { _ = number; }
+                                }
+                            }
+                            """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        await Assert.That(found.Select(selector: static diagnostic => Covered(diagnostic: diagnostic)))
+            .IsEquivalentTo(expected: ["string", "string", "int"], ordering: CollectionOrdering.Matching);
+
+        await Assert.That(found.Select(selector: static diagnostic => diagnostic.GetMessage()))
+            .IsEquivalentTo(
+                expected:
+                [
+                    "Avoid the explicit cast to string: the foreach casts each element; use a sequence of that type, or filter it with OfType",
+                    "Avoid the explicit cast to string: the foreach casts each element; use a sequence of that type, or filter it with OfType",
+                    "Avoid the explicit cast to int: the foreach casts each element; keep the elements in a type of the right size, or convert them in one place with a name"
+                ],
+                ordering: CollectionOrdering.Matching);
+    }
+
+    // A range variable with a type makes the query call Cast for each element, and the source has no cast. The
+    // report marks the type in a from clause and in a join clause. A range variable with no type, or with a
+    // type that the elements convert to implicitly, gives no report.
+    [Test]
+    public async Task AQueryRangeVariableThatConvertsEachElementExplicitlyIsReported()
+    {
+        IReadOnlyList<Diagnostic> found =
+            await AnalyzerHarness.Analyze(
+                    analyzer: new ExplicitCastAnalyzer(),
+                    source: """
+                            using System.Collections;
+                            using System.Collections.Generic;
+                            using System.Linq;
+
+                            public static class Queries
+                            {
+                                public static void Run(IEnumerable<object> objects, IEnumerable untyped, IEnumerable<string> strings)
+                                {
+                                    _ = from string text in objects select text.Length;
+                                    _ = from string text in untyped select text.Length;
+                                    _ = from text in strings join string other in objects on text equals other select text;
+                                    _ = from text in strings select text.Length;
+                                    _ = from object value in strings select value;
+                                }
+                            }
+                            """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        await Assert.That(found.Select(selector: static diagnostic => Covered(diagnostic: diagnostic)))
+            .IsEquivalentTo(expected: ["string", "string", "string"], ordering: CollectionOrdering.Matching);
+
+        await Assert.That(found.Select(selector: static diagnostic => diagnostic.GetMessage()).Distinct())
+            .IsEquivalentTo(
+                expected:
+                [
+                    "Avoid the explicit cast to string: the query casts each element with Cast; use a sequence of that type, or filter it with OfType"
+                ],
+                ordering: CollectionOrdering.Matching);
     }
 
     // A suppression is how the few places that need a cast say so. The reason goes next to it. The compiler
