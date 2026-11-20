@@ -58,6 +58,13 @@ of the variable.
 It doesn't report `as`, `is`, a pattern, an implicit conversion the compiler makes without a cast,
 a parenthesized expression such as `(big) + 1`, or code in a generated file.
 
+It also doesn't report a query whose range variable has a type that the elements convert to
+implicitly, such as `from long number in ints`, even though that query throws. `Cast<long>()` gets
+each element as an `object` and unboxes it, and a boxed `int` doesn't unbox as a `long`. The .NET
+SDK already reports this case with
+[CA2021](https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca2021), which
+is on by default, so MC0002 leaves it to that rule.
+
 ## How to avoid a cast
 
 - **A reference or an unboxing cast.** Match the type: `value is Square square`, or a `switch` with
