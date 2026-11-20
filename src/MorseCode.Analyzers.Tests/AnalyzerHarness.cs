@@ -31,6 +31,10 @@ internal static class AnalyzerHarness
     ///     The identifiers of the compiler errors that the sample must have, in the order of the source, or
     ///     null for a sample that compiles. The library must always compile.
     /// </param>
+    /// <param name="platform">
+    ///     True to compile against the assemblies of the runtime. False stands for an editor that analyzes
+    ///     the sample before it loads the references. Then the sample has no core library.
+    /// </param>
     /// <param name="cancellationToken">
     ///     The token that stops the analysis. A test with a time limit gives its own token.
     /// </param>
@@ -42,9 +46,10 @@ internal static class AnalyzerHarness
         string source,
         string? library = null,
         IReadOnlyList<string>? errors = null,
+        bool platform = true,
         CancellationToken cancellationToken = default)
     {
-        List<MetadataReference> references = [.. PlatformReferences()];
+        List<MetadataReference> references = platform ? [.. PlatformReferences()] : [];
         CSharpCompilation? libraryCompilation = null;
 
         if (library is not null)

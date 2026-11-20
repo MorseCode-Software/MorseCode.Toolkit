@@ -23,10 +23,12 @@ internal sealed class PrimaryConstructorParameterCodeFixTests
 
         """;
 
-    // A parameter with no modifier, one after an attribute, one on a line of its own, and one with scoped. Each
-    // gets in at the position that C# wants, and the layout of the list does not change.
+    // A parameter with no modifier, one after an attribute, and one on a line of its own. Each gets in at the
+    // position that C# wants, and the layout of the list does not change. A by-value scoped parameter has no
+    // report, thus no fix. Before, the fix wrote scoped in, which limits the reference and not the value. A
+    // caller in a different type that returns the result then did not compile.
     [Test]
-    public async Task TheFixWritesInBeforeTheTypeAndAfterScoped()
+    public async Task TheFixWritesInBeforeTheTypeAndNotOnAScopedParameter()
     {
         const string source =
             Mark
@@ -62,10 +64,7 @@ internal sealed class PrimaryConstructorParameterCodeFixTests
 
         await Assert.That(offers.Select(selector: static offer => offer.Title))
             .IsEquivalentTo(
-                expected:
-                [
-                    "Make the parameter in", "Make the parameter in", "Make the parameter in", "Make the parameter in"
-                ],
+                expected: ["Make the parameter in", "Make the parameter in", "Make the parameter in"],
                 ordering: CollectionOrdering.Matching);
 
         await Assert.That(offers.Select(selector: static offer => offer.Result))
@@ -74,10 +73,62 @@ internal sealed class PrimaryConstructorParameterCodeFixTests
                 [
                     source.Replace(oldValue: "Plain(int value)", newValue: "Plain(in int value)"),
                     source.Replace(oldValue: "Marked([Mark] string name)", newValue: "Marked([Mark] in string name)"),
-                    source.Replace(oldValue: "Wide(\n    int first)", newValue: "Wide(\n    in int first)"),
+                    source.Replace(oldValue: "Wide(\n    int first)", newValue: "Wide(\n    in int first)")
+                ],
+                ordering: CollectionOrdering.Matching);
+    }
+
+    // On a parameter of a ref struct, plain in lets the result of the constructor capture the reference. A caller
+    // in a different type that returns the result then does not compile. The check of the fix reads only the
+    // parts of the type, thus it does not see the caller. Scoped in keeps each such caller. The harness compiles
+    // the full result, thus a fix that writes plain in fails here.
+    [Test]
+    public async Task TheFixWritesScopedInOnAParameterOfARefStruct()
+    {
+        const string source =
+            """
+            using System;
+
+            public ref struct Number(int value)
+            {
+                public int Value { get; } = value;
+            }
+
+            public readonly ref struct Open(ReadOnlySpan<int> values)
+            {
+                public int Length { get; } = values.Length;
+            }
+
+            public static class Callers
+            {
+                public static Number FromParameter(int input) => new Number(value: input);
+
+                public static Number FromConstant() => new Number(value: 3);
+
+                public static Open FromArray(int[] array) => new Open(values: array);
+            }
+            """;
+
+        IReadOnlyList<CodeFixHarness.Offer> offers =
+            await CodeFixHarness.Offers(
+                    analyzer: new PrimaryConstructorParameterAnalyzer(),
+                    provider: new PrimaryConstructorParameterCodeFixProvider(),
+                    source: source)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        await Assert.That(offers.Select(selector: static offer => offer.Title))
+            .IsEquivalentTo(
+                expected: ["Make the parameter scoped in", "Make the parameter scoped in"],
+                ordering: CollectionOrdering.Matching);
+
+        await Assert.That(offers.Select(selector: static offer => offer.Result))
+            .IsEquivalentTo(
+                expected:
+                [
+                    source.Replace(oldValue: "Number(int value)", newValue: "Number(scoped in int value)"),
                     source.Replace(
-                        oldValue: "Window(scoped System.ReadOnlySpan<int> values)",
-                        newValue: "Window(scoped in System.ReadOnlySpan<int> values)")
+                        oldValue: "Open(ReadOnlySpan<int> values)",
+                        newValue: "Open(scoped in ReadOnlySpan<int> values)")
                 ],
                 ordering: CollectionOrdering.Matching);
     }

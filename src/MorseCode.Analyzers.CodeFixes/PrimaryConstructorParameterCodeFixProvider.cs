@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Composition;
@@ -27,10 +28,9 @@ namespace MorseCode.Analyzers.CodeFixes;
 ///         the person makes.
 ///     </para>
 ///     <para>
-///         The fix writes <c>in</c> only on a parameter with no modifier, or
-///         with only <c>scoped</c>. A <c>ref</c>, <c>out</c>, or
-///         <c>ref readonly</c> parameter has a different meaning, and the fix does
-///         not change it.
+///         The fix writes <c>in</c> only on a parameter with no modifier. A
+///         <c>ref</c>, <c>out</c>, or <c>ref readonly</c> parameter has a different
+///         meaning, and the fix does not change it.
 ///     </para>
 /// </remarks>
 [ExportCodeFixProvider(LanguageNames.CSharp, Name = nameof(PrimaryConstructorParameterCodeFixProvider))]
@@ -43,6 +43,10 @@ public sealed class PrimaryConstructorParameterCodeFixProvider : CodeFixProvider
     private const string RuleId = "MC0003";
 
     private const string EquivalenceKey = "MC0003";
+
+    // The name of the property of a report that holds the modifiers to write: in, or scoped in on a parameter
+    // of a ref struct. MorseCode.Analyzers writes it by this name.
+    private const string InProperty = "In";
 
     /// <inheritdoc />
     public override ImmutableArray<string> FixableDiagnosticIds => ImmutableArray.Create(item: RuleId);
@@ -64,15 +68,24 @@ public sealed class PrimaryConstructorParameterCodeFixProvider : CodeFixProvider
 
         foreach (Diagnostic diagnostic in context.Diagnostics)
         {
-            if (Find(root: root, diagnostic: diagnostic) is not { } parameter
-                || WithIn(parameter: parameter) is not { } withIn
-                || !await CompilesWithInAsync(
+            if (Find(root: root, diagnostic: diagnostic) is not { Type: { } type } parameter
+                || !diagnostic.Properties.TryGetValue(key: InProperty, value: out string? modifiers))
+            {
+                continue;
+            }
+
+            ParameterSyntax withIn = WithIn(parameter: parameter, type: type, modifiers: modifiers);
+
+            bool compiles =
+                await CompilesWithInAsync(
                         document: context.Document,
                         root: root,
                         parameter: parameter,
                         withIn: withIn,
                         cancellationToken: context.CancellationToken)
-                    .ConfigureAwait(continueOnCapturedContext: false))
+                    .ConfigureAwait(continueOnCapturedContext: false);
+
+            if (!compiles)
             {
                 continue;
             }
@@ -81,7 +94,7 @@ public sealed class PrimaryConstructorParameterCodeFixProvider : CodeFixProvider
 
             context.RegisterCodeFix(
                 action: CodeAction.Create(
-                    title: "Make the parameter in",
+                    title: $"Make the parameter {modifiers}",
                     createChangedDocument: _ =>
                         Task.FromResult(
                             result: document.WithSyntaxRoot(
@@ -112,15 +125,24 @@ public sealed class PrimaryConstructorParameterCodeFixProvider : CodeFixProvider
 
         foreach (Diagnostic diagnostic in diagnostics)
         {
-            if (Find(root: root, diagnostic: diagnostic) is { } parameter
-                && WithIn(parameter: parameter) is { } withIn
-                && await CompilesWithInAsync(
+            if (Find(root: root, diagnostic: diagnostic) is not { Type: { } type } parameter
+                || !diagnostic.Properties.TryGetValue(key: InProperty, value: out string? modifiers))
+            {
+                continue;
+            }
+
+            ParameterSyntax withIn = WithIn(parameter: parameter, type: type, modifiers: modifiers);
+
+            bool compiles =
+                await CompilesWithInAsync(
                         document: document,
                         root: root,
                         parameter: parameter,
                         withIn: withIn,
                         cancellationToken: context.CancellationToken)
-                    .ConfigureAwait(continueOnCapturedContext: false))
+                    .ConfigureAwait(continueOnCapturedContext: false);
+
+            if (compiles)
             {
                 changes[parameter] = withIn;
             }
@@ -134,24 +156,27 @@ public sealed class PrimaryConstructorParameterCodeFixProvider : CodeFixProvider
     private static ParameterSyntax? Find(SyntaxNode root, Diagnostic diagnostic) =>
         root.FindToken(position: diagnostic.Location.SourceSpan.Start).Parent as ParameterSyntax;
 
-    // The parameter with in, or null when it has a modifier other than scoped. Scoped comes before in. With no
-    // modifier, in takes the leading trivia of the type, which is the space after an attribute or the indent of
-    // a line.
-    private static ParameterSyntax? WithIn(ParameterSyntax parameter)
+    // The parameter with the modifiers of the report: in, or scoped in on a parameter of a ref struct. The rule
+    // reports only a parameter with no modifier, and it gives only these two values. Thus, the fix has no branch
+    // for a different case. The first modifier takes the leading trivia of the type, which is the space after an
+    // attribute or the indent of a line.
+    private static ParameterSyntax WithIn(ParameterSyntax parameter, TypeSyntax type, string? modifiers)
     {
         SyntaxToken @in =
             SyntaxFactory.Token(kind: SyntaxKind.InKeyword).WithTrailingTrivia(trivia: SyntaxFactory.Space);
 
-        return parameter switch
-        {
-            { Modifiers.Count: 0, Type: { } type } => parameter
-                .WithType(type: type.WithLeadingTrivia())
-                .WithModifiers(
-                    modifiers: SyntaxFactory.TokenList(token: @in.WithLeadingTrivia(trivia: type.GetLeadingTrivia()))),
-            { Modifiers: { Count: 1 } modifiers } when modifiers[index: 0].IsKind(kind: SyntaxKind.ScopedKeyword) =>
-                parameter.AddModifiers(items: @in),
-            _ => null
-        };
+        SyntaxTriviaList leading = type.GetLeadingTrivia();
+
+        SyntaxTokenList tokens =
+            string.Equals(a: modifiers, b: "scoped in", comparisonType: StringComparison.Ordinal)
+                ? SyntaxFactory.TokenList(
+                    SyntaxFactory.Token(kind: SyntaxKind.ScopedKeyword)
+                        .WithLeadingTrivia(trivia: leading)
+                        .WithTrailingTrivia(trivia: SyntaxFactory.Space),
+                    @in)
+                : SyntaxFactory.TokenList(token: @in.WithLeadingTrivia(trivia: leading));
+
+        return parameter.WithType(type: type.WithLeadingTrivia()).WithModifiers(modifiers: tokens);
     }
 
     // True when each part of the type compiles with no new error after the change. A part in a different document,

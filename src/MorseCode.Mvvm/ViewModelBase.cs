@@ -310,9 +310,10 @@ public class ViewModelBase : IViewModel
     ///     first. Each subsequent call does nothing, also when two threads call at the
     ///     same time. A call during the construction releases the registrations that
     ///     exist then, and closes the registration.
-    ///     The remarks of <see cref="Disposable.Composite" /> give the result of an
-    ///     exception. An <see cref="AggregateException" /> holds the exceptions in the
-    ///     order of their release.
+    ///     The remarks of
+    ///     <see cref="Disposable.Composite(IEnumerable{IDisposable})" /> give the
+    ///     result of an exception. An <see cref="AggregateException" /> holds the
+    ///     exceptions in the order of their release.
     /// </remarks>
     public void Dispose()
     {
