@@ -18,7 +18,10 @@ subclass gives to a base. The compiler checks only that a continuation returns a
 Constructed<TResult>. The analyzer reports the usual ways to return one that did not come from the
 handle of the continuation. MC1001 reports Value read directly from Construct or Advance on the
 handle. MC1002 reports a result of that call that is not used. MC1003 reports a null return. MC1004
-reports the result of a handle that the continuation made with Constructor.From. MC1005 reports a
+reports the result of a handle that the continuation made with Constructor.From. Both read what the
+continuation returns, also through a call that returns the value of a lambda, such as the function
+of Transaction.Run. A lambda whose value does not get to the result is not read, and a continuation
+inside another is read only for its own handle. MC1005 reports a
 function for Construct that does not read the values of the base. MC1006 reports a continuation
 that does not use its handle. These six are warnings, and each reports only what it can prove.
 MC1007 is information: it reports where the handle goes to code that the analyzer cannot follow,

@@ -114,6 +114,13 @@ made its handle. It reports only when that call is `Constructor.From` inside the
 value that comes out of a helper method is not reported, because the analyzer can't see where it
 came from.
 
+MC1003 and MC1004 read the values that the continuation can return. A call that returns the value of
+a lambda it gets, such as `Transaction.Run(() => ...)`, makes that lambda's returns part of the
+result, also when a local variable holds the lambda or the value of the call. A lambda whose value
+never becomes the result, such as one kept in a variable and not run, is not read. A continuation
+inside another, such as the one that `Advance` gets, is read on its own, against its own handle, so
+each value is reported once and names the right handle.
+
 ## MC1005
 
 **The function given to `Construct` doesn't read the values of the base.** The handle is the only

@@ -475,6 +475,101 @@ internal sealed class ContinuationAnalyzerTests
             .IsEquivalentTo(expected: ["MC1004"], ordering: CollectionOrdering.Matching);
     }
 
+    // A lambda in an inner continuation is also in the outer continuation. Before, the two continuations
+    // took its return as their result. Thus, each value had two reports, and one of them named the handle
+    // of the outer continuation.
+    [Test]
+    public async Task AValueInAnInnerContinuationIsReportedOnceForItsOwnHandle()
+    {
+        IReadOnlyList<Diagnostic> nullReturned =
+            await Analyze(source: Samples.OfStaged(continuation: InnerContinuation(otherPath: "null!")))
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        IReadOnlyList<Diagnostic> foreignReturned =
+            await Analyze(source: Samples.OfStaged(continuation: InnerContinuation(otherPath: Samples.Foreign)))
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        await Assert.That(Ids(found: nullReturned))
+            .IsEquivalentTo(expected: ["MC1003"], ordering: CollectionOrdering.Matching);
+
+        await Assert.That(nullReturned[0].GetMessage())
+            .IsEqualTo(expected: "The continuation returns null: return the result of its handle construct");
+
+        await Assert.That(Ids(found: foreignReturned))
+            .IsEquivalentTo(expected: ["MC1004"], ordering: CollectionOrdering.Matching);
+
+        await Assert.That(foreignReturned[0].GetMessage())
+            .IsEqualTo(
+                expected:
+                "The continuation returns the result of a handle from Constructor.From, and not the result of its "
+                + "handle construct");
+    }
+
+    // Each lambda here returns a Constructed, but its value does not get to the result. Two are in
+    // variables, and one goes to a call whose value the continuation discards. Before, the analyzer
+    // examined the return of each lambda in the body that returns a Constructed.
+    [Test]
+    public async Task ALambdaWhoseValueIsNotTheResultIsNotExamined()
+    {
+        IReadOnlyList<Diagnostic> found =
+            await Analyze(
+                    source: Samples.OfBase(
+                        continuation: $$"""
+                                        (output, construct) =>
+                                        {
+                                            Func<Constructed<Thing>> later = () => null!;
+                                            Func<Constructed<Thing>> other = () => {{Samples.Foreign}};
+                                            _ = Helpers.Now(f: () => {{Samples.Foreign}});
+
+                                            return construct.Construct({{Samples.Make}});
+                                        }
+                                        """))
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        await Assert.That(found).IsEmpty();
+    }
+
+    // A call that the continuation returns can give the value of a lambda as the result. This is also
+    // true when a local variable holds the lambda or the value of the call. A lambda in a variable also
+    // gets MC1007, because the analyzer does not follow the handle into it.
+    [Test]
+    public async Task ALambdaThatAReturnedCallRunsIsExaminedThroughALocalVariable()
+    {
+        IReadOnlyList<Diagnostic> lambdaInAVariable =
+            await Analyze(
+                    source: Samples.OfBase(
+                        continuation: $$"""
+                                        (output, construct) =>
+                                        {
+                                            Func<Constructed<Thing>> run =
+                                                () => Use.Flag ? construct.Construct({{Samples.Make}}) : {{Samples.Foreign}};
+
+                                            return Transaction.Run(f: run);
+                                        }
+                                        """))
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        IReadOnlyList<Diagnostic> valueInAVariable =
+            await Analyze(
+                    source: Samples.OfBase(
+                        continuation: $$"""
+                                        (output, construct) =>
+                                        {
+                                            Constructed<Thing> made =
+                                                Transaction.Run(f: () => Use.Flag ? construct.Construct({{Samples.Make}}) : null!);
+
+                                            return made;
+                                        }
+                                        """))
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        await Assert.That(Ids(found: lambdaInAVariable))
+            .IsEquivalentTo(expected: ["MC1007", "MC1004"], ordering: CollectionOrdering.Matching);
+
+        await Assert.That(Ids(found: valueInAVariable))
+            .IsEquivalentTo(expected: ["MC1003"], ordering: CollectionOrdering.Matching);
+    }
+
     // A helper method makes the Constructed here. The analyzer cannot prove where it comes from, thus
     // MC1004 does not report it. The continuation does not use its handle, which is MC1006.
     [Test]
@@ -755,6 +850,18 @@ internal sealed class ContinuationAnalyzerTests
         await Assert.That(Ids(found: found))
             .IsEquivalentTo(expected: ["MC1006"], ordering: CollectionOrdering.Matching);
     }
+
+    // A stage whose continuation advances it. Through the function of Transaction.Run, the continuation of
+    // the stage returns the result of its own handle on one path. On the other path, it returns the given
+    // value.
+    private static string InnerContinuation(string otherPath) =>
+        $"""
+         (output, stage) =>
+             stage.Advance(
+                 input: 1,
+                 continuation: static (second, construct) =>
+                     Transaction.Run(f: () => second.Length > 0 ? construct.Construct({Samples.Make}) : {otherPath}))
+         """;
 
     private static Task<IReadOnlyList<Diagnostic>> Analyze(string source) =>
         AnalyzerHarness.Analyze(analyzer: new ContinuationAnalyzer(), source: source);
