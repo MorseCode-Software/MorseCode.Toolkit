@@ -800,10 +800,12 @@ internal sealed class ContinuationAnalyzerTests
     }
 
     // A local function has a graph of its own. A read of the handle in it is the handle. A write in it can occur
-    // at any time, thus the variable gives no value. A write that cannot run does not get to a read. In the last
-    // sample, a conditional access gives the selected handle or a null that only the graph has. The analyzer
-    // does not follow a conditional access to the handle. Thus, the selected variable is not the handle, and
-    // the handle goes to code that the analyzer cannot follow.
+    // at any time, thus the variable gives no value. A write that cannot run does not get to a read. A
+    // conditional access gives the selected handle or a null that only the graph has. The analyzer does not
+    // follow a conditional access to the handle. Thus, the selected variable is not the handle, and the
+    // handle goes to code that the analyzer cannot follow. A foreach gives its variable the current element,
+    // which only the graph has. Thus, a variable that can get that element is not the handle. The handle in
+    // its declaration then goes to code that the analyzer cannot follow.
     [Test]
     public async Task ALocalFunctionAWriteThatCannotRunAndAValueOfTheGraphAreRead()
     {
@@ -856,6 +858,21 @@ internal sealed class ContinuationAnalyzerTests
                                  """)
                 .ConfigureAwait(continueOnCapturedContext: false);
 
+        IReadOnlyList<Diagnostic> elementOfAForeach =
+            await AnalyzeBody(
+                    statements: $$"""
+                                  Constructor<Values> next = construct;
+                                  Constructor<Values>[] handles = [construct];
+
+                                  foreach (Constructor<Values> item in handles)
+                                  {
+                                      next = item;
+                                  }
+
+                                  return next.Construct({{Samples.Make}});
+                                  """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
         await Assert.That(readInALocalFunction).IsEmpty();
         await Assert.That(writtenInALocalFunction).IsEmpty();
         await Assert.That(writeThatCannotRun).IsEmpty();
@@ -865,6 +882,9 @@ internal sealed class ContinuationAnalyzerTests
 
         await Assert.That(Covered(found: conditionalAccess))
             .IsEquivalentTo(expected: ["maybe"], ordering: CollectionOrdering.Matching);
+
+        await Assert.That(Ids(found: elementOfAForeach))
+            .IsEquivalentTo(expected: ["MC1007", "MC1007"], ordering: CollectionOrdering.Matching);
     }
 
     // A local variable is the handle at a read only where each value that can get to the read is the
