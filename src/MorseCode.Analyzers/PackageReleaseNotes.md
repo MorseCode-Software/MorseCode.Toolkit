@@ -15,6 +15,13 @@ copy the value to a field, is what the compiler refuses for a scoped value (CS83
 also refuses a member that uses a ref-like parameter (CS9110), so such a parameter cannot become the
 hidden state that the rule is about. The rule no longer reports it.
 
+Changed: on a parameter of a ref struct, MC0003 now asks for scoped in, and its message says so. An
+in parameter of the constructor of a ref struct lets what the constructor makes hold the reference,
+so a caller can no longer return the value when its argument does not outlive the call: a parameter
+of the caller, a constant, or an element of an array. Such a caller fails with CS8347, in whatever
+project it is. Scoped in keeps the reference in the constructor and leaves every such caller as it
+was. The rule's id and severity are unchanged.
+
 Changed: MC0001 now also checks the arguments of an indexer, such as grid[column: 2, row: 1], and
 the constructor arguments of an attribute, such as [Range(maximum: 9, minimum: 1)]. Before, it
 checked calls of methods, local functions, delegates, and constructors only, so named arguments out
@@ -62,7 +69,7 @@ an effect, or one has and each other argument is a constant, the title of the fi
 puts the arguments in order. In each other case, the title says that it changes the order in which
 they run, and the fix has a different equivalence key, so a fix of all reports with the first key
 never moves an effect. The fix is not offered when one argument declares a variable that a
-different argument names. For MC0003, the fix writes in before the type. It first
+different argument names. For MC0003, the fix writes in before the type, or scoped in on a parameter of a ref struct. It first
 compiles each part of the type with the change, and is offered only when that adds no error, so it
 is not offered for a parameter that a member captures, that a lambda uses, or that code writes. It
 does not change a ref, out, or ref readonly parameter. Each fix has a fix of all reports for a
