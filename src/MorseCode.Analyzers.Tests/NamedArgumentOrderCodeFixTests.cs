@@ -123,6 +123,37 @@ internal sealed class NamedArgumentOrderCodeFixTests
                 ordering: CollectionOrdering.Matching);
     }
 
+    // An argument in a wrapper keeps its wrapper, and goes to the position of its parameter. A call in order
+    // with such an argument gets no fix. Before, the analyzer gave the wrapped argument the last parameter.
+    // Thus, the fix moved a call in order out of order, or put a positional argument after a named one, which
+    // does not compile.
+    [Test]
+    public async Task AnArgumentInsideAWrapperGoesToThePositionOfItsParameter()
+    {
+        const string body =
+            """
+                    result = Calls.Three(b: 2, a: (x), c: 3);
+                    result = Calls.Three(1, c: checked(3 * 1), b: (2));
+                    result = Calls.Three(a: (x), b: 2, c: 3);
+                    result = Calls.Three((x), b: 2, c: 3);
+            """;
+
+        IReadOnlyList<CodeFixHarness.Offer> offers =
+            await Offers(body: body).ConfigureAwait(continueOnCapturedContext: false);
+
+        await Assert.That(offers.Select(selector: static offer => offer.Result))
+            .IsEquivalentTo(
+                expected:
+                [
+                    Source(body: body.Replace(oldValue: "Three(b: 2, a: (x), c: 3)", newValue: "Three(a: (x), b: 2, c: 3)")),
+                    Source(
+                        body: body.Replace(
+                            oldValue: "Three(1, c: checked(3 * 1), b: (2))",
+                            newValue: "Three(1, b: (2), c: checked(3 * 1))"))
+                ],
+                ordering: CollectionOrdering.Matching);
+    }
+
     // One argument with an effect with only constants keeps the evaluation, because a constant cannot see the
     // effect. An effect with a read of a variable, or two effects, can change what runs first, and the title
     // says so, with a different key.

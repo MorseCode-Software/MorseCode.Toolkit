@@ -8,6 +8,17 @@ new Grid { [column: 2, row: 1] = 3 }, is checked too. A name with an equals sign
 sets a property and is not part of the order. The rule, its message, and its id are as before.
 Because it now reports more, a build with -warnaserror can fail where it passed with 0.1.2.
 
+Fixed: MC0001 got the position of an argument wrong when the argument was in parentheses, in
+checked(...) or unchecked(...), or in parentheses with the null-forgiving operator, such as
+Three(a: (x), b: 2, c: 3). Such an argument has no operation of its own, so the compiler gives its
+operation the syntax of the expression inside, and the rule found the argument only for a plain
+null-forgiving operator. Each other one counted as the last parameter. A call in order gave a report,
+such as Three(a: (x), b: 2, c: 3) and Three(a: checked(x * 2), b: 2, c: 3), and a call out of order
+could give none, such as Three(a: 1, c: unchecked(3), b: ((2))). The rule now goes up from the syntax
+of each argument's operation to the argument of the list that holds it, so any such wrapper finds its
+argument. The new code fix reads the order from the rule, so it no longer puts a call that is in order
+out of order, or puts a positional argument after a named one, which does not compile.
+
 New: code fixes for MC0001 and MC0003, in a second assembly, MorseCode.Analyzers.CodeFixes, beside
 the analyzer under analyzers/dotnet/cs. An editor loads it, and the compiler does not, because a
 code fix needs the Roslyn workspaces. For MC0001, the fix puts the arguments in the order of the
