@@ -22,6 +22,7 @@
         <Title>MorseCode.Controls.ViewModels</Title>
         <Description>What a view model on SodaFlow gives to a control of the MorseCode toolkit, and the methods that build it. It has no dependency on a UI framework.</Description>
         <PackageIcon>MorseCode.png</PackageIcon>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
         <AssemblyName>MorseCode.Controls.ViewModels</AssemblyName>
         <RootNamespace>MorseCode.Controls.ViewModels</RootNamespace>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
@@ -60,12 +61,10 @@
     </ItemGroup>
 
     <!--
-        ReportedRange.Ahead is internal. The control writes it, and the tests of the control read it.
-        CreateScrollRequest is internal, and its tests call it.
+        CreateScrollRequest is internal, and its tests call it. The control uses only the public
+        surface, so that a control of a different package can do all that it does.
     -->
     <ItemGroup>
-        <InternalsVisibleTo Include="MorseCode.Controls.UI.Avalonia"/>
-        <InternalsVisibleTo Include="MorseCode.Controls.UI.Avalonia.Tests"/>
         <InternalsVisibleTo Include="MorseCode.Controls.ViewModels.Tests"/>
     </ItemGroup>
 
@@ -73,6 +72,7 @@
         <None Include="..\..\logo\MorseCode.png" Pack="true" PackagePath="\">
             <Link>MorseCode.png</Link>
         </None>
+        <None Include="README.md" Pack="true" PackagePath="\"/>
     </ItemGroup>
 
 </Project>

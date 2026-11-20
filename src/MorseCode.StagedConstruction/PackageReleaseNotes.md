@@ -2,8 +2,9 @@
 
 Breaking: Constructor<T>.Construct and Stage<,,>.Advance return a Constructed<TResult>, and a
 StageContinuation returns one, so the continuation of a subclass must return what Construct gives
-it. Only Construct makes a Constructed<TResult>. A continuation that returns without a call to
-Construct therefore no longer compiles; before, a base found the mistake at run time, or not at
+it. Only Construct makes a Constructed<TResult>. A continuation that never calls Construct
+therefore no longer compiles, unless it returns null! or the result of a different handle, which
+MC1003 and MC1004 of the analyzer report. Before, a base found the mistake at run time, or not at
 all. A CreateBase method reads Value on what the continuation returns and gives that to its
 caller. A continuation that ends with return construct.Construct(...), or with return
 next.Advance(...), compiles as it is; code that wrote the return type of such a lambda, or a
@@ -29,13 +30,16 @@ MC1007 is information: it reports where the handle goes to code that the analyze
 such as a helper method, a field, or a lambda that can run after the continuation returns. A C#
 project that has this package anywhere in its packages runs the analyzer with no step of its own,
 and a rule is turned off by its severity in .editorconfig. The documentation page on the
-continuation rules describes each one.
+continuation rules describes each one. The analyzer needs Roslyn 4.4 or later: the .NET 7 SDK or
+later, or Visual Studio 2022 17.4 or later. An older compiler does not run it, and the library
+itself does not need that compiler.
 
 New: the package has a net8.0 build, next to net472, net6.0, and netstandard2.0. It is the same
 code, compiled for net8.0. A project that targets net8.0 or later now takes the net8.0 build and
 not the net6.0 build. No signature or behavior changed. The reason is that
-MorseCode.Controls.UI.Avalonia targets net8.0 and depends on MorseCode.Mvvm, which references this
-package, and the documentation build needs one target that all of them have.
+MorseCode.Controls.UI.Avalonia targets net8.0 and depends on MorseCode.Controls.ViewModels, which
+depends on MorseCode.Mvvm, which references this package, and the documentation build needs one
+target that all of them have.
 
 New: the net8.0 build is marked as compatible with trimming and native AOT. The build of the
 package runs the trim, AOT, and single-file analyzers on it and fails on a report, so code that
@@ -44,6 +48,10 @@ IsAotCompatible, so an app that trims only the assemblies so marked, with TrimMo
 trims this one too. The net472, net6.0, and netstandard2.0 builds are not marked, because the SDK
 has no such analyzers for them. A native AOT publish that roots the assembly reports nothing in its
 code.
+
+New: each assembly in the package carries its PDB, with Source Link to the commit on GitHub. A
+debugger can step into the source with no symbol server, and a stack trace on .NET shows line
+numbers. The package has a readme, and its metadata gives the URL of the repository.
 
 0.2.1
 

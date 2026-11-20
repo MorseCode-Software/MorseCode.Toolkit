@@ -12,6 +12,10 @@ namespace MorseCode.Mvvm.Tests;
 
 public sealed class CompositeDisposableTests
 {
+    // The name of the attribute that C# 13 gives to a params collection. Where a target does not have the
+    // type, the compiler adds it to the assembly. Thus, the test reads the attribute by its name.
+    private const string ParamCollection = "ParamCollectionAttribute";
+
     [Test]
     public async Task DisposesEachEntryOnceInListOrder()
     {
@@ -164,6 +168,58 @@ public sealed class CompositeDisposableTests
         composite.Dispose();
 
         await Assert.That(composite).IsNotNull();
+    }
+
+    // A sequence that is not an array goes to the overload for any IEnumerable. It reads the sequence one
+    // time, when the composite is made.
+    [Test]
+    public async Task ASequenceDisposesItsEntriesInItsOrder()
+    {
+        List<string> log = [];
+        string[] names = ["A", "B", "C"];
+        int reads = 0;
+
+        IDisposable composite =
+            Disposable.Composite(
+                disposables: names.Select(
+                    selector: name =>
+                    {
+                        reads++;
+
+                        return new Recording(log: log, name: name);
+                    }));
+
+        composite.Dispose();
+
+        await Assert.That(log).IsEquivalentTo(expected: ["A", "B", "C"], ordering: CollectionOrdering.Matching);
+        await Assert.That(reads).IsEqualTo(expected: 3);
+    }
+
+    // A compiler before C# 13, and F#, read only ParamArrayAttribute. Thus, the call with each entry as an
+    // argument needs an overload with a params array for them. The overload for any IEnumerable is not
+    // params, because each call that gives each entry as an argument goes to the array overload.
+    [Test]
+    public async Task OnlyTheArrayOverloadIsParams()
+    {
+        List<(string Parameter, bool IsParamArray, bool IsParamCollection)> overloads =
+        [
+            .. typeof(Disposable).GetMethods()
+                .Where(predicate: static method => method.Name == nameof(Disposable.Composite))
+                .Select(selector: static method => method.GetParameters().Single())
+                .Select(
+                    selector: static parameter =>
+                    (
+                        Parameter: parameter.ParameterType.Name,
+                        IsParamArray: parameter.IsDefined(attributeType: typeof(ParamArrayAttribute), inherit: false),
+                        IsParamCollection: parameter.GetCustomAttributes(inherit: false)
+                            .Any(predicate: static attribute => attribute.GetType().Name == ParamCollection)))
+                .OrderBy(keySelector: static overload => overload.Parameter, comparer: StringComparer.Ordinal)
+        ];
+
+        await Assert.That(overloads)
+            .IsEquivalentTo(
+                expected: [("IDisposable[]", true, false), ("IEnumerable`1", false, false)],
+                ordering: CollectionOrdering.Matching);
     }
 
     // The loop that each sample view model in SodaFlow writes by hand, which this type replaces. Over

@@ -73,8 +73,23 @@
         <Company>MorseCode Software LLC</Company>
         <PackageProjectUrl>https://github.com/MorseCode-Software/MorseCode.Toolkit</PackageProjectUrl>
         <PackageLicenseExpression>BSD-3-Clause</PackageLicenseExpression>
-        <IncludeSource>True</IncludeSource>
-        <IncludeSymbols>True</IncludeSymbols>
+    </PropertyGroup>
+
+    <!--
+        Each assembly carries its PDB inside it. Thus, a debugger finds the PDB with no symbol server, and
+        a stack trace on .NET has line numbers. The SDK already adds Source Link, which maps each document
+        in the PDB to the commit on GitHub. The other choice was a .snupkg on the symbol server of
+        nuget.org. Its push with the key of trusted publishing is not documented. A failure of that push
+        shows only after the package is on nuget.org. The cost is about 35 KB for each package.
+
+        PublishRepositoryUrl puts the URL of the repository in the nuspec, beside the commit. On CI,
+        ContinuousIntegrationBuild maps the paths in the PDB to /_/. Thus, a build of one commit gives the
+        same files on each machine. A local build keeps its own paths, which a local debugger uses.
+    -->
+    <PropertyGroup>
+        <DebugType>embedded</DebugType>
+        <PublishRepositoryUrl>true</PublishRepositoryUrl>
+        <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
     </PropertyGroup>
 
     <!--
@@ -98,9 +113,11 @@
     <!--
         The analyzers of MorseCode.Analyzers, in every project but their own, their code fixes, and
         their tests, so the toolkit keeps the conventions that the package reports. The analyzer
-        project references the code fix project, thus a reference back is a cycle. A finding is a warning of the build,
-        and -warnaserror fails it. ReferenceOutputAssembly keeps the analyzer out of the references
-        of a project. PrivateAssets keeps it out of the dependencies of a package that pack makes.
+        project references the code fix project, thus a reference back is a cycle. A finding is a
+        warning of the build. The Build and Pack tasks of build.cake make each warning an error, as
+        -warnaserror does, and a build in an editor shows it as a warning. ReferenceOutputAssembly
+        keeps the analyzer out of the references of a project. PrivateAssets keeps it out of the
+        dependencies of a package that pack makes.
     -->
     <ItemGroup Condition="'$(MSBuildProjectName)' != 'MorseCode.Analyzers' And '$(MSBuildProjectName)' != 'MorseCode.Analyzers.CodeFixes' And '$(MSBuildProjectName)' != 'MorseCode.Analyzers.Tests'">
         <ProjectReference Include="$(MSBuildThisFileDirectory)MorseCode.Analyzers\MorseCode.Analyzers.csproj"

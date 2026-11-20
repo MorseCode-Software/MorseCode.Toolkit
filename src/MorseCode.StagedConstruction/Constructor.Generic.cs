@@ -33,9 +33,11 @@ namespace MorseCode.StagedConstruction;
 ///     </para>
 ///     <para>
 ///         <see cref="Construct{TResult}" /> returns a
-///         <see cref="Constructed{TResult}" />, and only it makes one. The
-///         continuation of the subclass must return one. Thus, the compiler
-///         checks that the continuation calls this method.
+///         <see cref="Constructed{TResult}" />, and only a <c>Construct</c>
+///         method makes one. The continuation of the subclass must return one.
+///         The compiler checks only that type, and not that the value came from
+///         this handle. The analyzer of this package reports a continuation that
+///         returns null or the result of a different handle.
 ///     </para>
 /// </remarks>
 /// <typeparam name="TBaseValues">
