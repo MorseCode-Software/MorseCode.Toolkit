@@ -34,11 +34,16 @@ Every cast expression, whatever the conversion is:
 - An enum to or from its number: `(int)color`, `(Color)1`.
 - A nullable to its value: `(int)maybe`.
 - A conversion that you wrote: `(Money)1.5m`.
-- A cast that the compiler does without: `(object)big`. The message then says that an implicit
-  conversion exists, and the cast isn't needed.
+- A cast that an implicit conversion would also do: `(object)big`. Where the value goes straight to
+  a destination of that type, as in `object boxed = (object)big;`, the message says the cast isn't
+  needed. Elsewhere the cast can still choose something: `(double)sum / count` divides doubles, and
+  `(object)a == (object)b` compares references. There the message says to put the value in a
+  variable of that type in place of the cast.
 - A cast to a tuple type, `((int, int))boxed`, a pointer, `(byte*)pointer`, or from `dynamic`.
-  The compiler treats a conversion from `dynamic` as implicit, so the message says the cast isn't
-  needed.
+  The compiler treats a conversion from `dynamic` as implicit, but the cast still matters: it runs
+  an explicit conversion when the code runs, and the code without it runs an implicit one, so a
+  `long` inside a `dynamic` converts to `int` with the cast and throws without it. The message
+  doesn't say the cast isn't needed there.
 
 The warning marks the type in parentheses, such as `(int)`, and not the value after it. A cast on
 a long expression doesn't underline the expression.

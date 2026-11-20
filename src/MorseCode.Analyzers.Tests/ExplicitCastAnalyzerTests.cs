@@ -29,9 +29,15 @@ internal sealed class ExplicitCastAnalyzerTests
             public static implicit operator decimal(Money value) => 0m;
         }
 
-        public interface IShape { }
+        public interface IShape
+        {
+            int Sides { get; }
+        }
 
-        public class Square : IShape { }
+        public class Square : IShape
+        {
+            int IShape.Sides => 4;
+        }
 
         public static class Calls
         {
@@ -162,10 +168,11 @@ internal sealed class ExplicitCastAnalyzerTests
     }
 
     // A cast to or from dynamic is a cast, and the report names it. The compiler classes a conversion from
-    // dynamic as implicit, because int number = unknown compiles, thus the message says the cast is not needed.
-    // That is true, and the value is still checked only when the code runs.
+    // dynamic as implicit, because int number = unknown compiles. But the cast runs an explicit conversion when
+    // the code runs, and the code without it runs an implicit one. A long in unknown converts with the cast and
+    // throws without it. Thus, the message does not say that the cast is not needed. Before, it did.
     [Test]
-    public async Task ACastFromDynamicGivesOneReportAndACastToDynamicSaysItIsNotNeeded()
+    public async Task ACastFromDynamicGivesOneReportThatDoesNotSayItIsNotNeeded()
     {
         IReadOnlyList<Diagnostic> found =
             await Analyze(
@@ -180,8 +187,90 @@ internal sealed class ExplicitCastAnalyzerTests
             .IsEquivalentTo(
                 expected:
                 [
-                    "Avoid the explicit cast to int: an implicit conversion exists, thus the cast is not needed",
+                    "Avoid the explicit cast to int: change the code so that the conversion is not necessary",
                     "Avoid the explicit cast to dynamic: an implicit conversion exists, thus the cast is not needed"
+                ],
+                ordering: CollectionOrdering.Matching);
+    }
+
+    // An implicit conversion exists for each of these casts, but each one chooses something. The cast to double
+    // makes the division one of doubles. The casts to object make == compare the references. The cast to
+    // the interface reaches a member that the class implements explicitly. Without the cast, each one does a
+    // different thing or does not compile. Thus, the message tells how to keep the type without a cast. Before,
+    // it said that the cast is not needed.
+    [Test]
+    public async Task ACastThatChoosesAnOperationIsNotCalledNotNeeded()
+    {
+        IReadOnlyList<Diagnostic> found =
+            await Analyze(
+                    body: """
+                          int sum = 7;
+                          int count = 2;
+                          string left = "a";
+                          string right = "a";
+                          Square square = new();
+                          _ = (double)sum / count;
+                          _ = (object)left == (object)right;
+                          _ = ((IShape)square).Sides;
+                          """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        const string chooses =
+            "an implicit conversion exists: put the value in a variable of that type in place of the cast";
+
+        await Assert.That(found.Select(selector: static diagnostic => diagnostic.GetMessage()))
+            .IsEquivalentTo(
+                expected:
+                [
+                    $"Avoid the explicit cast to double: {chooses}",
+                    $"Avoid the explicit cast to object: {chooses}",
+                    $"Avoid the explicit cast to object: {chooses}",
+                    $"Avoid the explicit cast to IShape: {chooses}"
+                ],
+                ordering: CollectionOrdering.Matching);
+    }
+
+    // The message says that the cast is not needed only where the value goes directly to a destination of the
+    // type of the cast. Each destination is one of these: the initializer of a variable of that declared type, an
+    // assignment, or a return of that type. A variable with var gets its type from the cast, and the return of a
+    // lambda can get its type from it too. Thus, those get the other message.
+    [Test]
+    public async Task ACastToTheTypeOfItsDestinationIsNotNeeded()
+    {
+        IReadOnlyList<Diagnostic> found =
+            await Analyze(
+                    body: """
+                          object boxed = (object)big;
+                          IShape asShape = (IShape)new Square();
+                          long wide = 0;
+                          wide = (long)big;
+                          object Box() => (object)big;
+                          var guessed = (object)big;
+                          Func<object> later = () => (object)big;
+                          _ = boxed;
+                          _ = asShape;
+                          _ = wide;
+                          _ = Box();
+                          _ = guessed;
+                          _ = later;
+                          """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        const string notNeeded = "an implicit conversion exists, thus the cast is not needed";
+
+        const string chooses =
+            "an implicit conversion exists: put the value in a variable of that type in place of the cast";
+
+        await Assert.That(found.Select(selector: static diagnostic => diagnostic.GetMessage()))
+            .IsEquivalentTo(
+                expected:
+                [
+                    $"Avoid the explicit cast to object: {notNeeded}",
+                    $"Avoid the explicit cast to IShape: {notNeeded}",
+                    $"Avoid the explicit cast to long: {notNeeded}",
+                    $"Avoid the explicit cast to object: {notNeeded}",
+                    $"Avoid the explicit cast to object: {chooses}",
+                    $"Avoid the explicit cast to object: {chooses}"
                 ],
                 ordering: CollectionOrdering.Matching);
     }

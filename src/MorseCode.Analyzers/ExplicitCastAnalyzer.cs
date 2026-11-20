@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -87,19 +88,42 @@ public sealed class ExplicitCastAnalyzer : DiagnosticAnalyzer
                             Hint(
                                 conversion: model.ClassifyConversion(expression: cast.Expression, destination: target),
                                 source: source,
-                                target: target)
+                                target: target,
+                                cast: cast,
+                                model: model,
+                                cancellationToken: nodeContext.CancellationToken)
                         ]));
             },
             syntaxKinds: SyntaxKind.CastExpression);
     }
 
-    // The way out that suits the conversion. The order matters: a conversion that is implicit needs no cast at
-    // all, and a reference conversion can be either direction.
-    private static string Hint(Conversion conversion, ITypeSymbol? source, ITypeSymbol target)
+    // The way out that suits the conversion. The order matters. A cast from dynamic runs an explicit conversion
+    // when the code runs. The code without the cast runs an implicit one, thus no other advice is correct for it.
+    // An implicit conversion makes a cast redundant only where the value goes to a destination of its type. A
+    // reference conversion can be either direction.
+    private static string Hint(
+        Conversion conversion,
+        ITypeSymbol? source,
+        ITypeSymbol target,
+        SyntaxNode cast,
+        SemanticModel model,
+        CancellationToken cancellationToken)
     {
+        if (source is { TypeKind: TypeKind.Dynamic })
+        {
+            return "change the code so that the conversion is not necessary";
+        }
+
         if (conversion.IsIdentity || conversion.IsImplicit)
         {
-            return "an implicit conversion exists, thus the cast is not needed";
+            return GoesToItsType(
+                cast: cast,
+                conversion: conversion,
+                target: target,
+                model: model,
+                cancellationToken: cancellationToken)
+                ? "an implicit conversion exists, thus the cast is not needed"
+                : "an implicit conversion exists: put the value in a variable of that type in place of the cast";
         }
 
         if (conversion.IsUnboxing
@@ -117,5 +141,62 @@ public sealed class ExplicitCastAnalyzer : DiagnosticAnalyzer
         return conversion.IsUserDefined
             ? "call a method that converts the value, with a name that says what it does"
             : "change the code so that the conversion is not necessary";
+    }
+
+    // True when the value of the cast goes directly to a destination of the same type as the cast. Then the code
+    // without the cast makes the same implicit conversion to the same type. One destination is the initializer
+    // of a variable or a property with a declared type. The others are a simple assignment, and the return of a
+    // method or a local function. A variable with var gets its type from the cast, and so can a lambda and an
+    // async method. A discard takes each type, thus there the cast changes nothing, unless it runs a conversion
+    // that the user wrote.
+    private static bool GoesToItsType(
+        SyntaxNode cast,
+        Conversion conversion,
+        ITypeSymbol target,
+        SemanticModel model,
+        CancellationToken cancellationToken)
+    {
+        SyntaxNode value = cast;
+
+        while (value.Parent is ParenthesizedExpressionSyntax parenthesized)
+        {
+            value = parenthesized;
+        }
+
+        ITypeSymbol? destination =
+            value.Parent switch
+            {
+                EqualsValueClauseSyntax
+                    {
+                        Parent: VariableDeclaratorSyntax
+                        {
+                            Parent: VariableDeclarationSyntax { Type: { IsVar: false } type }
+                        }
+                    } =>
+                    model.GetTypeInfo(expression: type, cancellationToken: cancellationToken).Type,
+                EqualsValueClauseSyntax { Parent: PropertyDeclarationSyntax property } =>
+                    model.GetTypeInfo(expression: property.Type, cancellationToken: cancellationToken).Type,
+                AssignmentExpressionSyntax assignment
+                    when assignment.IsKind(kind: SyntaxKind.SimpleAssignmentExpression)
+                         && assignment.Right == value =>
+                    model.GetSymbolInfo(expression: assignment.Left, cancellationToken: cancellationToken).Symbol
+                        is IDiscardSymbol
+                        ? conversion.IsUserDefined ? null : target
+                        : model.GetTypeInfo(expression: assignment.Left, cancellationToken: cancellationToken).Type,
+                ReturnStatementSyntax or ArrowExpressionClauseSyntax =>
+                    model.GetEnclosingSymbol(position: value.SpanStart, cancellationToken: cancellationToken) is
+                        IMethodSymbol
+                        {
+                            MethodKind: not MethodKind.AnonymousFunction,
+                            IsAsync: false,
+                            ReturnsByRef: false,
+                            ReturnsByRefReadonly: false
+                        } method
+                        ? method.ReturnType
+                        : null,
+                _ => null
+            };
+
+        return destination is not null && SymbolEqualityComparer.Default.Equals(x: destination, y: target);
     }
 }
