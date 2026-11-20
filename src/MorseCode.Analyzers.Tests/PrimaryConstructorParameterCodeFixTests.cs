@@ -23,10 +23,12 @@ internal sealed class PrimaryConstructorParameterCodeFixTests
 
         """;
 
-    // A parameter with no modifier, one after an attribute, one on a line of its own, and one with scoped. Each
-    // gets in at the position that C# wants, and the layout of the list does not change.
+    // A parameter with no modifier, one after an attribute, and one on a line of its own. Each gets in at the
+    // position that C# wants, and the layout of the list does not change. A by-value scoped parameter has no
+    // report, thus no fix. Before, the fix wrote scoped in, which limits the reference and not the value. A
+    // caller in a different type that returns the result then did not compile.
     [Test]
-    public async Task TheFixWritesInBeforeTheTypeAndAfterScoped()
+    public async Task TheFixWritesInBeforeTheTypeAndNotOnAScopedParameter()
     {
         const string source =
             Mark
@@ -62,10 +64,7 @@ internal sealed class PrimaryConstructorParameterCodeFixTests
 
         await Assert.That(offers.Select(selector: static offer => offer.Title))
             .IsEquivalentTo(
-                expected:
-                [
-                    "Make the parameter in", "Make the parameter in", "Make the parameter in", "Make the parameter in"
-                ],
+                expected: ["Make the parameter in", "Make the parameter in", "Make the parameter in"],
                 ordering: CollectionOrdering.Matching);
 
         await Assert.That(offers.Select(selector: static offer => offer.Result))
@@ -74,10 +73,7 @@ internal sealed class PrimaryConstructorParameterCodeFixTests
                 [
                     source.Replace(oldValue: "Plain(int value)", newValue: "Plain(in int value)"),
                     source.Replace(oldValue: "Marked([Mark] string name)", newValue: "Marked([Mark] in string name)"),
-                    source.Replace(oldValue: "Wide(\n    int first)", newValue: "Wide(\n    in int first)"),
-                    source.Replace(
-                        oldValue: "Window(scoped System.ReadOnlySpan<int> values)",
-                        newValue: "Window(scoped in System.ReadOnlySpan<int> values)")
+                    source.Replace(oldValue: "Wide(\n    int first)", newValue: "Wide(\n    in int first)")
                 ],
                 ordering: CollectionOrdering.Matching);
     }
