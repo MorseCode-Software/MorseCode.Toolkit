@@ -22,12 +22,15 @@ reports the result of a handle that the continuation made with Constructor.From.
 continuation returns, also through a call that returns the value of a lambda, such as the function
 of Transaction.Run. A lambda whose value does not get to the result is not read, and a continuation
 inside another is read only for its own handle. MC1004 follows a local variable to each value that
-can reach the read, across assignments, branches, loops, and try statements. A local variable is
+can reach the read, across assignments, branches, loops, and try statements. A variable that a
+pattern declares for the value it tests, such as is var next, gets that value. A local variable is
 the handle at a read only when each value that can reach the read is the handle. MC1005 reports a
 function for Construct that does not read the values of the base. MC1006 reports a continuation
 that does not use its handle. These six are warnings, and each reports only what it can prove.
 MC1007 is information: it reports where the handle goes to code that the analyzer cannot follow,
-such as a helper method, a field, or a lambda that can run after the continuation returns. A C#
+such as a helper method, a field, or a lambda that can run after the continuation returns. It
+follows a local function to each place that uses it: a call runs it there, and a delegate made from
+it is read as a lambda is. A C#
 project that has this package anywhere in its packages runs the analyzer with no step of its own,
 and a rule is turned off by its severity in .editorconfig. The documentation page on the
 continuation rules describes each one. The analyzer needs Roslyn 4.4 or later: the .NET 7 SDK or
