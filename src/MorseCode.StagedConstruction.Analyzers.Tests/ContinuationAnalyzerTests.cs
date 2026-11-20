@@ -674,6 +674,199 @@ internal sealed class ContinuationAnalyzerTests
             .IsEquivalentTo(expected: ["MC1006", "MC1004"], ordering: CollectionOrdering.Matching);
     }
 
+    // A deconstruction writes each variable in its tuple. Thus, the declaration does not get to the return. A
+    // write through a ref local can occur out of the order of the graph. That is also true when a ref
+    // reassignment or a ref conditional makes the ref local. In the last sample, the writes go to other
+    // variables and to an element of an array. Thus, the declaration gets to the return.
+    [Test]
+    public async Task EachKindOfWriteReplacesTheValueOrMakesItUnknown()
+    {
+        IReadOnlyList<Diagnostic> deconstruction =
+            await AnalyzeBody(
+                    statements: $"""
+                                 Constructed<Thing> made = {Samples.Foreign};
+                                 int number;
+                                 (made, number) = (construct.Construct({Samples.Make}), 1);
+
+                                 return made;
+                                 """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        IReadOnlyList<Diagnostic> refReassignment =
+            await AnalyzeBody(
+                    statements: $"""
+                                 Constructed<Thing> made = {Samples.Foreign};
+                                 Constructed<Thing> spare = {Samples.Foreign};
+                                 ref Constructed<Thing> alias = ref spare;
+                                 alias = ref made;
+                                 alias = construct.Construct({Samples.Make});
+
+                                 return made;
+                                 """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        IReadOnlyList<Diagnostic> refConditional =
+            await AnalyzeBody(
+                    statements: $"""
+                                 Constructed<Thing> made = {Samples.Foreign};
+                                 Constructed<Thing> spare = {Samples.Foreign};
+                                 ref Constructed<Thing> either = ref Use.Flag ? ref made : ref spare;
+                                 either = construct.Construct({Samples.Make});
+
+                                 return made;
+                                 """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        IReadOnlyList<Diagnostic> otherWrites =
+            await AnalyzeBody(
+                    statements: $$"""
+                                  Constructed<Thing> made = {{Samples.Foreign}};
+                                  int count = 0;
+                                  count += 1;
+                                  string? text = null;
+                                  text ??= "a";
+                                  int[] items = [count];
+                                  Touch(value: ref items[0]);
+                                  Take(value: out int fresh);
+
+                                  if ((items, fresh) is ([_, ..] all, _))
+                                  {
+                                      _ = all;
+                                  }
+
+                                  return made;
+
+                                  void Touch(ref int value) => value++;
+
+                                  void Take(out int value) => value = 1;
+                                  """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        await Assert.That(deconstruction).IsEmpty();
+        await Assert.That(refReassignment).IsEmpty();
+        await Assert.That(refConditional).IsEmpty();
+
+        await Assert.That(Ids(found: otherWrites))
+            .IsEquivalentTo(expected: ["MC1006", "MC1004"], ordering: CollectionOrdering.Matching);
+    }
+
+    // Two variables that read each other in a loop end the search at a read that it found before. A write in a
+    // try block can get to a catch block with a filter and to the code after the try statement. Thus, each
+    // return can give the result of a different handle.
+    [Test]
+    public async Task ALoopOfTwoVariablesAndACatchWithAFilterAreFollowed()
+    {
+        IReadOnlyList<Diagnostic> loop =
+            await AnalyzeBody(
+                    statements: $$"""
+                                  Constructed<Thing> made = {{Samples.Foreign}};
+
+                                  while (Use.Flag)
+                                  {
+                                      Constructed<Thing> other = made;
+                                      made = other;
+                                  }
+
+                                  return made;
+                                  """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        IReadOnlyList<Diagnostic> filter =
+            await AnalyzeBody(
+                    statements: $$"""
+                                  Constructed<Thing> made = construct.Construct({{Samples.Make}});
+
+                                  try
+                                  {
+                                      made = {{Samples.Foreign}};
+                                  }
+                                  catch (InvalidOperationException) when (Use.Flag)
+                                  {
+                                      return made;
+                                  }
+
+                                  return made;
+                                  """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        await Assert.That(Ids(found: loop))
+            .IsEquivalentTo(expected: ["MC1006", "MC1004"], ordering: CollectionOrdering.Matching);
+
+        await Assert.That(Covered(found: loop))
+            .IsEquivalentTo(expected: ["construct", "made"], ordering: CollectionOrdering.Matching);
+
+        await Assert.That(Ids(found: filter))
+            .IsEquivalentTo(expected: ["MC1004", "MC1004"], ordering: CollectionOrdering.Matching);
+    }
+
+    // A local function has a graph of its own. A read of the handle in it is the handle. A write in it can occur
+    // at any time, thus the variable gives no value. A write that cannot run does not get to a read. In the last
+    // sample, a conditional access gives the selected handle or a null that only the graph has. The analyzer
+    // does not follow a conditional access to the handle. Thus, the selected variable is not the handle, and
+    // the handle goes to code that the analyzer cannot follow.
+    [Test]
+    public async Task ALocalFunctionAWriteThatCannotRunAndAValueOfTheGraphAreRead()
+    {
+        IReadOnlyList<Diagnostic> readInALocalFunction =
+            await AnalyzeBody(
+                    statements: $$"""
+                                  return Make();
+
+                                  Constructed<Thing> Make()
+                                  {
+                                      Constructor<Values> next = construct;
+
+                                      return next.Construct({{Samples.Make}});
+                                  }
+                                  """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        IReadOnlyList<Diagnostic> writtenInALocalFunction =
+            await AnalyzeBody(
+                    statements: $"""
+                                 Constructed<Thing> made = construct.Construct({Samples.Make});
+                                 Reset();
+
+                                 return made;
+
+                                 void Reset() => made = {Samples.Foreign};
+                                 """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        IReadOnlyList<Diagnostic> writeThatCannotRun =
+            await AnalyzeBody(
+                    statements: $$"""
+                                  Constructed<Thing> made = construct.Construct({{Samples.Make}});
+
+                                  while (true)
+                                  {
+                                      return made;
+                                      made = {{Samples.Foreign}};
+                                  }
+                                  """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        IReadOnlyList<Diagnostic> conditionalAccess =
+            await AnalyzeBody(
+                    statements: $"""
+                                 Constructor<Values>? maybe = construct;
+                                 Constructor<Values>? selected = maybe?.Select(selector: static values => values);
+
+                                 return selected!.Construct({Samples.Make});
+                                 """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+        await Assert.That(readInALocalFunction).IsEmpty();
+        await Assert.That(writtenInALocalFunction).IsEmpty();
+        await Assert.That(writeThatCannotRun).IsEmpty();
+
+        await Assert.That(Ids(found: conditionalAccess))
+            .IsEquivalentTo(expected: ["MC1007"], ordering: CollectionOrdering.Matching);
+
+        await Assert.That(Covered(found: conditionalAccess))
+            .IsEquivalentTo(expected: ["maybe"], ordering: CollectionOrdering.Matching);
+    }
+
     // A local variable is the handle at a read only where each value that can get to the read is the
     // handle. Thus, a write that replaces the handle with a different handle ends the rules for the handle.
     // A write that is not a declaration can start them. A write to the variable and an out argument do
