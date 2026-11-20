@@ -93,6 +93,16 @@ of the new rows. With 30 old rows and 30 new rows, one update took about 1.2 to 
 when they were 450,000 positions apart, and about 17 to 19 milliseconds at 9,000,000 apart. It now
 takes about 4 microseconds at any distance, and it finds the same changed positions.
 
+Fixed: DisplayMemberBinding was ignored, and each row showed the ToString of its object. The base
+sets its template for the binding on a container only where no template is set, and the control
+then set the template of the container to ItemTemplate, which is null with DisplayMemberBinding.
+The base keeps its template private, and the control sets the template of a container again when a
+placeholder and a row change places, so keeping the base's template would have fixed only the first
+screen. The control now makes its own template for the binding, a TextBlock whose text the binding
+gives, as the base's template is, and uses it wherever it uses ItemTemplate. The binding is the only
+state of that view, so the template reuses its view, and display-member rows take part in the
+keeping of row views. A new DisplayMemberBinding gives a new template.
+
 Fixed: after a jump, an edit could send the list to a different part and back, and a view model
 that makes new row objects never settled. The list raised a Replace for each position whose item
 changed, and the panel of Avalonia then built each of those containers again. A panel with no
@@ -131,13 +141,13 @@ placeholder when its step is no longer than the positions on one side, so a fixe
 for one window size only. With 20 rows on screen and Buffer at 10, every step of one screen showed
 placeholders. Remove Buffer from your XAML.
 
-Breaking: the control reports a ReportedRange where it reported an ItemRange, and the member of the
-source is the action RangeReported, where it was the value VisibleRange. A ReportedRange holds two
-ranges from the same instant. Visible is the positions on screen, where a row that is only partly
-on screen counts, so a view model can now tell what the user sees. Constructed is the positions
-that the control wants rows for. Both stay inside the list. On the overload for a view model with
-its own rows, the parameter visibleRange is now reportedRanges, a StreamSink of ReportedRange. The
-view model holds that stream, and builds rows for Constructed.
+Breaking: the control reports a ReportedRange through the action RangeReported of its Source,
+where 0.2.1 wrote an ItemRange to its own property VisibleRange. A ReportedRange holds two ranges
+from the same instant. Visible is the positions on screen, where a row that is only partly on
+screen counts, so a view model can now tell what the user sees. Constructed is the positions that
+the control wants rows for. Both stay inside the list. A view model with its own rows builds them
+for Constructed. It gets the reports from a StreamSink of ReportedRange that it passes to
+CreateVirtualItemsSource, which the notes of MorseCode.Controls.ViewModels describe.
 
 A row that is added at an end of the list that is on screen no longer shows as a placeholder first.
 A source made from a collection slices past the end of the list by the positions that the control
@@ -160,6 +170,11 @@ The package now depends on MorseCode.Controls.ViewModels 0.3.0 and on
 SodaFlow.Bindable.ObjectModel, next to Avalonia and SodaFlow.Functional. To move from 0.2.x: build
 the source in the view model with CreateVirtualItemsSource, expose it as an IVirtualItemsSource,
 and replace the bindings in the view with Source="{Binding Source}".
+
+Fixed: with no PlaceholderTemplate, a placeholder showed the name of an internal type,
+MorseCode.Controls.UI.Avalonia.RowPlaceholder. It is now an empty line of text, as high as before.
+A PlaceholderTemplate that is set or changed while placeholders are on screen now reaches them.
+Before, they kept the old look until Avalonia used their containers for other positions.
 
 Changed: the dependencies on SodaFlow packages now have a ceiling at their next major version, as
 the dependencies between the packages of this repository already did: SodaFlow.Bindable.ObjectModel

@@ -12,12 +12,13 @@ It is not a replacement for an Avalonia control. Use it where you would use an `
 `ListBox` over a SodaFlow `ReactiveCollection`, and the rows are view models that cost something to
 make: they hold bindables, subscriptions, or a query of their own.
 
-The control is made for SodaFlow. It has one property to bind, `Source`, and one helper that makes
-the object to bind it to. The sections below show both.
+The control is made for SodaFlow. It has one property to bind, `Source`, and helper methods that
+make the object to bind it to: `CreateVirtualItemsSource`, and `CreateVirtualItemsSourceByKey` for
+scroll requests by key. The sections below show them.
 
-They come in two packages. The control is in `MorseCode.Controls.UI.Avalonia`. The helper, and every
-type your view model touches, is in `MorseCode.Controls.ViewModels`, which has no dependency on
-Avalonia. So the project that holds your view models does not need one either.
+They come in two packages. The control is in `MorseCode.Controls.UI.Avalonia`. The helpers, and
+every type your view model touches, are in `MorseCode.Controls.ViewModels`, which has no
+dependency on Avalonia. So the project that holds your view models does not need one either.
 
 ## How it works
 
@@ -110,9 +111,11 @@ It holds two ranges:
 | `Visible` | The positions on screen. A row that is only partly on screen counts. |
 | `Constructed` | The positions that the control wants rows for: the visible ones, and more on each side, so that a scroll finds its rows ready. |
 
-Both ranges stay inside the list. `CreateVirtualItemsSource` builds the rows of `Constructed` for
-you. The source that it returns carries the type of your rows, and your view model can read the
-report and the rows from it:
+Both ranges stay inside the list. When `Constructed` is cut short by the end of the list, the
+report also carries `Ahead`: the number of positions past the end that the control would want rows
+for if the list had them. It is 0 anywhere else. `CreateVirtualItemsSource` builds the rows of
+`Constructed`, and of `Ahead` once the list grows into it, for you. The source that it returns
+carries the type of your rows, and your view model can read the report and the rows from it:
 
 ```csharp
 IVirtualItemsSource<RowViewModel> source = output.CreateVirtualItemsSource(
@@ -180,6 +183,19 @@ again at every step of a scroll:
 Cell<ItemRange> constructed = reported.Map(static range => range.Constructed).Calm();
 ```
 
+To get a row that is added at the end of the list onto the screen together with the new count, also
+build rows for the `Ahead` positions that your count covers. Widen the range before you calm it:
+
+```csharp
+Cell<ItemRange> wanted =
+    reported
+        .Map(static range => range.Constructed with { Count = range.Constructed.Count + range.Ahead })
+        .Calm();
+```
+
+Without that, the row arrives a step later. See
+[The control decides how far ahead to ask](#the-control-decides-how-far-ahead-to-ask).
+
 ### When every row already exists
 
 If your view model already holds every row, and you want only the virtualization of the row views,
@@ -236,6 +252,8 @@ Each overload takes an optional `Stream<Unit>` of clears. See
 | `Source` | The one object that the control reads from and reports to. |
 | `PlaceholderTemplate` | What a position shows until its row arrives. |
 | `ItemTemplate` | What a row shows, as on any items control. |
+| `DisplayMemberBinding` | With no `ItemTemplate`, the member of each row to show as text, as on any items control. Its rows reuse their views as rows of a XAML `DataTemplate` do. |
+| `RecyclesRowViews` | Whether the control keeps the view of a row that leaves the screen and gives it to the next row, for a row template that reuses its view. `True` by default. See [The row view decides what a scroll costs](#the-row-view-decides-what-a-scroll-costs). |
 
 ### Scroll from the view model
 
@@ -260,7 +278,7 @@ the same position.
 
 Every overload takes an optional `Stream<Unit>` of clears. Each firing of it sets the request to
 `None`, so the view model can withdraw a request that the control didn't use yet. When a request
-and a clear come in one transaction, the request wins.
+comes in one transaction with a clear or a report, the request wins.
 
 Code runs the action with `scrollToAction.Execute(position)`, and a view binds a `Command` to it as it
 does to any `ICommand`.
@@ -290,7 +308,8 @@ else is the same as with positions: the request waits for the control, the contr
 `clears` withdraw it. The method has its own name rather than being an overload, because a
 collection keyed by `int` would make the two overloads indistinguishable.
 
-- A request for a position beyond `TotalCount` waits until the count grows, and it stays until then.
+- A request for a position beyond the `TotalCount` of `Rows` waits until the count grows, and it
+  stays until then.
   If the list is reloaded later and is long enough by then, the control scrolls to the old position
   at that point, which can surprise the user. Withdraw a request that has gone stale with the
   `clears` stream. A negative position can never apply, so the control reports it at once and does
@@ -300,11 +319,11 @@ collection keyed by `int` would make the two overloads indistinguishable.
   request beyond the count, withdraw it with `clears` if it should not apply by then.
 - A new request replaces one that is waiting. The last request wins.
 - A request that the view model makes while a report is on its way is kept. The report names the
-  position it handled, and the view model clears the request only if it is still that position. The
-  one gap left is a new request for the same position inside that window, which the report clears.
-  The position was just shown, so nothing is lost.
-- The control scrolls once for each request. A change of `TotalCount` before the view model has
-  cleared the request does not scroll again.
+  request it handled, position and number, and the view model clears the request only if it is
+  still that one. A new request for the same position has a new number, so the report does not
+  clear it.
+- The control scrolls once for each request. A change of the `TotalCount` of `Rows` before the view
+  model has cleared the request does not scroll again.
 - The tests of the control use these methods with a real SodaFlow graph, including a request made
   before the view binds. The graph of the request has tests of its own.
 
@@ -395,6 +414,11 @@ view model would build rows nobody can see. Make the placeholder about as high a
 If rows differ in height, use a typical height. Avalonia corrects its estimate as real rows
 arrive.
 
+With no `PlaceholderTemplate`, a placeholder is an empty line of text: it shows nothing, and it is
+as high as a line of text in your theme. That keeps Avalonia from the problem above, but a template
+as high as a row keeps the scroll bar steadier. Changing `PlaceholderTemplate` while the list is on
+screen, for example for a new theme, gives the new template to the placeholders already showing.
+
 ### The control decides how far ahead to ask
 
 The control asks for rows beyond the screen, so that a scroll finds them ready. It asks for one
@@ -404,10 +428,16 @@ size. There is no setting for it.
 
 A row that is added at an end of the list that is on screen does not show as a placeholder first.
 A source made from a collection delivers the row together with the new count, because its slice
-reaches past the end of the list. A list that is read at its end while rows arrive, such as a log,
-is the usual case. A view model that builds its own rows gets there in two steps: the control
-reports again as soon as it sees the new count, and the view model answers with the row. With the
-default panel that happens before the next layout.
+reaches past the end of the list by `Ahead` positions. A list that is read at its end while rows
+arrive, such as a log, is the usual case. A view model that builds its own rows does the same if it
+builds rows for `Ahead` too, as shown in
+[When the rows do not come from a collection](#when-the-rows-do-not-come-from-a-collection).
+
+If it builds rows only for `Constructed`, it gets there in two steps: the control reports again as
+soon as it sees the new count, and the view model answers with the row. With the default panel that
+happens before the next layout, so no placeholder shows. With a panel other than the default
+`VirtualizingStackPanel`, the second report can wait for a layout, and that layout shows a
+placeholder at the new position.
 
 ### The control uses the style of `ListBox`
 
@@ -439,17 +469,74 @@ The control gives Avalonia its own list, one position per item. Setting `ItemsSo
 - **A change of the count by more than 512 positions resets the list.** Avalonia clears its
   containers and makes them again, which is cheaper than an event for every position.
 
+## Write a control for the source
+
+`IVirtualItemsSource` and everything in it are public, and nothing in them depends on Avalonia, so
+another control can drive the same view models: a control for a different UI framework, or a
+different layout of the rows. `VirtualizingItemsControl` uses only the public surface. A control of
+your own has to keep the same rules for the view models to work with it.
+
+Reading the rows:
+
+- Read `Rows` when you attach, and again on each `PropertyChanged`. Take the count, the offset, and
+  the rows from one value, and apply them in one update.
+- Show the row at index `p - Offset` of `Items` at position `p`, and a placeholder at any position
+  the items do not cover. The rows can answer an earlier report, so do not expect them to cover the
+  range you reported last.
+- Read a row from `Items` when you need it. The view model never changes a list after it hands it
+  over.
+
+Reporting:
+
+- Run `RangeReported` whenever the report changes, and not with a report equal to the last one. The
+  action does not drop duplicates, so compare before you run it. Compare a new source with
+  `ReportedRange.Empty`, which is where every source starts.
+- Keep `Visible` and `Constructed` inside the list as you know it, with `Constructed` covering
+  `Visible`, and put the positions you want past the end in `Ahead`.
+- Report again when the count in `Rows` changes, even if no container changed. The ranges stop at
+  the count, so a new count can change them. Without this, the row of a new position comes only
+  with the next scroll.
+- Do not report a smaller range just because you have no containers for a moment, as after the
+  items change and before the next layout. The view model would drop rows that are on screen, the
+  rows would change again, and the cycle would not stop. Keep the last report until the containers
+  are back. Only a list that is empty, or that has just stopped being empty, needs a new report
+  then.
+- Expect the view model to build rows inside the action. It builds them in the transaction of the
+  report, on the thread that runs the action, so a row that is heavy to build holds up that thread.
+  `VirtualizingItemsControl` runs it on the UI thread.
+
+Scrolling:
+
+- Scroll once for each `ScrollRequest` value, then run `ScrollHandled` with that value. Each request
+  has a number of its own, so two requests for the same position are different values.
+- Mark the request as handled before you run `ScrollHandled`. The view model can clear or replace
+  it while the action runs, and that new value must not be marked as handled.
+- Let a position past the end of the list wait until the count reaches it. A negative position can
+  never apply, so report it without scrolling.
+- Let a request wait while your control or one of its parents is hidden, and scroll when the control
+  shows. Do not run `ScrollHandled` before that scroll. A view model can ask while the list is in a
+  collapsed `Expander` or under a panel bound to `IsVisible`, and it expects the request to apply
+  once the list is on screen, as it does with `VirtualizingItemsControl`.
+
+Lifetime:
+
+- Remove your handlers from `Rows` and `ScrollRequest` when the control leaves the visual tree, and
+  read both values again when it returns. A view model that outlives its view then does not keep the
+  view alive.
+
 ## Targets and dependencies
 
 The control is in `MorseCode.Controls.UI.Avalonia`, which targets `net8.0` and `net10.0`, as
 Avalonia 12 does. Reference it from the project that holds your views.
 
-`CreateVirtualItemsSource`, `IVirtualItemsSource`, `VirtualRows`, `ReportedRange`, and `ItemRange`
-are in `MorseCode.Controls.ViewModels`. Reference it from the project that holds your view models.
-It has the same targets as `MorseCode.Mvvm`, and it depends on SodaFlow,
-`SodaFlow.Bindable.ObjectModel`, `SodaFlow.Collections`, and `MorseCode.Mvvm` 0.3.0 or later. The
-source is made of SodaFlow bindable values, and `CreateVirtualItemsSource` works with the `IOutput`
-of a `ViewModelBase`.
+`CreateVirtualItemsSource`, `CreateVirtualItemsSourceByKey`, `IVirtualItemsSource`,
+`IVirtualItemsSource<TRow>`, `VirtualRows`, `ReportedRange`, `ItemRange`, and `ScrollRequest` are
+in `MorseCode.Controls.ViewModels`. Reference it from the project that holds your view models. It
+has the same targets as `MorseCode.Mvvm`. It depends on SodaFlow, `SodaFlow.Bindable.ObjectModel`,
+`SodaFlow.Collections`, `SodaFlow.Functional`, and `MorseCode.Mvvm`, each up to its next breaking
+version: `MorseCode.Mvvm` from 0.3.0 and below 0.4.0. See
+[Version ranges](packages.md#version-ranges). The source is made of SodaFlow bindable values, and
+`CreateVirtualItemsSource` works with the `IOutput` of a `ViewModelBase`.
 
 The control package depends on the view model package. An app that keeps its views and its view
 models in one project needs only the first.

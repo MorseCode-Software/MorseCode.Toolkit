@@ -1,11 +1,71 @@
 0.1.3
 
+Fixed: MC0003 reported the primary constructor parameter of an attribute, such as
+class MarkAttribute(int level) : Attribute. C# refuses to apply an attribute whose constructor has an
+in parameter (CS8358), so the change the rule asked for broke every use of the attribute, and in a
+library those uses are in other projects, where the library's own build does not see them. The rule
+now leaves out a type that derives from System.Attribute, directly or through another attribute,
+abstract or not, as it already left out a params parameter.
+
+Fixed: MC0003 reported a by-value scoped parameter, such as
+ref struct Window(scoped ReadOnlySpan<int> values). No spelling with in keeps such a value scoped:
+scoped in limits the reference, and the value is then not scoped, so a caller in another type that
+returns what the constructor made no longer compiles (CS8347). The other advice of the message, to
+copy the value to a field, is what the compiler refuses for a scoped value (CS8352). The compiler
+also refuses a member that uses a ref-like parameter (CS9110), so such a parameter cannot become the
+hidden state that the rule is about. The rule no longer reports it.
+
+Changed: on a parameter of a ref struct, MC0003 now asks for scoped in, and its message says so. An
+in parameter of the constructor of a ref struct lets what the constructor makes hold the reference,
+so a caller can no longer return the value when its argument does not outlive the call: a parameter
+of the caller, a constant, or an element of an array. Such a caller fails with CS8347, in whatever
+project it is. Scoped in keeps the reference in the constructor and leaves every such caller as it
+was. The rule's id and severity are unchanged.
+
+Fixed: MC0003 reported a ref, out, or ref readonly parameter, such as class Doubled(ref int value).
+The compiler already refuses a member that captures such a parameter (CS9109), so it cannot become
+the hidden state the rule is about, and a write through ref or out changes the caller's variable,
+which is what the modifier is for. Changing it to in would change that contract, so the code fix
+never offered it, and only a suppression removed the warning. The rule now reports only a parameter
+with no modifier.
+
 Changed: MC0001 now also checks the arguments of an indexer, such as grid[column: 2, row: 1], and
 the constructor arguments of an attribute, such as [Range(maximum: 9, minimum: 1)]. Before, it
 checked calls of methods, local functions, delegates, and constructors only, so named arguments out
-of order in these two places gave no report. A name with an equals sign in an attribute sets a
-property and is not part of the order. The rule, its message, and its id are as before. Because it
-now reports more, a build with -warnaserror can fail where it passed with 0.1.2.
+of order in these two places gave no report. An indexer in an object initializer, such as
+new Grid { [column: 2, row: 1] = 3 }, is checked too. A name with an equals sign in an attribute
+sets a property and is not part of the order. The rule, its message, and its id are as before.
+Because it now reports more, a build with -warnaserror can fail where it passed with 0.1.2.
+
+Fixed: MC0001 got the position of an argument wrong when the argument was in parentheses, in
+checked(...) or unchecked(...), or in parentheses with the null-forgiving operator, such as
+Three(a: (x), b: 2, c: 3). Such an argument has no operation of its own, so the compiler gives its
+operation the syntax of the expression inside, and the rule found the argument only for a plain
+null-forgiving operator. Each other one counted as the last parameter. A call in order gave a report,
+such as Three(a: (x), b: 2, c: 3) and Three(a: checked(x * 2), b: 2, c: 3), and a call out of order
+could give none, such as Three(a: 1, c: unchecked(3), b: ((2))). The rule now goes up from the syntax
+of each argument's operation to the argument of the list that holds it, so any such wrapper finds its
+argument. The new code fix reads the order from the rule, so it no longer puts a call that is in order
+out of order, or puts a positional argument after a named one, which does not compile.
+
+Fixed: MC0002 said that a cast is not needed wherever an implicit conversion exists, but a cast can
+choose something even then. (double)sum / count divides doubles and not integers, (object)a ==
+(object)b compares references and not text, and ((IShape)square).Sides reaches a member that the
+class implements explicitly; without the cast, each does something else or does not compile. The
+message now says the cast is not needed only where the value goes straight to a destination of the
+cast's type: a variable or property with that declared type, a simple assignment, or the return of a
+method of that type. Elsewhere it says to put the value in a variable of that type in place of the
+cast. A cast from dynamic no longer says it is not needed at all: the cast runs an explicit
+conversion when the code runs and the code without it an implicit one, so a long in a dynamic
+converts to int with the cast and throws without it. The rule still reports every cast.
+
+Changed: MC0002 now also reports a foreach, and a range variable of a query, with a type that each
+element converts to explicitly: foreach (string text in objects) over an IEnumerable<object>,
+foreach (int number in longs) over an IEnumerable<long>, and from string text in objects, which
+calls Cast<string>(). The compiler makes those conversions with no cast in the source, and they fail
+or lose data as a cast does. The report marks the type of the variable. A loop with var, or with a
+type that the elements convert to implicitly, gives no report. Because the rule now reports more, a
+build with -warnaserror can fail where it passed with 0.1.2.
 
 New: code fixes for MC0001 and MC0003, in a second assembly, MorseCode.Analyzers.CodeFixes, beside
 the analyzer under analyzers/dotnet/cs. An editor loads it, and the compiler does not, because a
@@ -16,11 +76,19 @@ an effect, or one has and each other argument is a constant, the title of the fi
 puts the arguments in order. In each other case, the title says that it changes the order in which
 they run, and the fix has a different equivalence key, so a fix of all reports with the first key
 never moves an effect. The fix is not offered when one argument declares a variable that a
-different argument names. For MC0003, the fix writes in before the type, or after scoped. It first
+different argument names. For MC0003, the fix writes in before the type, or scoped in on a parameter of a ref struct. It first
 compiles each part of the type with the change, and is offered only when that adds no error, so it
 is not offered for a parameter that a member captures, that a lambda uses, or that code writes. It
 does not change a ref, out, or ref readonly parameter. Each fix has a fix of all reports for a
 document, a project, and a solution.
+
+In the MC0001 fix, each argument takes its comments with it while each position keeps its line. The
+fix is not offered where a directive such as #if is between the arguments, or where a comment to the
+end of a line would come to rest before a closing parenthesis on its line. For its title, an
+explicit cast that can throw, such as an unbox, counts as an effect. So does a delegate from a
+method of an instance that can be null, also when it is written with new or a cast, because it
+throws ArgumentException where a field read would throw NullReferenceException. A delegate from a
+static method, from this, or from a value does not count, also as a method group.
 
 0.1.2
 

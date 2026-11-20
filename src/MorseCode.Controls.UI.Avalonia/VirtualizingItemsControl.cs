@@ -7,6 +7,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.Presenters;
 using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Templates;
+using Avalonia.Data;
 using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Threading;
@@ -45,7 +46,7 @@ namespace MorseCode.Controls.UI.Avalonia;
 ///     </para>
 ///     <para>
 ///         To scroll, the view model makes a request in the source. The control scrolls there when
-///         it can, and then reports the position back. Thus, a request made before the control is
+///         it can, and then reports the request back. Thus, a request made before the control is
 ///         bound or laid out is not lost.
 ///     </para>
 ///     <para>
@@ -112,6 +113,12 @@ public class VirtualizingItemsControl : ItemsControl
     private static readonly FuncTemplate<Panel?> DefaultPanel =
         new(func: static () => new VirtualizingStackPanel());
 
+    // The placeholder when the app gives no template: an empty line of text. A placeholder must have a
+    // height, else the panel makes a container for each position. A line of text has the height of the
+    // font of the theme. Without this template, Avalonia shows the name of the placeholder type.
+    private static readonly FuncDataTemplate<RowPlaceholder> DefaultPlaceholderTemplate =
+        new(build: static (_, _) => new TextBlock(), supportsRecycling: true);
+
     private readonly VirtualItemList items = new();
 
     // Gives the number of positions on each side, from the number of positions that show.
@@ -139,6 +146,11 @@ public class VirtualizingItemsControl : ItemsControl
 
     // The source that the control reads and reports to.
     private IVirtualItemsSource? source;
+
+    // The template for DisplayMemberBinding, and the binding that it shows. The template is the same object
+    // until the binding changes, so that the row views that it built stay usable.
+    private IRecyclingDataTemplate? displayMemberTemplate;
+    private BindingBase? displayMemberTemplateBinding;
 
     // The handlers on the values of the source. They are set only while the control follows the source,
     // which is while it is in a visual tree. A handler is a reference from the source to the control, and
@@ -188,7 +200,7 @@ public class VirtualizingItemsControl : ItemsControl
     /// <remarks>
     ///     <para>
     ///         The control reads the rows, with their count, and the scroll request from the source, and
-    ///         reports the range that shows and the position that it scrolled to. Make the source with
+    ///         reports the range that shows and the request that it scrolled for. Make the source with
     ///         <c>CreateVirtualItemsSource</c>. A change of this property detaches the control from the
     ///         old source and attaches it to the new one.
     ///     </para>
@@ -246,8 +258,14 @@ public class VirtualizingItemsControl : ItemsControl
     ///     not cover.
     /// </summary>
     /// <remarks>
-    ///     The data context of the template is the control's own placeholder, which has
-    ///     no data. Give the template the height of a row.
+    ///     <para>
+    ///         The data context of the template is the control's own placeholder, which
+    ///         has no data. Give the template the height of a row.
+    ///     </para>
+    ///     <para>
+    ///         With no template, a placeholder is an empty line of text. A change of
+    ///         this property gives the new template to each placeholder on the screen.
+    ///     </para>
     /// </remarks>
     public IDataTemplate? PlaceholderTemplate
     {
@@ -274,18 +292,22 @@ public class VirtualizingItemsControl : ItemsControl
     // The row views that the control keeps now. A test reads them.
     internal IReadOnlyCollection<Control> KeptRowViews => this.rowViews;
 
+    private IDataTemplate EffectivePlaceholderTemplate => this.PlaceholderTemplate ?? DefaultPlaceholderTemplate;
+
     // The template for a row in the presenter. It is the row template, or the template of the control
     // for the presenter, which gives the row template a view to use again. Only a row template that
     // uses its view again can use such a view. A template that does not says that each row needs a
     // view of its own.
     private IDataTemplate? RowTemplateFor(ContentPresenter presenter)
     {
-        if (!this.RecyclesRowViews || this.ItemTemplate is not IRecyclingDataTemplate rowTemplate)
+        IDataTemplate? itemTemplate = this.EffectiveItemTemplate;
+
+        if (!this.RecyclesRowViews || itemTemplate is not IRecyclingDataTemplate rowTemplate)
         {
             this.rowViews.Clear();
             this.rowViewTemplate = null;
 
-            return this.ItemTemplate;
+            return itemTemplate;
         }
 
         // A kept view came from the row template of that time. A different row template cannot use it.
@@ -297,6 +319,41 @@ public class VirtualizingItemsControl : ItemsControl
         }
 
         return this.rowViewTemplate.For(presenter: presenter);
+    }
+
+    // The template that shows a row: ItemTemplate, or a template for DisplayMemberBinding. The base makes
+    // its own template for the binding, but it sets that template only when it prepares a container. The
+    // control changes the template of a container when a placeholder and a row change places, and the
+    // template of the base is private. Thus, the control makes a template that does the same: a TextBlock
+    // whose text the binding gives. The binding is the only state of the view. Thus, the template can use
+    // a view again, and the control can keep its views.
+    private IDataTemplate? EffectiveItemTemplate
+    {
+        get
+        {
+            if (this.ItemTemplate is { } itemTemplate)
+            {
+                return itemTemplate;
+            }
+
+            if (this.DisplayMemberBinding is not { } binding)
+            {
+                return null;
+            }
+
+            if (this.displayMemberTemplate is null
+                || !ReferenceEquals(objA: this.displayMemberTemplateBinding, objB: binding))
+            {
+                this.displayMemberTemplateBinding = binding;
+
+                this.displayMemberTemplate =
+                    new FuncDataTemplate<object?>(
+                        build: (_, _) => new TextBlock { [!TextBlock.TextProperty] = binding },
+                        supportsRecycling: true);
+            }
+
+            return this.displayMemberTemplate;
+        }
     }
 
     /// <inheritdoc />
@@ -332,7 +389,7 @@ public class VirtualizingItemsControl : ItemsControl
         {
             this.AttachSource(newSource: change.GetNewValue<IVirtualItemsSource?>());
         }
-        else if (change.Property == RecyclesRowViewsProperty)
+        else if (change.Property == RecyclesRowViewsProperty || change.Property == PlaceholderTemplateProperty)
         {
             // Each container gets its template again, as it does for a new row template.
             this.RefreshContainers();
@@ -407,11 +464,11 @@ public class VirtualizingItemsControl : ItemsControl
         {
             case ContentPresenter presenter:
                 presenter.ContentTemplate =
-                    isPlaceholder ? this.PlaceholderTemplate : this.RowTemplateFor(presenter: presenter);
+                    isPlaceholder ? this.EffectivePlaceholderTemplate : this.RowTemplateFor(presenter: presenter);
 
                 break;
             case ContentControl control:
-                control.ContentTemplate = isPlaceholder ? this.PlaceholderTemplate : this.ItemTemplate;
+                control.ContentTemplate = isPlaceholder ? this.EffectivePlaceholderTemplate : this.EffectiveItemTemplate;
 
                 break;
         }
@@ -514,13 +571,15 @@ public class VirtualizingItemsControl : ItemsControl
         // which the row template never gets a placeholder.
         if (itemChange.After is RowPlaceholder)
         {
-            container.SetValue(property: contentTemplate, value: this.PlaceholderTemplate);
+            container.SetValue(property: contentTemplate, value: this.EffectivePlaceholderTemplate);
             container.SetCurrentValue(property: content, value: itemChange.After);
         }
         else
         {
             IDataTemplate? rowTemplate =
-                container is ContentPresenter presenter ? this.RowTemplateFor(presenter: presenter) : this.ItemTemplate;
+                container is ContentPresenter presenter
+                    ? this.RowTemplateFor(presenter: presenter)
+                    : this.EffectiveItemTemplate;
 
             container.SetCurrentValue(property: content, value: itemChange.After);
             container.SetValue(property: contentTemplate, value: rowTemplate);

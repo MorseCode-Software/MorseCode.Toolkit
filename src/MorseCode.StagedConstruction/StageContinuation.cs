@@ -26,9 +26,10 @@ namespace MorseCode.StagedConstruction;
 /// <returns>
 ///     The <see cref="Constructed{TResult}" /> that the subclass gets from
 ///     <paramref name="next" />. <c>Construct</c> makes it after the last stage.
-///     <c>Advance</c> on a stage gives it back without a change. Only
-///     <c>Construct</c> makes one, thus the compiler checks that the callback
-///     calls it.
+///     <c>Advance</c> on a stage gives it back without a change. The compiler
+///     checks only the type, and not that the value came from
+///     <paramref name="next" />. The analyzer of this package reports a callback
+///     that returns null or the result of a different handle.
 /// </returns>
 [PublicAPI]
 public delegate Constructed<TResult> StageContinuation<in TOutput, in TNext, TResult>(TOutput output, TNext next);

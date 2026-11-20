@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
@@ -7,6 +8,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Presenters;
 using Avalonia.Controls.Templates;
+using Avalonia.Data;
 using Avalonia.Threading;
 using MorseCode.Controls.ViewModels;
 using TUnit.Assertions;
@@ -407,6 +409,132 @@ public sealed class VirtualizingItemsControlRowViewTests
 
                 await Assert.That(ShowsItsRows(shown: shown)).IsTrue();
             });
+
+    // With no ItemTemplate, DisplayMemberBinding gives the text of each row. Before, the control set the
+    // template of each presenter to the ItemTemplate, which is null. That replaced the template of the
+    // base, and each row showed the ToString of its object.
+    [Test]
+    public Task DisplayMemberBindingShowsTheMemberOfEachRowAcrossAScroll() =>
+        TestApplication.Run(
+            test: static async () =>
+            {
+                VirtualModel model = new(total: 1000);
+                using ShownVirtual shown = new(model: model, buffer: RowsOnTheScreen);
+
+                ShowTheMember(shown: shown, path: nameof(VirtualRow.Text));
+
+                bool isCorrect = ShowsItsRows(shown: shown);
+
+                foreach (int rows in new[] { 3, 7, -2, 9, -9, 40, -35 })
+                {
+                    ScrollBy(shown: shown, rows: rows);
+                    isCorrect &= ShowsItsRows(shown: shown);
+                }
+
+                await Assert.That(isCorrect).IsTrue();
+            });
+
+    // The control sets the template of a container when a placeholder and a row change places. Thus, the
+    // template of the base, which it sets only when it prepares a container, is gone after a placeholder.
+    // The rows that come at the placeholders also use the kept views.
+    [Test]
+    public Task DisplayMemberBindingShowsTheMemberOfARowThatArrivesAtAPlaceholder() =>
+        TestApplication.Run(
+            test: static async () =>
+            {
+                GivenRowsModel model = new();
+                model.Give(value: Given(first: 0, count: RowsOnTheScreen));
+                using ShownVirtual shown = new(model: model, buffer: 0);
+
+                ShowTheMember(shown: shown, path: nameof(VirtualRow.Text));
+
+                await Assert.That(Texts(shown: shown).Take(count: RowsOnTheScreen))
+                    .IsEquivalentTo(expected: Rows(first: 0, count: RowsOnTheScreen), ordering: CollectionOrdering.Matching);
+
+                model.Give(value: VirtualRows.Empty with { TotalCount = 1000 });
+                shown.Settle();
+
+                List<Control> kept = [.. shown.List.KeptRowViews];
+
+                await Assert.That(kept.Count).IsGreaterThanOrEqualTo(minimum: RowsOnTheScreen);
+
+                model.Give(value: Given(first: 100, count: RowsOnTheScreen));
+                shown.Settle();
+
+                await Assert.That(Texts(shown: shown).Take(count: RowsOnTheScreen))
+                    .IsEquivalentTo(
+                        expected: Rows(first: 100, count: RowsOnTheScreen),
+                        ordering: CollectionOrdering.Matching);
+
+                HashSet<Control> keptBefore = new(collection: kept, comparer: ReferenceEqualityComparer.Instance);
+
+                await Assert.That(
+                        Views(shown: shown)
+                            .Take(count: RowsOnTheScreen)
+                            .All(predicate: view => view is not null && keptBefore.Contains(item: view)))
+                    .IsTrue();
+            });
+
+    // A new DisplayMemberBinding gives each row the new member, also in a view that the control kept.
+    [Test]
+    public Task ANewDisplayMemberBindingShowsTheNewMember() =>
+        TestApplication.Run(
+            test: static async () =>
+            {
+                VirtualModel model = new(total: 1000);
+                using ShownVirtual shown = new(model: model, buffer: RowsOnTheScreen);
+
+                ShowTheMember(shown: shown, path: nameof(VirtualRow.Text));
+
+                shown.List.DisplayMemberBinding = new Binding(path: nameof(VirtualRow.Position));
+                shown.Settle();
+
+                bool isCorrect = ShowsItsPositions(shown: shown);
+
+                ScrollBy(shown: shown, rows: 40);
+                isCorrect &= ShowsItsPositions(shown: shown);
+
+                await Assert.That(isCorrect).IsTrue();
+            });
+
+    // With no ItemTemplate and no DisplayMemberBinding, the control gives a row no template. Thus, the
+    // presenter uses the template of Avalonia for an object, which shows the ToString of the row.
+    [Test]
+    public Task WithNoTemplateAndNoBindingEachRowShowsTheTextOfItsObject() =>
+        TestApplication.Run(
+            test: static async () =>
+            {
+                VirtualModel model = new(total: 1000);
+                using ShownVirtual shown = new(model: model, buffer: RowsOnTheScreen);
+
+                shown.List.ItemTemplate = null;
+                shown.Settle();
+
+                await Assert.That(shown.Shown().Count).IsGreaterThanOrEqualTo(minimum: RowsOnTheScreen);
+
+                bool isCorrect = ShowsTheTextOfItsObjects(shown: shown);
+
+                ScrollBy(shown: shown, rows: 40);
+                isCorrect &= ShowsTheTextOfItsObjects(shown: shown);
+
+                await Assert.That(isCorrect).IsTrue();
+            });
+
+    private static void ShowTheMember(ShownVirtual shown, string path)
+    {
+        // The base does not accept DisplayMemberBinding while there is an ItemTemplate.
+        shown.List.ItemTemplate = null;
+        shown.List.DisplayMemberBinding = new Binding(path: path);
+        shown.Settle();
+    }
+
+    // True when each container shows the ToString of the row of its position.
+    private static bool ShowsTheTextOfItsObjects(ShownVirtual shown) =>
+        shown.Shown().All(predicate: static pair => pair.Text == new VirtualRow(Position: pair.Position).ToString());
+
+    // True when each container shows the number of its position.
+    private static bool ShowsItsPositions(ShownVirtual shown) =>
+        shown.Shown().All(predicate: static pair => pair.Text == pair.Position.ToString(provider: CultureInfo.InvariantCulture));
 
     private static void ScrollBy(ShownVirtual shown, int rows)
     {
