@@ -49,7 +49,10 @@ Every cast expression, whatever the conversion is:
   `foreach (int number in longs)` over an `IEnumerable<long>`, and `from string text in objects`,
   which calls `Cast<string>()`. The message says to use a sequence of that type or filter it with
   `OfType`, or, for a number, to keep the elements in a type of the right size. A loop with `var`,
-  or with a type that the elements convert to implicitly, isn't reported.
+  or with a type that the elements convert to implicitly, isn't reported. A query over a type that
+  implements more than one `IEnumerable<T>` has no single element type. `Cast` reads it through the
+  non-generic `IEnumerable`, so each element converts from `object`: `from byte number in both` is
+  reported, and `from object value in both` isn't.
 
 The warning marks the type in parentheses, such as `(int)`, and not the value after it. A cast on
 a long expression doesn't underline the expression. For a `foreach` or a query, it marks the type
