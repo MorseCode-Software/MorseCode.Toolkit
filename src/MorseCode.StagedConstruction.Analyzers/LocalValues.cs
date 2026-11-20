@@ -237,15 +237,11 @@ internal sealed class LocalValues
                 : Find(graph: inner, function: function, span: span, cancellationToken: cancellationToken);
         }
 
-        IMethodSymbol? local =
-            graph.LocalFunctions.FirstOrDefault(
+        // The function is in the graph. Thus, when no lambda holds its span, a local function does.
+        IMethodSymbol local =
+            graph.LocalFunctions.First(
                 predicate: candidate =>
                     candidate.DeclaringSyntaxReferences.FirstOrDefault()?.Span.Contains(span: span) == true);
-
-        if (local is null)
-        {
-            return null;
-        }
 
         ControlFlowGraph body =
             graph.GetLocalFunctionControlFlowGraph(localFunction: local, cancellationToken: cancellationToken);
@@ -294,15 +290,12 @@ internal sealed class LocalValues
         return graph;
     }
 
-    private void Follow(FunctionGraph graph, IOperation? value, Search search)
+    private void Follow(FunctionGraph graph, IOperation value, Search search)
     {
         search.CancellationToken.ThrowIfCancellationRequested();
 
         switch (OperationTree.Unwrap(operation: value))
         {
-            case null:
-                return;
-
             // A conditional, a null coalescing, and a switch expression put each of their values in one
             // capture.
             case IFlowCaptureReferenceOperation capture:
@@ -343,7 +336,7 @@ internal sealed class LocalValues
                 }
 
                 return;
-            case var leaf:
+            case { } leaf:
                 OperationKind kind =
                     leaf.Kind == OperationKind.FlowAnonymousFunction ? OperationKind.AnonymousFunction : leaf.Kind;
 
@@ -474,10 +467,7 @@ internal sealed class LocalValues
             IOperation read,
             CancellationToken cancellationToken)
         {
-            if (!this.places.TryGetValue(key: read, value: out (int Block, int Position) place))
-            {
-                return [];
-            }
+            (int Block, int Position) place = this.places[key: read];
 
             Definition? last =
                 this.Definitions(local: local)
@@ -499,7 +489,8 @@ internal sealed class LocalValues
 
         // The try region that a catch, a filter, or a finally region follows, if the block starts one. An
         // exception can occur at each operation in the try region, thus each write in it can get to the
-        // handler. A handler after a filter also gets the writes of the filter.
+        // handler. A catch after a filter runs only when the filter gives true. Thus, it gets its writes
+        // from the branch out of the filter, and the filter gets the writes of the try region.
         private static IEnumerable<ControlFlowRegion> Protected(BasicBlock block)
         {
             for (ControlFlowRegion? region = block.EnclosingRegion;
@@ -519,7 +510,7 @@ internal sealed class LocalValues
                 {
                     if (region.Kind == ControlFlowRegionKind.Catch)
                     {
-                        yield return owner.NestedRegions[0];
+                        continue;
                     }
 
                     owner = owner.EnclosingRegion;
@@ -568,12 +559,11 @@ internal sealed class LocalValues
         }
 
         // Each write whose value the analyzer cannot know. A deconstruction writes each variable in its
-        // target.
+        // target. The graph makes a ??= into a test for null and a simple assignment.
         private static IEnumerable<ILocalSymbol> UnknownWrites(IOperation operation) =>
             operation switch
             {
                 ICompoundAssignmentOperation { Target: ILocalReferenceOperation target } => [target.Local],
-                ICoalesceAssignmentOperation { Target: ILocalReferenceOperation target } => [target.Local],
                 IIncrementOrDecrementOperation { Target: ILocalReferenceOperation target } => [target.Local],
                 IArgumentOperation { Parameter.RefKind: RefKind.Ref or RefKind.Out } argument =>
                     argument.Value switch
