@@ -491,11 +491,11 @@ internal sealed class ExplicitCastAnalyzerTests
                 ordering: CollectionOrdering.Matching);
     }
 
-    // A type with two IEnumerable<T> has no one type of element. Thus, the analyzer cannot classify the
-    // conversion of a range variable over it, and it gives no report. The query over objects shows that the
-    // analyzer ran.
+    // A type with two IEnumerable<T> has no one type of element. Cast reads each element through the
+    // IEnumerable that is not generic, thus it converts from object. The analyzer reports a range variable of a
+    // value type, which unboxes each element. A range variable of type object gives no report.
     [Test]
-    public async Task AQueryOverATypeWithTwoTypesOfElementGivesNoReport()
+    public async Task AQueryOverATypeWithTwoTypesOfElementConvertsFromObject()
     {
         IReadOnlyList<Diagnostic> found =
             await AnalyzerHarness.Analyze(
@@ -516,17 +516,24 @@ internal sealed class ExplicitCastAnalyzerTests
 
                             public static class Queries
                             {
-                                public static void Run(Both both, IEnumerable<object> objects)
+                                public static void Run(Both both)
                                 {
                                     _ = from byte number in both select number;
-                                    _ = from string text in objects select text;
+                                    _ = from int number in both select number;
+                                    _ = from object value in both select value;
                                 }
                             }
                             """)
                 .ConfigureAwait(continueOnCapturedContext: false);
 
-        await Assert.That(found.Select(selector: static diagnostic => Covered(diagnostic: diagnostic)))
-            .IsEquivalentTo(expected: ["string"], ordering: CollectionOrdering.Matching);
+        await Assert.That(found.Select(selector: static diagnostic => diagnostic.GetMessage()))
+            .IsEquivalentTo(
+                expected:
+                [
+                    "Avoid the explicit cast to byte: the query casts each element with Cast; use a sequence of that type, or filter it with OfType",
+                    "Avoid the explicit cast to int: the query casts each element with Cast; use a sequence of that type, or filter it with OfType"
+                ],
+                ordering: CollectionOrdering.Matching);
     }
 
     // An editor analyzes code before it compiles. A cast, a foreach, or a range variable whose type has an
