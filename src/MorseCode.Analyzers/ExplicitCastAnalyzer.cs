@@ -175,8 +175,8 @@ public sealed class ExplicitCastAnalyzer : DiagnosticAnalyzer
         }
     }
 
-    // The type of each element of a sequence: T for an IEnumerable<T>, and object for an IEnumerable that is not
-    // generic. Null when the type has more than one IEnumerable<T>, because then the element is not known.
+    // The type of each element of a sequence: T for one IEnumerable<T>, and object for each other sequence. With
+    // more than one IEnumerable<T>, Cast reads the elements through the IEnumerable that is not generic.
     private static ITypeSymbol? ElementType(ITypeSymbol? sequence, Compilation compilation)
     {
         if (sequence is null or IErrorTypeSymbol)
@@ -198,12 +198,9 @@ public sealed class ExplicitCastAnalyzer : DiagnosticAnalyzer
                 .OfType<INamedTypeSymbol>()
         ];
 
-        return enumerables.Length switch
-        {
-            0 => compilation.GetSpecialType(specialType: SpecialType.System_Object),
-            1 => enumerables[0].TypeArguments[0],
-            _ => null
-        };
+        return enumerables.Length == 1
+            ? enumerables[0].TypeArguments[0]
+            : compilation.GetSpecialType(specialType: SpecialType.System_Object);
     }
 
     private static void ReportEachElement(

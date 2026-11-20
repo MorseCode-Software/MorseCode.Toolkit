@@ -64,8 +64,11 @@ element converts to explicitly: foreach (string text in objects) over an IEnumer
 foreach (int number in longs) over an IEnumerable<long>, and from string text in objects, which
 calls Cast<string>(). The compiler makes those conversions with no cast in the source, and they fail
 or lose data as a cast does. The report marks the type of the variable. A loop with var, or with a
-type that the elements convert to implicitly, gives no report. Because the rule now reports more, a
-build with -warnaserror can fail where it passed with 0.1.2.
+type that the elements convert to implicitly, gives no report. A query over a type with more than
+one IEnumerable<T> converts each element from object, because Cast reads such a sequence through
+the IEnumerable that is not generic, so from byte number in both is reported and
+from object value in both is not. Because the rule now reports more, a build with -warnaserror can
+fail where it passed with 0.1.2.
 
 New: code fixes for MC0001 and MC0003, in a second assembly, MorseCode.Analyzers.CodeFixes, beside
 the analyzer under analyzers/dotnet/cs. An editor loads it, and the compiler does not, because a
