@@ -752,7 +752,8 @@ internal sealed class ContinuationAnalyzerTests
 
     // Two variables that read each other in a loop end the search at a read that it found before. A write in a
     // try block can get to a catch block with a filter and to the code after the try statement. Thus, each
-    // return can give the result of a different handle.
+    // return can give the result of a different handle. A catch after a filter runs only when the filter gives
+    // true. Thus, a write in the filter replaces the earlier value for the catch.
     [Test]
     public async Task ALoopOfTwoVariablesAndACatchWithAFilterAreFollowed()
     {
@@ -789,6 +790,25 @@ internal sealed class ContinuationAnalyzerTests
                                   """)
                 .ConfigureAwait(continueOnCapturedContext: false);
 
+        IReadOnlyList<Diagnostic> filterThatWrites =
+            await AnalyzeBody(
+                    statements: $$"""
+                                  Constructed<Thing> made = {{Samples.Foreign}};
+
+                                  try
+                                  {
+                                      Use.Flag = !Use.Flag;
+                                  }
+                                  catch (InvalidOperationException)
+                                      when ((made = construct.Construct({{Samples.Make}})) is not null)
+                                  {
+                                      return made;
+                                  }
+
+                                  return construct.Construct({{Samples.Make}});
+                                  """)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
         await Assert.That(Ids(found: loop))
             .IsEquivalentTo(expected: ["MC1006", "MC1004"], ordering: CollectionOrdering.Matching);
 
@@ -797,6 +817,8 @@ internal sealed class ContinuationAnalyzerTests
 
         await Assert.That(Ids(found: filter))
             .IsEquivalentTo(expected: ["MC1004", "MC1004"], ordering: CollectionOrdering.Matching);
+
+        await Assert.That(filterThatWrites).IsEmpty();
     }
 
     // A local function has a graph of its own. A read of the handle in it is the handle. A write in it can occur

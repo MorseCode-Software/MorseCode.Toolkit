@@ -489,7 +489,8 @@ internal sealed class LocalValues
 
         // The try region that a catch, a filter, or a finally region follows, if the block starts one. An
         // exception can occur at each operation in the try region, thus each write in it can get to the
-        // handler. A handler after a filter also gets the writes of the filter.
+        // handler. A catch after a filter runs only when the filter gives true. Thus, it gets its writes
+        // from the branch out of the filter, and the filter gets the writes of the try region.
         private static IEnumerable<ControlFlowRegion> Protected(BasicBlock block)
         {
             for (ControlFlowRegion? region = block.EnclosingRegion;
@@ -509,7 +510,7 @@ internal sealed class LocalValues
                 {
                     if (region.Kind == ControlFlowRegionKind.Catch)
                     {
-                        yield return owner.NestedRegions[0];
+                        continue;
                     }
 
                     owner = owner.EnclosingRegion;
