@@ -250,6 +250,7 @@ Each overload takes an optional `Stream<Unit>` of clears. See
 | `Source` | The one object that the control reads from and reports to. |
 | `PlaceholderTemplate` | What a position shows until its row arrives. |
 | `ItemTemplate` | What a row shows, as on any items control. |
+| `DisplayMemberBinding` | With no `ItemTemplate`, the member of each row to show as text, as on any items control. Its rows reuse their views as rows of a XAML `DataTemplate` do. |
 | `RecyclesRowViews` | Whether the control keeps the view of a row that leaves the screen and gives it to the next row, for a row template that reuses its view. `True` by default. See [The row view decides what a scroll costs](#the-row-view-decides-what-a-scroll-costs). |
 
 ### Scroll from the view model
